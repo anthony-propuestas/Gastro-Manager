@@ -1,0 +1,1 @@
+ALTER TABLE employees ADD COLUMN monthly_salary REAL DEFAULT 0;

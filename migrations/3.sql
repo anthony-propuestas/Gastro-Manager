@@ -1,0 +1,2 @@
+ALTER TABLE topics ADD COLUMN due_date DATE;
+ALTER TABLE topics ADD COLUMN due_time TEXT;

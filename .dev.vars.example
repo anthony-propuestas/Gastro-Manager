@@ -1,0 +1,15 @@
+# Copia este archivo como .dev.vars y rellena los valores reales.
+# .dev.vars NUNCA se commitea al repositorio (ya está en .gitignore).
+
+# Google OAuth (obtener en https://console.cloud.google.com)
+GOOGLE_CLIENT_ID=your_google_client_id_here
+GOOGLE_CLIENT_SECRET=your_google_client_secret_here
+
+# JWT Secret — genera con: node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+JWT_SECRET=your_random_64_char_hex_string_here
+
+# Google Gemini AI (obtener en https://aistudio.google.com)
+GEMINI_API_KEY=your_gemini_api_key_here
+
+# Email del primer administrador de la app
+INITIAL_ADMIN_EMAIL=tu_email@gmail.com
