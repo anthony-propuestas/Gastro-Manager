@@ -339,14 +339,7 @@ export default function Dashboard() {
             className="w-full max-w-xs"
             variant="outline"
           >
-            {isInviting || isLoadingInvite ? (
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-            ) : copied ? (
-              <Check className="w-4 h-4 mr-2 text-green-500" />
-            ) : (
-              <Copy className="w-4 h-4 mr-2" />
-            )}
-            {copied ? "¡Link copiado!" : "Copiar link de invitación"}
+            Copiar link de invitación
           </Button>
           {inviteError && <p className="text-sm text-destructive mt-2">{inviteError}</p>}
         </CardContent>
