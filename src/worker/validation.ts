@@ -152,6 +152,15 @@ export const markSalaryPaidSchema = z.object({
     .optional(),
 });
 
+// Negocio validation schemas
+export const createNegocioSchema = z.object({
+  name: z.string().min(1, "Nombre es requerido").max(100, "Nombre muy largo"),
+});
+
+export const updateNegocioSchema = z.object({
+  name: z.string().min(1, "Nombre es requerido").max(100, "Nombre muy largo").optional(),
+});
+
 // Helper to validate and parse with Zod
 export function validateData<T>(schema: z.ZodSchema<T>, data: unknown): {
   success: boolean;

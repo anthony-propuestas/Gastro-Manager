@@ -14,6 +14,8 @@ import Settings from "@/react-app/pages/Settings";
 import Admin from "@/react-app/pages/Admin";
 import Login from "@/react-app/pages/Login";
 import AuthCallback from "@/react-app/pages/AuthCallback";
+import NegocioSetup from "@/react-app/pages/NegocioSetup";
+import InvitePage from "@/react-app/pages/InvitePage";
 
 export default function App() {
   return (
@@ -27,6 +29,17 @@ export default function App() {
           {/* Public routes */}
           <Route path="/login" element={<Login />} />
           <Route path="/auth/callback" element={<AuthCallback />} />
+          <Route path="/invite/:token" element={<InvitePage />} />
+
+          {/* Negocio setup (auth required, no negocio required) */}
+          <Route
+            path="/negocio/setup"
+            element={
+              <ProtectedRoute>
+                <NegocioSetup />
+              </ProtectedRoute>
+            }
+          />
 
           {/* Protected routes */}
               <Route

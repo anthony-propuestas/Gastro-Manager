@@ -1,8 +1,10 @@
 import { useState, useEffect } from "react";
+import { useAuth } from "../context/AuthContext";
+import { apiFetch } from "../lib/api";
 
 export interface JobRole {
   id: number;
-  user_id: string;
+  negocio_id: number;
   name: string;
   created_at: string;
   updated_at: string;
@@ -13,6 +15,7 @@ export interface JobRoleInput {
 }
 
 export function useJobRoles() {
+  const { currentNegocio } = useAuth();
   const [jobRoles, setJobRoles] = useState<JobRole[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -21,7 +24,7 @@ export function useJobRoles() {
     try {
       setIsLoading(true);
       setError(null);
-      const response = await fetch("/api/job-roles");
+      const response = await apiFetch("/api/job-roles", {}, currentNegocio?.id);
       const data = await response.json();
 
       if (!response.ok || !data.success) {
@@ -37,12 +40,11 @@ export function useJobRoles() {
   };
 
   const createJobRole = async (input: JobRoleInput): Promise<JobRole> => {
-    const response = await fetch("/api/job-roles", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(input),
-    });
-
+    const response = await apiFetch(
+      "/api/job-roles",
+      { method: "POST", body: JSON.stringify(input) },
+      currentNegocio?.id
+    );
     const data = await response.json();
 
     if (!response.ok || !data.success) {
@@ -54,10 +56,11 @@ export function useJobRoles() {
   };
 
   const deleteJobRole = async (id: number): Promise<void> => {
-    const response = await fetch(`/api/job-roles/${id}`, {
-      method: "DELETE",
-    });
-
+    const response = await apiFetch(
+      `/api/job-roles/${id}`,
+      { method: "DELETE" },
+      currentNegocio?.id
+    );
     const data = await response.json();
 
     if (!response.ok || !data.success) {
@@ -69,7 +72,7 @@ export function useJobRoles() {
 
   useEffect(() => {
     fetchJobRoles();
-  }, []);
+  }, [currentNegocio?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return {
     jobRoles,

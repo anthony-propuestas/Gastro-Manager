@@ -1,7 +1,10 @@
 import { useState, useEffect, useCallback } from "react";
+import { useAuth } from "../context/AuthContext";
+import { apiFetch } from "../lib/api";
 
 export interface Employee {
   id: number;
+  negocio_id: number;
   user_id: string;
   name: string;
   role: string;
@@ -26,6 +29,7 @@ export interface EmployeeInput {
 }
 
 export function useEmployees() {
+  const { currentNegocio } = useAuth();
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -34,9 +38,9 @@ export function useEmployees() {
     try {
       setIsLoading(true);
       setError(null);
-      const response = await fetch("/api/employees");
+      const response = await apiFetch("/api/employees", {}, currentNegocio?.id);
       const data = await response.json();
-      
+
       if (data.success) {
         setEmployees(data.data || []);
       } else {
@@ -48,7 +52,7 @@ export function useEmployees() {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [currentNegocio?.id]);
 
   useEffect(() => {
     fetchEmployees();
@@ -56,13 +60,13 @@ export function useEmployees() {
 
   const createEmployee = async (input: EmployeeInput): Promise<Employee | null> => {
     try {
-      const response = await fetch("/api/employees", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(input),
-      });
+      const response = await apiFetch(
+        "/api/employees",
+        { method: "POST", body: JSON.stringify(input) },
+        currentNegocio?.id
+      );
       const data = await response.json();
-      
+
       if (data.success) {
         await fetchEmployees();
         return data.data;
@@ -77,13 +81,13 @@ export function useEmployees() {
 
   const updateEmployee = async (id: number, input: Partial<EmployeeInput>): Promise<Employee | null> => {
     try {
-      const response = await fetch(`/api/employees/${id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(input),
-      });
+      const response = await apiFetch(
+        `/api/employees/${id}`,
+        { method: "PUT", body: JSON.stringify(input) },
+        currentNegocio?.id
+      );
       const data = await response.json();
-      
+
       if (data.success) {
         await fetchEmployees();
         return data.data;
@@ -98,11 +102,13 @@ export function useEmployees() {
 
   const deleteEmployee = async (id: number): Promise<boolean> => {
     try {
-      const response = await fetch(`/api/employees/${id}`, {
-        method: "DELETE",
-      });
+      const response = await apiFetch(
+        `/api/employees/${id}`,
+        { method: "DELETE" },
+        currentNegocio?.id
+      );
       const data = await response.json();
-      
+
       if (data.success) {
         await fetchEmployees();
         return true;

@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { useAuth } from "../context/AuthContext";
+import { apiFetch } from "../lib/api";
 
 interface Message {
   role: "user" | "assistant";
@@ -7,6 +9,7 @@ interface Message {
 }
 
 export function useChat() {
+  const { currentNegocio } = useAuth();
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -14,7 +17,6 @@ export function useChat() {
   const sendMessage = async (message: string) => {
     if (!message.trim()) return;
 
-    // Add user message
     const userMessage: Message = {
       role: "user",
       content: message,
@@ -25,13 +27,11 @@ export function useChat() {
     setError(null);
 
     try {
-      const response = await fetch("/api/chat", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ message }),
-      });
+      const response = await apiFetch(
+        "/api/chat",
+        { method: "POST", body: JSON.stringify({ message }) },
+        currentNegocio?.id
+      );
 
       const data = await response.json();
 
@@ -39,7 +39,6 @@ export function useChat() {
         throw new Error(data.error?.message || "Error al enviar mensaje");
       }
 
-      // Add assistant response
       const assistantMessage: Message = {
         role: "assistant",
         content: data.data.reply,

@@ -1,7 +1,10 @@
 import { useState, useEffect, useCallback } from "react";
+import { useAuth } from "../context/AuthContext";
+import { apiFetch } from "../lib/api";
 
 export interface CalendarEvent {
   id: number;
+  negocio_id: number;
   user_id: string;
   title: string;
   description: string | null;
@@ -25,6 +28,7 @@ export interface EventFormData {
 }
 
 export function useEvents(month?: number, year?: number) {
+  const { currentNegocio } = useAuth();
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -37,7 +41,7 @@ export function useEvents(month?: number, year?: number) {
       if (month !== undefined && year !== undefined) {
         url += `?month=${month + 1}&year=${year}`;
       }
-      const response = await fetch(url);
+      const response = await apiFetch(url, {}, currentNegocio?.id);
       const data = await response.json();
 
       if (data.success) {
@@ -45,12 +49,12 @@ export function useEvents(month?: number, year?: number) {
       } else {
         setError(data.error?.message || "Error al cargar eventos");
       }
-    } catch (err) {
+    } catch {
       setError("Error de conexión");
     } finally {
       setIsLoading(false);
     }
-  }, [month, year]);
+  }, [month, year, currentNegocio?.id]);
 
   useEffect(() => {
     fetchEvents();
@@ -58,11 +62,11 @@ export function useEvents(month?: number, year?: number) {
 
   const createEvent = async (eventData: EventFormData): Promise<boolean> => {
     try {
-      const response = await fetch("/api/events", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(eventData),
-      });
+      const response = await apiFetch(
+        "/api/events",
+        { method: "POST", body: JSON.stringify(eventData) },
+        currentNegocio?.id
+      );
       const data = await response.json();
 
       if (data.success) {
@@ -72,7 +76,7 @@ export function useEvents(month?: number, year?: number) {
         setError(data.error?.message || "Error al crear evento");
         return false;
       }
-    } catch (err) {
+    } catch {
       setError("Error de conexión");
       return false;
     }
@@ -80,11 +84,11 @@ export function useEvents(month?: number, year?: number) {
 
   const updateEvent = async (id: number, eventData: Partial<EventFormData>): Promise<boolean> => {
     try {
-      const response = await fetch(`/api/events/${id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(eventData),
-      });
+      const response = await apiFetch(
+        `/api/events/${id}`,
+        { method: "PUT", body: JSON.stringify(eventData) },
+        currentNegocio?.id
+      );
       const data = await response.json();
 
       if (data.success) {
@@ -94,7 +98,7 @@ export function useEvents(month?: number, year?: number) {
         setError(data.error?.message || "Error al actualizar evento");
         return false;
       }
-    } catch (err) {
+    } catch {
       setError("Error de conexión");
       return false;
     }
@@ -102,9 +106,11 @@ export function useEvents(month?: number, year?: number) {
 
   const deleteEvent = async (id: number): Promise<boolean> => {
     try {
-      const response = await fetch(`/api/events/${id}`, {
-        method: "DELETE",
-      });
+      const response = await apiFetch(
+        `/api/events/${id}`,
+        { method: "DELETE" },
+        currentNegocio?.id
+      );
       const data = await response.json();
 
       if (data.success) {
@@ -114,7 +120,7 @@ export function useEvents(month?: number, year?: number) {
         setError(data.error?.message || "Error al eliminar evento");
         return false;
       }
-    } catch (err) {
+    } catch {
       setError("Error de conexión");
       return false;
     }

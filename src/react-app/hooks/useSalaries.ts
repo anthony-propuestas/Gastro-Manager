@@ -1,7 +1,10 @@
 import { useState, useCallback } from "react";
+import { useAuth } from "../context/AuthContext";
+import { apiFetch } from "../lib/api";
 
 export interface Advance {
   id: number;
+  negocio_id: number;
   user_id: string;
   employee_id: number;
   amount: number;
@@ -44,6 +47,7 @@ export interface SalaryOverview {
 }
 
 export function useSalaries() {
+  const { currentNegocio } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -51,14 +55,14 @@ export function useSalaries() {
     try {
       setIsLoading(true);
       setError(null);
-      
+
       const params = new URLSearchParams();
       if (month) params.append("month", month.toString());
       if (year) params.append("year", year.toString());
-      
-      const response = await fetch(`/api/salaries/overview?${params}`);
+
+      const response = await apiFetch(`/api/salaries/overview?${params}`, {}, currentNegocio?.id);
       const data = await response.json();
-      
+
       if (data.success) {
         return data.data;
       } else {
@@ -72,17 +76,21 @@ export function useSalaries() {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [currentNegocio?.id]);
 
   const fetchAdvances = useCallback(async (employeeId: number, month?: number, year?: number): Promise<Advance[]> => {
     try {
       const params = new URLSearchParams();
       if (month) params.append("month", month.toString());
       if (year) params.append("year", year.toString());
-      
-      const response = await fetch(`/api/employees/${employeeId}/advances?${params}`);
+
+      const response = await apiFetch(
+        `/api/employees/${employeeId}/advances?${params}`,
+        {},
+        currentNegocio?.id
+      );
       const data = await response.json();
-      
+
       if (data.success) {
         return data.data || [];
       } else {
@@ -92,17 +100,17 @@ export function useSalaries() {
       console.error("Error fetching advances:", err);
       throw err;
     }
-  }, []);
+  }, [currentNegocio?.id]);
 
   const createAdvance = async (employeeId: number, input: AdvanceInput): Promise<Advance | null> => {
     try {
-      const response = await fetch(`/api/employees/${employeeId}/advances`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(input),
-      });
+      const response = await apiFetch(
+        `/api/employees/${employeeId}/advances`,
+        { method: "POST", body: JSON.stringify(input) },
+        currentNegocio?.id
+      );
       const data = await response.json();
-      
+
       if (data.success) {
         return data.data;
       } else {
@@ -116,11 +124,13 @@ export function useSalaries() {
 
   const deleteAdvance = async (advanceId: number): Promise<boolean> => {
     try {
-      const response = await fetch(`/api/advances/${advanceId}`, {
-        method: "DELETE",
-      });
+      const response = await apiFetch(
+        `/api/advances/${advanceId}`,
+        { method: "DELETE" },
+        currentNegocio?.id
+      );
       const data = await response.json();
-      
+
       if (data.success) {
         return true;
       } else {
@@ -134,17 +144,16 @@ export function useSalaries() {
 
   const markAsPaid = async (employeeId: number, month: number, year: number): Promise<boolean> => {
     try {
-      const response = await fetch("/api/salary-payments/mark-paid", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          employee_id: employeeId,
-          period_month: month,
-          period_year: year,
-        }),
-      });
+      const response = await apiFetch(
+        "/api/salary-payments/mark-paid",
+        {
+          method: "POST",
+          body: JSON.stringify({ employee_id: employeeId, period_month: month, period_year: year }),
+        },
+        currentNegocio?.id
+      );
       const data = await response.json();
-      
+
       if (data.success) {
         return true;
       } else {
@@ -158,16 +167,16 @@ export function useSalaries() {
 
   const markAllAsPaid = async (month: number, year: number): Promise<boolean> => {
     try {
-      const response = await fetch("/api/salary-payments/mark-all-paid", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          period_month: month,
-          period_year: year,
-        }),
-      });
+      const response = await apiFetch(
+        "/api/salary-payments/mark-all-paid",
+        {
+          method: "POST",
+          body: JSON.stringify({ period_month: month, period_year: year }),
+        },
+        currentNegocio?.id
+      );
       const data = await response.json();
-      
+
       if (data.success) {
         return true;
       } else {

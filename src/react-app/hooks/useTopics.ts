@@ -1,4 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
+import { useAuth } from "../context/AuthContext";
+import { apiFetch } from "../lib/api";
 
 export interface Topic {
   id: number;
@@ -26,19 +28,24 @@ export interface Note {
 }
 
 export function useTopics(employeeId: number | null) {
+  const { currentNegocio } = useAuth();
   const [topics, setTopics] = useState<Topic[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const fetchTopics = useCallback(async () => {
     if (!employeeId) return;
-    
+
     try {
       setIsLoading(true);
       setError(null);
-      const response = await fetch(`/api/employees/${employeeId}/topics`);
+      const response = await apiFetch(
+        `/api/employees/${employeeId}/topics`,
+        {},
+        currentNegocio?.id
+      );
       const data = await response.json();
-      
+
       if (data.success) {
         setTopics(data.data || []);
       } else {
@@ -50,7 +57,7 @@ export function useTopics(employeeId: number | null) {
     } finally {
       setIsLoading(false);
     }
-  }, [employeeId]);
+  }, [employeeId, currentNegocio?.id]);
 
   useEffect(() => {
     if (employeeId) {
@@ -62,14 +69,14 @@ export function useTopics(employeeId: number | null) {
 
   const createTopic = async (title: string, due_date?: string, due_time?: string): Promise<Topic | null> => {
     if (!employeeId) return null;
-    
-    const response = await fetch(`/api/employees/${employeeId}/topics`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title, due_date, due_time }),
-    });
+
+    const response = await apiFetch(
+      `/api/employees/${employeeId}/topics`,
+      { method: "POST", body: JSON.stringify({ title, due_date, due_time }) },
+      currentNegocio?.id
+    );
     const data = await response.json();
-    
+
     if (data.success) {
       await fetchTopics();
       return data.data;
@@ -77,14 +84,17 @@ export function useTopics(employeeId: number | null) {
     throw new Error(data.error?.message || "Error al crear tema");
   };
 
-  const updateTopic = async (id: number, updates: { title?: string; is_open?: boolean; due_date?: string | null; due_time?: string | null }): Promise<Topic | null> => {
-    const response = await fetch(`/api/topics/${id}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(updates),
-    });
+  const updateTopic = async (
+    id: number,
+    updates: { title?: string; is_open?: boolean; due_date?: string | null; due_time?: string | null }
+  ): Promise<Topic | null> => {
+    const response = await apiFetch(
+      `/api/topics/${id}`,
+      { method: "PUT", body: JSON.stringify(updates) },
+      currentNegocio?.id
+    );
     const data = await response.json();
-    
+
     if (data.success) {
       await fetchTopics();
       return data.data;
@@ -93,9 +103,13 @@ export function useTopics(employeeId: number | null) {
   };
 
   const deleteTopic = async (id: number): Promise<boolean> => {
-    const response = await fetch(`/api/topics/${id}`, { method: "DELETE" });
+    const response = await apiFetch(
+      `/api/topics/${id}`,
+      { method: "DELETE" },
+      currentNegocio?.id
+    );
     const data = await response.json();
-    
+
     if (data.success) {
       await fetchTopics();
       return true;
@@ -114,19 +128,21 @@ export function useTopics(employeeId: number | null) {
   };
 }
 
-// Hook to get topic deadlines for calendar
 export function useTopicDeadlines(month: number, year: number) {
+  const { currentNegocio } = useAuth();
   const [deadlines, setDeadlines] = useState<TopicWithEmployee[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
   const fetchDeadlines = useCallback(async () => {
     try {
       setIsLoading(true);
-      const response = await fetch(
-        `/api/topics/deadlines?month=${month + 1}&year=${year}`
+      const response = await apiFetch(
+        `/api/topics/deadlines?month=${month + 1}&year=${year}`,
+        {},
+        currentNegocio?.id
       );
       const data = await response.json();
-      
+
       if (data.success) {
         setDeadlines(data.data || []);
       }
@@ -135,16 +151,19 @@ export function useTopicDeadlines(month: number, year: number) {
     } finally {
       setIsLoading(false);
     }
-  }, [month, year]);
+  }, [month, year, currentNegocio?.id]);
 
   useEffect(() => {
     fetchDeadlines();
   }, [fetchDeadlines]);
 
-  const getDeadlinesForDate = useCallback((date: Date) => {
-    const dateStr = date.toISOString().split('T')[0];
-    return deadlines.filter(d => d.due_date === dateStr);
-  }, [deadlines]);
+  const getDeadlinesForDate = useCallback(
+    (date: Date) => {
+      const dateStr = date.toISOString().split("T")[0];
+      return deadlines.filter((d) => d.due_date === dateStr);
+    },
+    [deadlines]
+  );
 
   return {
     deadlines,
@@ -155,19 +174,24 @@ export function useTopicDeadlines(month: number, year: number) {
 }
 
 export function useNotes(topicId: number | null) {
+  const { currentNegocio } = useAuth();
   const [notes, setNotes] = useState<Note[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const fetchNotes = useCallback(async () => {
     if (!topicId) return;
-    
+
     try {
       setIsLoading(true);
       setError(null);
-      const response = await fetch(`/api/topics/${topicId}/notes`);
+      const response = await apiFetch(
+        `/api/topics/${topicId}/notes`,
+        {},
+        currentNegocio?.id
+      );
       const data = await response.json();
-      
+
       if (data.success) {
         setNotes(data.data || []);
       } else {
@@ -179,7 +203,7 @@ export function useNotes(topicId: number | null) {
     } finally {
       setIsLoading(false);
     }
-  }, [topicId]);
+  }, [topicId, currentNegocio?.id]);
 
   useEffect(() => {
     if (topicId) {
@@ -191,14 +215,14 @@ export function useNotes(topicId: number | null) {
 
   const createNote = async (content: string): Promise<Note | null> => {
     if (!topicId) return null;
-    
-    const response = await fetch(`/api/topics/${topicId}/notes`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ content }),
-    });
+
+    const response = await apiFetch(
+      `/api/topics/${topicId}/notes`,
+      { method: "POST", body: JSON.stringify({ content }) },
+      currentNegocio?.id
+    );
     const data = await response.json();
-    
+
     if (data.success) {
       await fetchNotes();
       return data.data;
@@ -207,13 +231,13 @@ export function useNotes(topicId: number | null) {
   };
 
   const updateNote = async (id: number, content: string): Promise<Note | null> => {
-    const response = await fetch(`/api/notes/${id}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ content }),
-    });
+    const response = await apiFetch(
+      `/api/notes/${id}`,
+      { method: "PUT", body: JSON.stringify({ content }) },
+      currentNegocio?.id
+    );
     const data = await response.json();
-    
+
     if (data.success) {
       await fetchNotes();
       return data.data;
@@ -222,9 +246,13 @@ export function useNotes(topicId: number | null) {
   };
 
   const deleteNote = async (id: number): Promise<boolean> => {
-    const response = await fetch(`/api/notes/${id}`, { method: "DELETE" });
+    const response = await apiFetch(
+      `/api/notes/${id}`,
+      { method: "DELETE" },
+      currentNegocio?.id
+    );
     const data = await response.json();
-    
+
     if (data.success) {
       await fetchNotes();
       return true;

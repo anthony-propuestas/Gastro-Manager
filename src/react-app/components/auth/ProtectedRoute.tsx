@@ -1,5 +1,5 @@
 import { ReactNode } from "react";
-import { Navigate } from "react-router";
+import { Navigate, useLocation } from "react-router";
 import { useAuth } from "@/react-app/context/AuthContext";
 import { Loader2, ChefHat } from "lucide-react";
 
@@ -8,7 +8,8 @@ interface ProtectedRouteProps {
 }
 
 export default function ProtectedRoute({ children }: ProtectedRouteProps) {
-  const { user, isPending } = useAuth();
+  const { user, isPending, currentNegocio } = useAuth();
+  const location = useLocation();
 
   if (isPending) {
     return (
@@ -24,6 +25,15 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
 
   if (!user) {
     return <Navigate to="/login" replace />;
+  }
+
+  // User is authenticated but has no active negocio — send to setup
+  // (Allow /negocio/setup and /invite/* to pass through without this check)
+  const isSetupRoute = location.pathname === "/negocio/setup";
+  const isInviteRoute = location.pathname.startsWith("/invite/");
+
+  if (!currentNegocio && !isSetupRoute && !isInviteRoute) {
+    return <Navigate to="/negocio/setup" replace />;
   }
 
   return <>{children}</>;

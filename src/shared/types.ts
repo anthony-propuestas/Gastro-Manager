@@ -1,15 +1,33 @@
-import z from "zod";
-
 /**
  * Types shared between the client and server go here.
- *
- * For example, we can add zod schemas for API input validation, and derive types from them:
- *
- * export const TodoSchema = z.object({
- *   id: z.number(),
- *   name: z.string(),
- *   completed: z.number().int(), // 0 or 1
- * })
- *
- * export type TodoType = z.infer<typeof TodoSchema>;
  */
+
+export type Negocio = {
+  id: number;
+  name: string;
+  created_by: string;
+  member_count?: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type NegocioMember = {
+  user_id: string;
+  user_email: string;
+  user_name: string;
+  invited_by: string;
+  joined_at: string;
+};
+
+export type Invitation = {
+  token: string;
+  expires_at: string;
+  invite_url: string;
+};
+
+export type InvitationPreview = {
+  negocio_name: string;
+  invited_by_name: string;
+  expires_at: string;
+};
+
