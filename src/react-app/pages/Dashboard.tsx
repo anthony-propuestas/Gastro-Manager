@@ -1,9 +1,12 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
-import { Users, Calendar, DollarSign, AlertCircle } from "lucide-react";
+import { Users, Calendar, DollarSign, AlertCircle, Copy, Loader2, Check } from "lucide-react";
 import { Card, CardContent } from "@/react-app/components/ui/card";
+import { Button } from "@/react-app/components/ui/button";
 import { useEmployees } from "@/react-app/hooks/useEmployees";
 import { useSalaries } from "@/react-app/hooks/useSalaries";
+import { useNegocios } from "@/react-app/hooks/useNegocios";
+import { useAuth } from "@/react-app/context/AuthContext";
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -109,6 +112,32 @@ export default function Dashboard() {
       onClick: () => navigate("/sueldos"),
     },
   ];
+
+  // Sección de invitación
+  const { currentNegocio } = useAuth();
+  const { generateInvitation, isLoading: isLoadingInvite } = useNegocios();
+  const [copied, setCopied] = useState(false);
+  const [inviteError, setInviteError] = useState<string | null>(null);
+  const [isInviting, setIsInviting] = useState(false);
+
+  const handleCopyInvite = async () => {
+    setIsInviting(true);
+    setInviteError(null);
+    if (!currentNegocio) {
+      setInviteError("No hay negocio seleccionado.");
+      setIsInviting(false);
+      return;
+    }
+    const inv = await generateInvitation(currentNegocio.id);
+    if (inv && inv.invite_url) {
+      await navigator.clipboard.writeText(inv.invite_url);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } else {
+      setInviteError("No se pudo generar el link de invitación.");
+    }
+    setIsInviting(false);
+  };
 
   return (
     <div className="space-y-8">
@@ -296,6 +325,30 @@ export default function Dashboard() {
               Configuración
             </button>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Sección de invitación al final del dashboard */}
+      <Card className="border-0 shadow-sm mt-8">
+        <CardContent className="p-6 flex flex-col items-center">
+          <h2 className="text-lg font-serif font-semibold mb-2">Invitar a un miembro</h2>
+          <p className="text-muted-foreground mb-4 text-center">Genera y copia un link para invitar a alguien a tu negocio.</p>
+          <Button
+            onClick={handleCopyInvite}
+            disabled={isInviting || isLoadingInvite || !currentNegocio}
+            className="w-full max-w-xs"
+            variant="outline"
+          >
+            {isInviting || isLoadingInvite ? (
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            ) : copied ? (
+              <Check className="w-4 h-4 mr-2 text-green-500" />
+            ) : (
+              <Copy className="w-4 h-4 mr-2" />
+            )}
+            {copied ? "¡Link copiado!" : "Copiar link de invitación"}
+          </Button>
+          {inviteError && <p className="text-sm text-destructive mt-2">{inviteError}</p>}
         </CardContent>
       </Card>
     </div>
