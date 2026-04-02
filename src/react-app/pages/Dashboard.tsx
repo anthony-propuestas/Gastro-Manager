@@ -116,27 +116,33 @@ export default function Dashboard() {
   // Sección de invitación
   const { currentNegocio } = useAuth();
   const { generateInvitation, isLoading: isLoadingInvite } = useNegocios();
-  const [copied, setCopied] = useState(false);
+  const [inviteVisible, setInviteVisible] = useState(true);
   const [inviteError, setInviteError] = useState<string | null>(null);
   const [isInviting, setIsInviting] = useState(false);
 
   const handleCopyInvite = async () => {
     setIsInviting(true);
     setInviteError(null);
-    if (!currentNegocio) {
-      setInviteError("No hay negocio seleccionado.");
+    try {
+      if (!currentNegocio) {
+        setInviteError("No hay negocio seleccionado.");
+        setInviteVisible(false);
+        return;
+      }
+      const inv = await generateInvitation(currentNegocio.id);
+      if (inv && inv.invite_url) {
+        await navigator.clipboard.writeText(inv.invite_url);
+        setInviteVisible(false); // Oculta la sección tras copiar
+      } else {
+        setInviteError("No se pudo generar el link de invitación.");
+        setInviteVisible(false);
+      }
+    } catch (err) {
+      setInviteError("Error inesperado al copiar el link.");
+      setInviteVisible(false);
+    } finally {
       setIsInviting(false);
-      return;
     }
-    const inv = await generateInvitation(currentNegocio.id);
-    if (inv && inv.invite_url) {
-      await navigator.clipboard.writeText(inv.invite_url);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } else {
-      setInviteError("No se pudo generar el link de invitación.");
-    }
-    setIsInviting(false);
   };
 
   return (
@@ -329,21 +335,23 @@ export default function Dashboard() {
       </Card>
 
       {/* Sección de invitación al final del dashboard */}
-      <Card className="border-0 shadow-sm mt-8">
-        <CardContent className="p-6 flex flex-col items-center">
-          <h2 className="text-lg font-serif font-semibold mb-2">Invitar a un miembro</h2>
-          <p className="text-muted-foreground mb-4 text-center">Genera y copia un link para invitar a alguien a tu negocio.</p>
-          <Button
-            onClick={handleCopyInvite}
-            disabled={isInviting || isLoadingInvite || !currentNegocio}
-            className="w-full max-w-xs"
-            variant="outline"
-          >
-            Copiar link de invitación
-          </Button>
-          {inviteError && <p className="text-sm text-destructive mt-2">{inviteError}</p>}
-        </CardContent>
-      </Card>
+      {inviteVisible && (
+        <Card className="border-0 shadow-sm mt-8">
+          <CardContent className="p-6 flex flex-col items-center">
+            <h2 className="text-lg font-serif font-semibold mb-2">Invitar a un miembro</h2>
+            <p className="text-muted-foreground mb-4 text-center">Genera y copia un link para invitar a alguien a tu negocio.</p>
+            <Button
+              onClick={handleCopyInvite}
+              disabled={isInviting || isLoadingInvite || !currentNegocio}
+              className="w-full max-w-xs"
+              variant="outline"
+            >
+              {isInviting ? "Generando..." : "Copiar link de invitación"}
+            </Button>
+            {inviteError && <p className="text-sm text-destructive mt-2">{inviteError}</p>}
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
