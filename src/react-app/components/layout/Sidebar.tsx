@@ -21,7 +21,6 @@ import {
 import { cn } from "@/react-app/lib/utils";
 import { useState, useEffect } from "react";
 import { useSidebar } from "@/react-app/hooks/useSidebar";
-import NegocioManager from "@/react-app/components/negocios/NegocioManager";
 import type { Negocio } from "@/shared/types";
 
 const navItems = [
@@ -39,7 +38,6 @@ export default function Sidebar() {
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [showNegocioDropdown, setShowNegocioDropdown] = useState(false);
-  const [showManager, setShowManager] = useState(false);
   const { isOpen, isCollapsed, setIsOpen, toggleCollapsed } = useSidebar();
 
   // Check admin status
@@ -253,7 +251,7 @@ export default function Sidebar() {
           {/* Manage team button */}
           {currentNegocio && (
             <button
-              onClick={() => setShowManager(true)}
+              onClick={() => navigate("/configuracion")}
               title={isCollapsed ? "Gestionar equipo" : undefined}
               className={cn(
                 "flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 w-full",
@@ -332,9 +330,6 @@ export default function Sidebar() {
           </div>
         </div>
       </aside>
-
-      {/* NegocioManager modal */}
-      <NegocioManager open={showManager} onClose={() => setShowManager(false)} />
     </>
   );
 }
