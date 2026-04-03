@@ -10,22 +10,11 @@ import { useAuth } from "@/react-app/context/AuthContext";
 import { useNegocios } from "@/react-app/hooks/useNegocios";
 import type { NegocioMember } from "@/shared/types";
 
-type InvitationResponse = {
-  success: boolean;
-  data?: {
-    invite_url: string;
-  };
-  error?: {
-    message?: string;
-  };
-};
-
 export default function Settings() {
   const { user, currentNegocio, setCurrentNegocio, refreshNegocios } = useAuth();
   const { getNegocioDetail, removeMember, leaveNegocio } = useNegocios();
   const [members, setMembers] = useState<NegocioMember[]>([]);
   const [isCreator, setIsCreator] = useState(false);
-  const [invite, setInvite] = useState({ url: "", error: "", loading: false });
   const [teamError, setTeamError] = useState("");
   const [loadingMember, setLoadingMember] = useState<string | null>(null);
   const [leaving, setLeaving] = useState(false);
@@ -50,36 +39,6 @@ export default function Settings() {
 
     loadTeam();
   }, [currentNegocio?.id, getNegocioDetail, user?.id]);
-
-  const handleGenerateInvite = async () => {
-    if (!currentNegocio) {
-      setInvite(prev => ({ ...prev, error: "No hay un negocio seleccionado." }));
-      return;
-    }
-
-    setInvite({ url: "", error: "", loading: true });
-
-    try {
-      const response = await fetch(`/api/negocios/${currentNegocio.id}/invitations`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-      });
-
-      const data = (await response.json()) as InvitationResponse;
-
-      if (!response.ok || !data.success || !data.data?.invite_url) {
-        throw new Error(data.error?.message || "No se pudo generar la invitacion.");
-      }
-
-      setInvite({ url: data.data.invite_url, error: "", loading: false });
-    } catch (error) {
-      setInvite({
-        url: "",
-        error: error instanceof Error ? error.message : "Error inesperado al generar la invitacion.",
-        loading: false,
-      });
-    }
-  };
 
   const handleRemoveMember = async (userId: string) => {
     if (!currentNegocio) return;
@@ -287,9 +246,9 @@ export default function Settings() {
               <UsersRound className="w-5 h-5 text-primary" />
             </div>
             <div>
-              <CardTitle className="text-lg font-serif">Equipo del negocio</CardTitle>
+              <CardTitle className="text-lg font-serif">Managers de negocio</CardTitle>
               <CardDescription>
-                Genera enlaces para invitar miembros y administra el equipo del negocio actual.
+                Administra los managers con acceso al negocio actual.
               </CardDescription>
             </div>
           </div>
@@ -299,38 +258,9 @@ export default function Settings() {
             <p className="text-sm text-muted-foreground">Selecciona un negocio para administrar su equipo.</p>
           ) : (
             <>
-              <div className="space-y-3 rounded-lg bg-muted/40 p-4">
-                <div>
-                  <p className="font-medium">{currentNegocio.name}</p>
-                  <p className="text-sm text-muted-foreground">
-                    Genera un enlace y compartelo manualmente con la persona que quieras invitar.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={handleGenerateInvite}
-                  disabled={invite.loading}
-                  className="inline-flex h-10 items-center justify-center rounded-4xl border border-border bg-input/30 px-4 text-sm font-medium hover:bg-input/50 disabled:opacity-50"
-                >
-                  {invite.loading ? "Generando..." : "Generar link de invitacion"}
-                </button>
-                <div className={invite.url ? "space-y-2" : "hidden"}>
-                  <Label htmlFor="invite-url">Link generado</Label>
-                  <Input id="invite-url" value={invite.url} readOnly />
-                  <p className="text-xs text-muted-foreground">
-                    Copia este enlace manualmente y compartelo con tu equipo.
-                  </p>
-                </div>
-                <p className={invite.error ? "text-sm text-destructive" : "hidden"}>
-                  {invite.error}
-                </p>
-              </div>
-
-              <Separator />
-
               <div className="space-y-3">
                 <div>
-                  <p className="font-medium">Miembros</p>
+                  <p className="font-medium">Miembros actuales</p>
                   <p className="text-sm text-muted-foreground">{members.length} personas con acceso a este negocio.</p>
                 </div>
                 {members.map((member) => {

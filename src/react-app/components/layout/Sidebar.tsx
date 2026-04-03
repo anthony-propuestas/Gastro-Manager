@@ -14,7 +14,6 @@ import {
   Banknote,
   Shield,
   Building2,
-  UsersRound,
   ChevronDown,
   Plus,
 } from "lucide-react";
@@ -248,23 +247,6 @@ export default function Sidebar() {
             </NavLink>
           )}
 
-          {/* Manage team button */}
-          {currentNegocio && (
-            <button
-              onClick={() => navigate("/configuracion")}
-              title={isCollapsed ? "Gestionar equipo" : undefined}
-              className={cn(
-                "flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 w-full",
-                "hover:bg-sidebar-accent text-sidebar-foreground/70",
-                isCollapsed && "lg:justify-center lg:px-3"
-              )}
-            >
-              <UsersRound className="w-5 h-5 flex-shrink-0" />
-              <span className={cn("font-medium transition-opacity duration-200", isCollapsed && "lg:hidden")}>
-                Gestionar equipo
-              </span>
-            </button>
-          )}
         </nav>
 
         {/* Desktop collapse toggle */}
