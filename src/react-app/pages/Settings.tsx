@@ -25,10 +25,8 @@ export default function Settings() {
   const { getNegocioDetail, removeMember, leaveNegocio } = useNegocios();
   const [members, setMembers] = useState<NegocioMember[]>([]);
   const [isCreator, setIsCreator] = useState(false);
-  const [inviteUrl, setInviteUrl] = useState("");
-  const [inviteError, setInviteError] = useState("");
+  const [invite, setInvite] = useState({ url: "", error: "", loading: false });
   const [teamError, setTeamError] = useState("");
-  const [loadingInvite, setLoadingInvite] = useState(false);
   const [loadingMember, setLoadingMember] = useState<string | null>(null);
   const [leaving, setLeaving] = useState(false);
 
@@ -55,12 +53,11 @@ export default function Settings() {
 
   const handleGenerateInvite = async () => {
     if (!currentNegocio) {
-      setInviteError("No hay un negocio seleccionado.");
+      setInvite(prev => ({ ...prev, error: "No hay un negocio seleccionado." }));
       return;
     }
 
-    setLoadingInvite(true);
-    setInviteError("");
+    setInvite({ url: "", error: "", loading: true });
 
     try {
       const response = await fetch(`/api/negocios/${currentNegocio.id}/invitations`, {
@@ -74,12 +71,13 @@ export default function Settings() {
         throw new Error(data.error?.message || "No se pudo generar la invitacion.");
       }
 
-      setInviteUrl(data.data.invite_url);
+      setInvite({ url: data.data.invite_url, error: "", loading: false });
     } catch (error) {
-      setInviteUrl("");
-      setInviteError(error instanceof Error ? error.message : "Error inesperado al generar la invitacion.");
-    } finally {
-      setLoadingInvite(false);
+      setInvite({
+        url: "",
+        error: error instanceof Error ? error.message : "Error inesperado al generar la invitacion.",
+        loading: false,
+      });
     }
   };
 
@@ -311,21 +309,21 @@ export default function Settings() {
                 <button
                   type="button"
                   onClick={handleGenerateInvite}
-                  disabled={loadingInvite}
+                  disabled={invite.loading}
                   className="inline-flex h-10 items-center justify-center rounded-4xl border border-border bg-input/30 px-4 text-sm font-medium hover:bg-input/50 disabled:opacity-50"
                 >
-                  {loadingInvite ? "Generando..." : "Generar link de invitacion"}
+                  {invite.loading ? "Generando..." : "Generar link de invitacion"}
                 </button>
-                {inviteUrl && (
-                  <div className="space-y-2">
-                    <Label htmlFor="invite-url">Link generado</Label>
-                    <Input id="invite-url" value={inviteUrl} readOnly />
-                    <p className="text-xs text-muted-foreground">
-                      Copia este enlace manualmente y compartelo con tu equipo.
-                    </p>
-                  </div>
-                )}
-                {inviteError && <p className="text-sm text-destructive">{inviteError}</p>}
+                <div className={invite.url ? "space-y-2" : "hidden"}>
+                  <Label htmlFor="invite-url">Link generado</Label>
+                  <Input id="invite-url" value={invite.url} readOnly />
+                  <p className="text-xs text-muted-foreground">
+                    Copia este enlace manualmente y compartelo con tu equipo.
+                  </p>
+                </div>
+                <p className={invite.error ? "text-sm text-destructive" : "hidden"}>
+                  {invite.error}
+                </p>
               </div>
 
               <Separator />
