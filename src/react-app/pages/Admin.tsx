@@ -17,6 +17,7 @@ export default function Admin() {
       fetchStats();
       fetchEmails();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAdmin]);
 
   const handleAddEmail = async (e: React.FormEvent) => {

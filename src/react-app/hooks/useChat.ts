@@ -45,8 +45,8 @@ export function useChat() {
         timestamp: new Date(),
       };
       setMessages((prev) => [...prev, assistantMessage]);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Error desconocido");
       console.error("Error sending message:", err);
     } finally {
       setIsLoading(false);

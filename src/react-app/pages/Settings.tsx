@@ -38,7 +38,7 @@ export default function Settings() {
     };
 
     loadTeam();
-  }, [currentNegocio?.id, getNegocioDetail, user?.id]);
+  }, [currentNegocio, getNegocioDetail, user?.id]);
 
   const handleRemoveMember = async (userId: string) => {
     if (!currentNegocio) return;

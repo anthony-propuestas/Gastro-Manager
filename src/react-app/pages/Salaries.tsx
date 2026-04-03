@@ -6,11 +6,27 @@ import { useToast } from "@/react-app/components/ui/toast";
 import AdvanceModal from "@/react-app/components/salaries/AdvanceModal";
 import EmployeeAdvancesModal from "@/react-app/components/salaries/EmployeeAdvancesModal";
 
+type SalaryOverview = {
+  totals?: {
+    total_salaries: number;
+    total_advances: number;
+    total_remaining: number;
+  };
+  employees?: Array<{
+    id: number;
+    name: string;
+    role: string;
+    monthly_salary: number;
+    advances_total: number;
+    remaining: number;
+  }>;
+};
+
 export default function Salaries() {
   const { fetchOverview, markAsPaid, markAllAsPaid } = useSalaries();
   const { showToast } = useToast();
   
-  const [overview, setOverview] = useState<any>(null);
+  const [overview, setOverview] = useState<SalaryOverview | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [currentMonth, setCurrentMonth] = useState(new Date().getMonth() + 1);
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
@@ -27,6 +43,7 @@ export default function Salaries() {
 
   useEffect(() => {
     loadOverview();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentMonth, currentYear]);
 
   const handleMarkPaid = async (employeeId: number) => {

@@ -31,7 +31,7 @@ export default function EmployeeAdvancesModal({
     try {
       const data = await fetchAdvances(employee.id, month, year);
       setAdvances(data);
-    } catch (error) {
+    } catch {
       showToast("Error al cargar adelantos", "error");
     } finally {
       setIsLoading(false);
@@ -42,6 +42,7 @@ export default function EmployeeAdvancesModal({
     if (isOpen) {
       loadAdvances();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, employee.id, month, year]);
 
   const handleDelete = async (advanceId: number) => {

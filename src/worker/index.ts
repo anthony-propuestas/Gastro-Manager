@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { Hono, type MiddlewareHandler } from "hono";
 import { getCookie } from "hono/cookie";
 import { SignJWT, jwtVerify } from "jose";

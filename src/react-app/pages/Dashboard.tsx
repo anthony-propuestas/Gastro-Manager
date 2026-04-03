@@ -14,14 +14,30 @@ type InvitationResponse = {
   error?: { message?: string };
 };
 
+type SalaryOverview = {
+  totals?: {
+    total_salaries: number;
+    total_advances: number;
+  };
+};
+
+type CalendarEvent = {
+  id: number;
+  event_date: string;
+  title: string;
+  start_time?: string;
+  description?: string;
+  location?: string;
+};
+
 export default function Dashboard() {
   const navigate = useNavigate();
   const { currentNegocio } = useAuth();
   const { employees, isLoading: loadingEmployees } = useEmployees();
   const { fetchOverview } = useSalaries();
   const [invite, setInvite] = useState({ url: "", error: "", loading: false });
-  const [salaryOverview, setSalaryOverview] = useState<any>(null);
-  const [eventsToday, setEventsToday] = useState<any[]>([]);
+  const [salaryOverview, setSalaryOverview] = useState<SalaryOverview | null>(null);
+  const [eventsToday, setEventsToday] = useState<CalendarEvent[]>([]);
   const [openTopics, setOpenTopics] = useState(0);
   const [loadingData, setLoadingData] = useState(true);
 
@@ -44,7 +60,7 @@ export default function Dashboard() {
         
         if (data.success) {
           const todayStr = today.toISOString().split('T')[0];
-          const todayEvents = (data.data || []).filter((e: any) => e.event_date === todayStr);
+          const todayEvents = (data.data || []).filter((e: CalendarEvent) => e.event_date === todayStr);
           setEventsToday(todayEvents);
         }
       } catch (error) {
@@ -56,7 +72,7 @@ export default function Dashboard() {
         const response = await fetch("/api/topics/deadlines");
         const data = await response.json();
         if (data.success) {
-          const open = (data.data || []).filter((t: any) => t.is_open === 1).length;
+          const open = (data.data || []).filter((t: { is_open: number }) => t.is_open === 1).length;
           setOpenTopics(open);
         }
       } catch (error) {
