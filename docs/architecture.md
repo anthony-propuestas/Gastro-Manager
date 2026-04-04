@@ -2,365 +2,254 @@
 
 ## Visión General
 
-Gastro Manager es una aplicación web full-stack construida con arquitectura moderna basada en:
-
-- **Frontend SPA**: React con enrutamiento del lado del cliente
-- **Backend API**: Hono ejecutándose en Cloudflare Workers
-- **Base de Datos**: D1 (SQLite administrado por Cloudflare)
-- **Edge Computing**: Todo desplegado en la red global de Cloudflare
-
-## Diagrama de Arquitectura
+Gastro Manager es una aplicación full-stack donde el Worker de Cloudflare sirve tanto el frontend estático (React SPA) como la API REST, conectada a una base de datos D1 (SQLite) y servicios externos.
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                         CLIENTE                              │
-│  ┌──────────────────────────────────────────────────────┐   │
-│  │         React App (Frontend SPA)                      │   │
-│  │  - React Router para navegación                       │   │
-│  │  - Hooks personalizados para lógica                   │   │
-│  │  - Componentes UI (shadcn/ui)                         │   │
-│  │  - ChatWidget (Asistente Virtual IA)                  │   │
-│  └──────────────────────────────────────────────────────┘   │
-└───────────────────────────┬─────────────────────────────────┘
-                            │ HTTPS
-                            ▼
-┌─────────────────────────────────────────────────────────────┐
-│              CLOUDFLARE WORKERS (Edge)                       │
-│  ┌──────────────────────────────────────────────────────┐   │
-│  │              Hono API (Backend)                       │   │
-│  │  - Autenticación middleware                           │   │
-│  │  - Validación con Zod                                 │   │
-│  │  - Endpoints REST                                     │   │
-│  │  - Logging de uso                                     │   │
-│  │  - Integración con Gemini AI                          │   │
-│  └────────────┬─────────────────────┬────────────────────┘   │
-│               │                     │                         │
-│               ▼                     ▼                         │
-│  ┌─────────────────────┐  ┌──────────────────────┐          │
-│  │   D1 Database       │  │  Mocha Users Service │          │
-│  │   (SQLite)          │  │  (OAuth Provider)    │          │
-│  │  - 8 tablas         │  │  - Google OAuth      │          │
-│  │  - Relaciones       │  │  - Session tokens    │          │
-│  └─────────────────────┘  └──────────────────────┘          │
-│               │                                               │
-│               ▼                                               │
-│  ┌─────────────────────┐                                     │
-│  │  Google Gemini API  │                                     │
-│  │  (IA Generativa)    │                                     │
-│  │  - gemini-2.5-flash │                                     │
-│  │  - REST API         │                                     │
-│  └─────────────────────┘                                     │
-└─────────────────────────────────────────────────────────────┘
+Navegador
+   │
+   │  HTTPS
+   ▼
+Cloudflare Worker (Hono)
+   ├── Sirve React SPA (archivos estáticos)
+   └── API REST /api/*
+         ├── authMiddleware      → lee rol fresco de D1
+         ├── negocioMiddleware   → valida X-Negocio-ID
+         ├── usageLimitMiddleware → cuotas atómicas
+         └── Route handlers → D1 (SQLite)
+                              └── Google Gemini API (chatbot)
+
+Mocha Users Service (OAuth) ← validado en authMiddleware
 ```
 
-## Flujo de Datos
+---
 
-### 1. Autenticación
+## Stack Tecnológico
 
-```
-Usuario → Login Page → Google OAuth → Mocha Users Service
-                                              ↓
-                                      Session Token
-                                              ↓
-                                    Cookie (httpOnly)
-                                              ↓
-                              Requests con token en cookie
-                                              ↓
-                              authMiddleware valida token
-                                              ↓
-                                   Acceso a recursos
-```
+| Capa | Tecnología | Versión |
+|---|---|---|
+| Frontend | React + React Router | 19 / 7 |
+| Estilos | Tailwind CSS + shadcn/ui | v4 |
+| Backend | Hono | latest |
+| Runtime | Cloudflare Workers | Edge |
+| Base de datos | Cloudflare D1 (SQLite) | — |
+| Autenticación | Mocha Users Service (Google OAuth) | — |
+| Validación | Zod | — |
+| IA | Google Gemini 2.5 Flash | v1beta |
 
-### 2. Operaciones CRUD
+---
 
-```
-Componente React → Custom Hook (useEmployees, useSalaries, etc.)
-                          ↓
-                    fetch() API call
-                          ↓
-              Hono Route Handler (worker/index.ts)
-                          ↓
-              authMiddleware (verificar sesión)
-                          ↓
-              validateData (Zod schemas)
-                          ↓
-                D1 Database Query
-                          ↓
-              logUsage (registrar acción)
-                          ↓
-              Response JSON → Hook → Estado React → UI
-```
+## Middlewares del Worker
 
-### 3. Chatbot con IA (Asistente Virtual)
+### `authMiddleware`
 
-```
-Usuario escribe pregunta → ChatWidget (componente flotante)
-                                   ↓
-                          useChat hook → POST /api/chat
-                                   ↓
-                      authMiddleware (verificar sesión)
-                                   ↓
-              Obtener contexto del usuario de D1:
-              - Empleados (nombres, roles, salarios)
-              - Eventos del mes
-              - Tópicos pendientes/vencidos
-              - Adelantos y pagos
-                                   ↓
-              Construir prompt con contexto + pregunta
-                                   ↓
-              Llamada REST a Google Gemini API
-              (gemini-2.5-flash via v1beta endpoint)
-                                   ↓
-              Respuesta IA → JSON → useChat → UI
-                                   ↓
-              Mostrar respuesta en ChatWidget
-```
+Ejecuta en todas las rutas `/api/*` (excepto OAuth).
 
-## Capas de la Aplicación
-
-### Frontend (React)
-
-**Responsabilidades:**
-- Presentación de la interfaz de usuario
-- Manejo de estado local y global (Context API)
-- Validación de formularios (cliente)
-- Enrutamiento (React Router)
-- Llamadas a API
-
-**Estructura:**
-```
-src/react-app/
-├── components/        # Componentes reutilizables
-│   ├── ui/           # Componentes base (shadcn)
-│   ├── layout/       # Layouts (Sidebar, MainLayout)
-│   ├── auth/         # Componentes de autenticación
-│   ├── employees/    # Componentes de empleados
-│   └── salaries/     # Componentes de sueldos
-├── pages/            # Páginas/vistas principales
-├── hooks/            # Custom hooks
-└── lib/              # Utilidades
-```
-
-### Backend (Hono + Cloudflare Workers)
-
-**Responsabilidades:**
-- Autenticación y autorización
-- Validación de datos (servidor)
-- Lógica de negocio
-- Operaciones de base de datos
-- Logging y auditoría
-
-**Estructura:**
-```
-src/worker/
-├── index.ts          # API endpoints y middlewares
-└── validation.ts     # Esquemas Zod
-```
-
-### Base de Datos (D1)
-
-**Responsabilidades:**
-- Almacenamiento persistente
-- Integridad de datos
-- Consultas SQL
-
-## Patrones de Diseño Utilizados
-
-### 1. **Custom Hooks Pattern**
-
-Encapsula lógica de negocio y llamadas a API:
+1. Lee la cookie `mocha_session_token` y la verifica con Mocha Users Service.
+2. Decodifica el JWT para obtener `user.id`.
+3. **Lee el `role` fresco de la tabla `users` en D1** (no confía en el JWT para el rol).
+4. Si el usuario no existe en `users`, asigna `role = 'usuario_basico'` por defecto.
 
 ```typescript
-// useEmployees.ts
-export function useEmployees() {
-  const [employees, setEmployees] = useState([]);
-  
-  const fetchEmployees = async () => {
-    // Lógica de fetch
-  };
-  
-  return { employees, fetchEmployees, ... };
-}
+// Corrección 5: rol siempre desde DB, nunca desde JWT
+const dbUser = await db.prepare("SELECT role FROM users WHERE id = ?")
+  .bind(user.id).first<{ role: string }>();
+user.role = dbUser?.role ?? "usuario_basico";
 ```
 
-**Beneficios:**
-- Reutilización de lógica
-- Separación de concerns
-- Fácil testing
+### `negocioMiddleware`
 
-### 2. **Context Provider Pattern**
+Ejecuta en todos los endpoints de datos operativos.
 
-Para estado global (sidebar, toast, auth):
+1. Lee el header `X-Negocio-ID`.
+2. Verifica que el negocio exista en D1.
+3. Verifica que el usuario autenticado sea miembro del negocio.
+4. Inyecta `negocio` en el contexto Hono para los handlers.
 
-```typescript
-export function ToastProvider({ children }) {
-  const [toasts, setToasts] = useState([]);
-  
-  const addToast = (message, type) => {
-    // Lógica
-  };
-  
-  return (
-    <ToastContext.Provider value={{ addToast }}>
-      {children}
-    </ToastContext.Provider>
-  );
-}
+### `createUsageLimitMiddleware(tool)`
+
+Ejecuta antes de los 8 endpoints de escritura con cuota.
+
+**Patrón atómico (increment-then-revert) para evitar TOCTOU:**
+
+```
+1. INSERT usage_counters ... count = count + 1 RETURNING count
+2. Si newCount > limit:
+   a. UPDATE usage_counters SET count = count - 1
+   b. Devolver 429 USAGE_LIMIT_EXCEEDED
+3. Si newCount <= limit: continuar con el handler
 ```
 
-### 3. **Middleware Pattern**
+Omite todo si `user.role === 'usuario_inteligente'`.
 
-Para autenticación y validación:
+---
 
-```typescript
-// Autenticación
-app.use("/api/*", authMiddleware(...));
+## Sistema Multi-Negocio
 
-// Endpoint con validación
-app.post("/api/employees", async (c) => {
-  const validation = validateData(createEmployeeSchema, data);
-  if (!validation.success) {
-    return c.json({ error: validation.error }, 400);
-  }
-  // ...
-});
+Cada usuario puede crear o pertenecer a múltiples negocios. Todo dato operativo (empleados, sueldos, eventos) está aislado por `negocio_id`.
+
+```
+Usuario A ──┬── Miembro de: Negocio 1 (Restaurante Norte)
+            │                  └── employees, events, salary_payments...
+            └── Miembro de: Negocio 2 (Restaurante Sur)
+                               └── employees, events, salary_payments...
 ```
 
-### 4. **Repository Pattern (implícito)**
+El frontend mantiene un `currentNegocio` en el `AuthContext` y lo envía en cada petición como `X-Negocio-ID`.
 
-Hooks actúan como repositorios para acceso a datos:
+**Invitaciones:** Se genera un token único; el destinatario abre el enlace, autenticarse si no lo está, y canjea el token con `POST /api/invitations/:token/redeem`. El token queda invalidado tras el primer uso.
 
-```typescript
-// Hook = Repository
-const { employees, createEmployee, updateEmployee } = useEmployees();
+---
 
-// En lugar de queries directas
-const employees = await db.select(...);
+## Sistema de Roles y Cuotas
+
+### Roles
+
+| Rol | Descripción |
+|---|---|
+| `usuario_basico` | Sujeto a cuotas mensuales configurables |
+| `usuario_inteligente` | Sin cuotas; acceso ilimitado |
+
+El rol se almacena en `users.role` y es gestionado por el admin vía `/api/admin/users/:id/promote|demote`. Los cambios son **inmediatos** porque el `authMiddleware` lo lee de DB en cada request.
+
+### Cuotas
+
+Las cuotas son **por usuario por negocio por mes** (`UNIQUE(user_id, negocio_id, tool, period)`).
+
+- **8 herramientas** sujetas a cuota: `employees`, `job_roles`, `topics`, `notes`, `advances`, `salary_payments`, `events`, `chat`.
+- Los límites son globales (una fila por tool en `usage_limits`) y editables desde el panel de admin.
+- El endpoint `mark-all-paid` consume **N usos** (uno por empleado marcado), con el mismo patrón atómico.
+
+---
+
+## Flujos Principales
+
+### Login
+
+```
+1. Frontend → GET /api/oauth/google/redirect_url → URL de Google
+2. Usuario se autentica en Google
+3. Google redirige con ?code=...
+4. Frontend → POST /api/sessions { code }
+5. Worker intercambia code por token con Mocha
+6. Worker hace UPSERT en users (sin sobrescribir role)
+7. Cookie mocha_session_token seteada (httpOnly)
+8. Redirección a dashboard
 ```
 
-### 5. **Error Boundary Pattern**
+### Operación con cuota (ejemplo: crear empleado)
 
-Manejo de errores en React:
-
-```typescript
-<ErrorBoundary>
-  <App />
-</ErrorBoundary>
-
-<PageErrorBoundary>
-  <Dashboard />
-</PageErrorBoundary>
+```
+POST /api/employees
+  │
+  ├── authMiddleware: valida cookie → lee role de DB
+  ├── negocioMiddleware: valida X-Negocio-ID → carga negocio
+  ├── usageLimitMiddleware("employees"):
+  │     - Si role === "usuario_inteligente" → skip
+  │     - INSERT usage_counters count+1 RETURNING count
+  │     - Si count > limit → UPDATE count-1 → 429
+  └── handler: INSERT employees → 201
 ```
 
-## Convenciones de Código
+### Chatbot IA
 
-### Naming Conventions
-
-**Base de datos:**
-- Tablas: `snake_case` plural (employees, events)
-- Columnas: `snake_case` (created_at, user_id)
-- Booleanos: `is_active`, `is_open`, `has_*`
-
-**TypeScript/React:**
-- Componentes: `PascalCase` (Dashboard, EmployeeModal)
-- Hooks: `camelCase` con prefijo `use` (useEmployees)
-- Funciones: `camelCase` (fetchEmployees)
-- Constantes: `UPPER_SNAKE_CASE` (MOCHA_SESSION_TOKEN)
-
-**API Endpoints:**
-- RESTful: `/api/resource` (GET all), `/api/resource/:id` (GET one)
-- Acciones: `/api/resource/:id/action` (POST /api/employees/:id/topics)
-
-### Response Format
-
-Todas las respuestas de API siguen el formato:
-
-```typescript
-// Success
-{
-  success: true,
-  data: { ... }
-}
-
-// Error
-{
-  success: false,
-  error: {
-    code: "ERROR_CODE",
-    message: "Mensaje descriptivo"
-  }
-}
+```
+POST /api/chat { message }
+  │
+  ├── authMiddleware + negocioMiddleware + usageLimitMiddleware("chat")
+  └── handler:
+        ├── SELECT empleados activos del negocio
+        ├── SELECT eventos del mes
+        ├── SELECT tópicos pendientes
+        ├── SELECT anticipos y pagos
+        ├── Construir system prompt con contexto
+        └── POST → Gemini 2.5 Flash API
+              └── Respuesta → { response: "..." }
 ```
 
-## Consideraciones de Rendimiento
+---
 
-### 1. **Edge Computing**
-- Workers ejecutan en +200 ubicaciones globalmente
-- Latencia ~10-50ms vs ~200-500ms de servidores centralizados
+## Estructura del Proyecto
 
-### 2. **Database Queries**
-- D1 está co-localizado con Workers
-- Consultas optimizadas con índices
-- Evitar N+1 queries
+```
+gastro-manager/
+├── migrations/           # 10 migraciones SQL (inmutables)
+├── docs/                 # Documentación
+├── src/
+│   ├── worker/
+│   │   ├── index.ts      # Todos los endpoints y middlewares
+│   │   ├── usageTools.ts # Constantes USAGE_TOOLS y DEFAULT_USAGE_LIMITS
+│   │   └── validation.ts # Esquemas Zod
+│   └── react-app/
+│       ├── context/
+│       │   └── AuthContext.tsx    # user, role, currentNegocio
+│       ├── hooks/
+│       │   ├── useAdmin.ts        # Panel de admin
+│       │   ├── useMyUsage.ts      # Cuotas propias
+│       │   ├── useChat.ts         # Chatbot
+│       │   └── use*.ts            # Hooks por módulo
+│       ├── components/
+│       │   ├── UsageBanner.tsx    # Banner de advertencia de cuota
+│       │   ├── ChatWidget.tsx     # Widget flotante del chatbot
+│       │   └── ui/                # shadcn/ui components
+│       └── pages/
+│           ├── Admin.tsx          # Panel de administración
+│           ├── Dashboard.tsx
+│           ├── Employees.tsx
+│           ├── Salaries.tsx
+│           ├── CalendarPage.tsx
+│           └── ...
+└── public/
+```
 
-### 3. **Frontend Optimization**
-- Code splitting por ruta (React Router)
-- Lazy loading de componentes pesados
-- Memoización con useMemo/useCallback donde necesario
+---
 
-### 4. **Caching**
-- Estado local en hooks reduce llamadas API
-- React Query podría agregarse para caché más sofisticado
+## Capas de Seguridad
 
-## Seguridad
+| Capa | Mecanismo | Dónde |
+|---|---|---|
+| 1. Autenticación | Google OAuth + cookie httpOnly | `authMiddleware` |
+| 2. Rol fresco | Rol leído de DB, nunca del JWT | `authMiddleware` |
+| 3. Aislamiento de datos | Todas las queries filtran por `negocio_id` | `negocioMiddleware` + handlers |
+| 4. Validación de entrada | Zod schemas en servidor | `validateData()` |
+| 5. Cuotas atómicas | Increment-then-revert sin TOCTOU | `createUsageLimitMiddleware` |
 
-### Capas de Seguridad
+**Principios aplicados:**
+- *Least privilege*: `usuario_basico` tiene cuotas; solo admin gestiona roles.
+- *Defense in depth*: validación en cliente Y servidor.
+- *Secure by default*: todas las rutas protegidas por defecto.
+- *Secret management*: variables de entorno, nunca hardcoded.
 
-1. **Autenticación (Capa 1)**: Google OAuth + Session tokens
-2. **Autorización (Capa 2)**: Middleware verifica user_id
-3. **Validación (Capa 3)**: Zod schemas en backend
-4. **Isolación de datos (Capa 4)**: Queries filtran por user_id
+---
 
-### Principios Aplicados
+## Patrones de Diseño
 
-- **Least Privilege**: Usuarios solo ven sus propios datos
-- **Defense in Depth**: Validación en cliente Y servidor
-- **Secure by Default**: Rutas protegidas por defecto
-- **Secret Management**: Variables de entorno, nunca hardcoded
+### Custom Hooks como repositorios
+Cada módulo tiene un hook (`useEmployees`, `useSalaries`, etc.) que encapsula el estado y las llamadas a API. Los componentes solo consumen el hook.
 
-## Escalabilidad
+### Context API para estado global
+`AuthContext` expone `user`, `role`, `currentNegocio`, y la lista de negocios. `ToastContext` para notificaciones. `SidebarContext` para estado del menú.
 
-### Horizontal Scaling
-- Workers escalan automáticamente
-- Sin límite de instancias concurrentes
-- Pay-per-request modelo
+### Formato de respuesta uniforme
+Todos los endpoints devuelven `{ success: true, data }` o `{ success: false, error: { code, message } }`.
 
-### Database Scaling
-- D1 maneja ~500 req/s por database
-- Para mayor escala: múltiples databases o migrar a D1 Premium
+### Middleware chain en Hono
+```
+authMiddleware → negocioMiddleware → usageLimitMiddleware → handler
+```
+Cada middleware puede cortocircuitar la cadena devolviendo una respuesta sin llamar a `next()`.
 
-### Limitaciones Actuales
-- D1 tiene límite de 10GB (Free tier)
-- Workers tienen 50ms CPU time (Free tier)
+---
 
-## Monitoreo y Debugging
+## Rendimiento
 
-### Logs
-- `console.log()` en Workers → Cloudflare Dashboard
-- Error tracking con ErrorBoundary
-- Usage logs en `usage_logs` table
+- **Edge computing**: Workers ejecutan en +200 ubicaciones; latencia ~10-50ms.
+- **D1 co-localizado**: SQLite co-ubicado con el Worker; sin latencia de red adicional.
+- **Sin N+1**: los endpoints de overview (sueldos, calendario) usan JOINs y queries agregadas.
 
-### Debugging
-- Local development con Vite
-- Source maps habilitados
-- React DevTools compatible
+---
 
-## Próximas Mejoras Potenciales
+## Monitoreo
 
-1. **React Query**: Caché y sincronización de datos
-2. **WebSockets**: Actualizaciones en tiempo real
-3. **Testing**: Unit tests con Vitest, E2E con Playwright
-4. **Analytics**: Integración con plataforma de analytics
-5. **Internationalization**: Soporte multi-idioma
-6. **Progressive Web App**: Offline support
-7. **Chatbot mejorado**: Memoria de conversaciones, más contexto
+- Logs de Worker: `console.log/error` → Cloudflare Dashboard → Workers → Logs.
+- Errores React: `ErrorBoundary` en el layout principal.
+- Uso de cuotas: tabla `usage_counters` consultable vía `GET /api/admin/usage`.

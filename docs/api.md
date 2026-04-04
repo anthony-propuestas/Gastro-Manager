@@ -5,807 +5,520 @@ API RESTful construida con Hono en Cloudflare Workers.
 ## Base URL
 
 ```
-Production: https://gastro-manager.mocha.app
-Development: http://localhost:5173
+Producción:  https://gastro-manager.mocha.app
+Desarrollo:  http://localhost:5173
 ```
+
+---
 
 ## Autenticación
 
-Todas las rutas `/api/*` (excepto OAuth) requieren autenticación.
-
-### Headers
+Todas las rutas `/api/*` (excepto OAuth) requieren una cookie de sesión válida.
 
 ```
 Cookie: mocha_session_token=<token>
 ```
 
-El token se establece automáticamente después del login con Google OAuth.
+El token se establece automáticamente tras el login con Google OAuth.
+
+---
+
+## Header de Negocio
+
+Todos los endpoints de datos operativos (empleados, sueldos, eventos, etc.) requieren adicionalmente:
+
+```
+X-Negocio-ID: <id_del_negocio_activo>
+```
+
+Si el header está ausente o el usuario no es miembro del negocio, la respuesta es `403 FORBIDDEN`.
+
+---
 
 ## Formato de Respuestas
 
-### Success Response
-
 ```json
-{
-  "success": true,
-  "data": { ... }
-}
+// Éxito
+{ "success": true, "data": { ... } }
+
+// Error
+{ "success": false, "error": { "code": "ERROR_CODE", "message": "Descripción" } }
 ```
 
-### Error Response
-
-```json
-{
-  "success": false,
-  "error": {
-    "code": "ERROR_CODE",
-    "message": "Descripción del error"
-  }
-}
-```
+---
 
 ## Endpoints
 
 ### Autenticación
 
 #### `GET /api/oauth/google/redirect_url`
-
-Obtiene la URL de redirección para iniciar login con Google.
-
-**Response:**
-```json
-{
-  "redirectUrl": "https://accounts.google.com/..."
-}
-```
+Obtiene la URL de redirección para iniciar Google OAuth.
 
 #### `POST /api/sessions`
+Intercambia el código OAuth por una cookie de sesión. Persiste al usuario en la tabla `users` (UPSERT).
 
-Intercambia el código OAuth por un token de sesión.
-
-**Request Body:**
 ```json
-{
-  "code": "oauth_code_from_google"
-}
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "data": {
-    "token": "session_token"
-  }
-}
+// Request
+{ "code": "oauth_code_from_google" }
 ```
 
 #### `DELETE /api/sessions`
-
 Cierra la sesión del usuario actual.
 
-**Response:**
-```json
-{
-  "success": true,
-  "data": {}
-}
-```
+#### `GET /api/logout`
+Redirección de logout (alias del anterior).
 
 #### `GET /api/users/me`
+Información del usuario autenticado.
 
-Obtiene información del usuario autenticado.
-
-**Response:**
 ```json
+// Response data
 {
-  "success": true,
-  "data": {
-    "id": "user_123",
-    "email": "usuario@example.com",
-    "name": "Juan Pérez",
-    "picture": "https://..."
-  }
+  "id": "google_sub_123",
+  "email": "usuario@example.com",
+  "name": "Juan Pérez",
+  "picture": "https://...",
+  "role": "usuario_basico"
 }
 ```
+
+---
+
+### Negocios
+
+#### `POST /api/negocios`
+Crea un nuevo negocio. El creador queda automáticamente como miembro.
+
+```json
+// Request
+{ "name": "Restaurante La Paloma" }
+```
+
+#### `GET /api/negocios`
+Lista los negocios en los que el usuario es miembro.
+
+```json
+// Response data (array)
+[{
+  "id": 1,
+  "name": "Restaurante La Paloma",
+  "created_by": "google_sub_123",
+  "created_at": "2026-01-15T10:00:00Z",
+  "members": [{ "user_id": "...", "user_email": "...", "user_name": "..." }]
+}]
+```
+
+#### `GET /api/negocios/:id`
+Detalle de un negocio (solo si el usuario es miembro).
+
+#### `POST /api/negocios/:id/invitations`
+Genera un enlace de invitación de un solo uso para unirse al negocio.
+
+```json
+// Response data
+{ "inviteUrl": "https://gastro-manager.mocha.app/join/abc123token" }
+```
+
+#### `GET /api/invitations/:token`
+Verifica un token de invitación sin canjearlo.
+
+```json
+// Response data
+{ "negocioName": "Restaurante La Paloma", "invitedBy": "admin@example.com" }
+```
+
+#### `POST /api/invitations/:token/redeem`
+Canjea el token: agrega al usuario autenticado como miembro del negocio. El token queda invalidado.
+
+#### `DELETE /api/negocios/:id/members/:userId`
+Expulsa a un miembro del negocio (solo el creador puede hacerlo).
+
+#### `DELETE /api/negocios/:id/leave`
+El usuario actual abandona el negocio.
 
 ---
 
 ### Empleados
+*Requieren `X-Negocio-ID`*
 
 #### `GET /api/employees`
-
-Lista todos los empleados del usuario.
-
-**Response:**
-```json
-{
-  "success": true,
-  "data": [
-    {
-      "id": 1,
-      "name": "María García",
-      "role": "Mesera",
-      "phone": "1234567890",
-      "email": "maria@example.com",
-      "hire_date": "2024-01-15",
-      "is_active": 1,
-      "monthly_salary": 8000,
-      "created_at": "2024-01-01T10:00:00Z",
-      "updated_at": "2024-01-15T14:30:00Z"
-    }
-  ]
-}
-```
-
-#### `POST /api/employees`
-
-Crea un nuevo empleado.
-
-**Request Body:**
-```json
-{
-  "name": "Carlos López",
-  "role": "Cocinero",
-  "phone": "0987654321",
-  "email": "carlos@example.com",
-  "hire_date": "2024-03-01",
-  "is_active": true,
-  "monthly_salary": 10000
-}
-```
-
-**Validaciones:**
-- `name`: requerido, 1-100 caracteres
-- `role`: requerido, 1-50 caracteres
-- `phone`: opcional, máx 20 caracteres
-- `email`: opcional, formato válido
-- `monthly_salary`: 0-1,000,000
-
-**Response:**
-```json
-{
-  "success": true,
-  "data": {
-    "id": 2,
-    "name": "Carlos López",
-    ...
-  }
-}
-```
+Lista todos los empleados del negocio activo.
 
 #### `GET /api/employees/:id`
+Detalle de un empleado.
 
-Obtiene un empleado específico.
+#### `POST /api/employees` ⚠️ *Sujeto a cuota `employees`*
+Crea un empleado.
 
-**Response:**
 ```json
+// Request
 {
-  "success": true,
-  "data": {
-    "id": 1,
-    "name": "María García",
-    ...
-  }
+  "name": "María García",
+  "role": "Mesera",
+  "phone": "5551234567",
+  "email": "maria@example.com",
+  "hire_date": "2026-01-15",
+  "is_active": true,
+  "monthly_salary": 8000
 }
 ```
 
 #### `PUT /api/employees/:id`
-
-Actualiza un empleado existente.
-
-**Request Body:** (todos los campos opcionales)
-```json
-{
-  "name": "María García Pérez",
-  "monthly_salary": 8500,
-  "is_active": false
-}
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "data": {
-    "id": 1,
-    "name": "María García Pérez",
-    ...
-  }
-}
-```
+Actualiza un empleado (todos los campos opcionales).
 
 #### `DELETE /api/employees/:id`
-
 Elimina un empleado.
-
-**Response:**
-```json
-{
-  "success": true,
-  "data": {}
-}
-```
 
 ---
 
 ### Puestos de Trabajo
+*Requieren `X-Negocio-ID`*
 
 #### `GET /api/job-roles`
+Lista los puestos personalizados del negocio.
 
-Lista los puestos personalizados del usuario.
-
-**Response:**
+#### `POST /api/job-roles` ⚠️ *Sujeto a cuota `job_roles`*
 ```json
-{
-  "success": true,
-  "data": [
-    {
-      "id": 1,
-      "name": "Supervisor de Cocina",
-      "created_at": "2024-01-01T10:00:00Z"
-    }
-  ]
-}
-```
-
-#### `POST /api/job-roles`
-
-Crea un nuevo puesto personalizado.
-
-**Request Body:**
-```json
-{
-  "name": "Bartender"
-}
+{ "name": "Supervisor de Barra" }
 ```
 
 #### `DELETE /api/job-roles/:id`
-
 Elimina un puesto personalizado.
 
 ---
 
 ### Tópicos
+*Requieren `X-Negocio-ID`*
 
 #### `GET /api/employees/:employeeId/topics`
-
 Lista los tópicos de un empleado.
 
-**Response:**
+#### `POST /api/employees/:employeeId/topics` ⚠️ *Sujeto a cuota `topics`*
 ```json
 {
-  "success": true,
-  "data": [
-    {
-      "id": 1,
-      "employee_id": 1,
-      "title": "Capacitación en seguridad",
-      "is_open": 1,
-      "due_date": "2024-04-15",
-      "due_time": "14:00",
-      "created_at": "2024-03-01T10:00:00Z"
-    }
-  ]
+  "title": "Capacitación en seguridad alimentaria",
+  "due_date": "2026-05-01",
+  "due_time": "14:00"
 }
 ```
-
-#### `POST /api/employees/:employeeId/topics`
-
-Crea un tópico para un empleado.
-
-**Request Body:**
-```json
-{
-  "title": "Evaluación de desempeño",
-  "due_date": "2024-05-01",
-  "due_time": "10:00"
-}
-```
-
-**Validaciones:**
-- `title`: requerido, 1-200 caracteres
-- `due_date`: opcional, formato válido
-- `due_time`: opcional, formato HH:MM
 
 #### `PUT /api/topics/:id`
-
-Actualiza un tópico.
-
-**Request Body:**
-```json
-{
-  "title": "Evaluación trimestral",
-  "is_open": false
-}
-```
+Actualiza un tópico (incluyendo `is_open`).
 
 #### `DELETE /api/topics/:id`
-
 Elimina un tópico.
 
 #### `GET /api/topics/deadlines`
+Lista todos los tópicos abiertos con fecha límite del negocio.
 
-Obtiene todos los tópicos con deadline del usuario.
-
-**Response:**
 ```json
-{
-  "success": true,
-  "data": [
-    {
-      "id": 1,
-      "employee_id": 1,
-      "employee_name": "María García",
-      "title": "Capacitación",
-      "is_open": 1,
-      "due_date": "2024-04-15",
-      "due_time": "14:00"
-    }
-  ]
-}
+// Response data (array)
+[{
+  "id": 1,
+  "employee_id": 5,
+  "employee_name": "María García",
+  "title": "Capacitación seguridad",
+  "is_open": 1,
+  "due_date": "2026-05-01",
+  "due_time": "14:00"
+}]
 ```
 
 ---
 
 ### Notas
+*Requieren `X-Negocio-ID`*
 
 #### `GET /api/topics/:topicId/notes`
-
 Lista las notas de un tópico.
 
-**Response:**
+#### `POST /api/topics/:topicId/notes` ⚠️ *Sujeto a cuota `notes`*
 ```json
-{
-  "success": true,
-  "data": [
-    {
-      "id": 1,
-      "topic_id": 1,
-      "content": "Completó el módulo 1 de capacitación",
-      "created_at": "2024-03-15T10:00:00Z"
-    }
-  ]
-}
+{ "content": "Completó el módulo 1 de seguridad alimentaria" }
 ```
-
-#### `POST /api/topics/:topicId/notes`
-
-Crea una nota en un tópico.
-
-**Request Body:**
-```json
-{
-  "content": "Pendiente: revisar certificado"
-}
-```
-
-**Validaciones:**
-- `content`: requerido, 1-1000 caracteres
 
 #### `PUT /api/notes/:id`
-
-Actualiza una nota.
+Actualiza el contenido de una nota.
 
 #### `DELETE /api/notes/:id`
-
 Elimina una nota.
 
 ---
 
 ### Eventos
+*Requieren `X-Negocio-ID`*
 
 #### `GET /api/events`
+Lista eventos del negocio. Soporta filtros por mes y año.
 
-Lista eventos del usuario.
-
-**Query Parameters:**
-- `month`: Mes (1-12, opcional)
-- `year`: Año (opcional)
-
-**Ejemplo:** `/api/events?month=3&year=2024`
-
-**Response:**
-```json
-{
-  "success": true,
-  "data": [
-    {
-      "id": 1,
-      "title": "Reunión de equipo",
-      "description": "Revisión mensual",
-      "event_date": "2024-03-15",
-      "start_time": "10:00",
-      "end_time": "11:00",
-      "event_type": "meeting",
-      "location": "Oficina principal",
-      "created_at": "2024-03-01T10:00:00Z"
-    }
-  ]
-}
+```
+GET /api/events?month=4&year=2026
 ```
 
-#### `POST /api/events`
+#### `GET /api/events/:id`
+Detalle de un evento.
 
-Crea un evento.
-
-**Request Body:**
+#### `POST /api/events` ⚠️ *Sujeto a cuota `events`*
 ```json
 {
-  "title": "Entrega de uniformes",
-  "description": "Nuevos uniformes para staff",
-  "event_date": "2024-04-01",
-  "start_time": "09:00",
-  "end_time": "12:00",
-  "event_type": "task",
-  "location": "Almacén"
+  "title": "Reunión de equipo",
+  "description": "Revisión mensual de indicadores",
+  "event_date": "2026-04-15",
+  "start_time": "10:00",
+  "end_time": "11:30",
+  "event_type": "meeting",
+  "location": "Sala principal"
 }
 ```
-
-**Validaciones:**
-- `title`: requerido, 1-200 caracteres
-- `description`: opcional, máx 1000 caracteres
-- `event_date`: requerido, fecha válida
-- `start_time`, `end_time`: formato HH:MM
-- `location`: máx 200 caracteres
 
 #### `PUT /api/events/:id`
-
 Actualiza un evento.
 
 #### `DELETE /api/events/:id`
-
 Elimina un evento.
 
 ---
 
 ### Sueldos
+*Requieren `X-Negocio-ID`*
 
 #### `GET /api/salaries/overview`
+Resumen de sueldos del mes para todos los empleados activos.
 
-Obtiene resumen de sueldos del mes.
+```
+GET /api/salaries/overview?month=4&year=2026
+```
 
-**Query Parameters:**
-- `month`: Mes (1-12)
-- `year`: Año
-
-**Ejemplo:** `/api/salaries/overview?month=3&year=2024`
-
-**Response:**
 ```json
+// Response data
 {
-  "success": true,
-  "data": {
-    "employees": [
-      {
-        "id": 1,
-        "name": "María García",
-        "monthly_salary": 8000,
-        "advances_total": 1500,
-        "net_amount": 6500,
-        "is_paid": 0
-      }
-    ],
-    "totals": {
-      "total_salaries": 25000,
-      "total_advances": 4500,
-      "total_net": 20500,
-      "paid_count": 2,
-      "pending_count": 3
-    }
+  "employees": [{
+    "id": 1,
+    "name": "María García",
+    "monthly_salary": 8000,
+    "advances_total": 1500,
+    "net_amount": 6500,
+    "is_paid": 0
+  }],
+  "totals": {
+    "total_salaries": 25000,
+    "total_advances": 4500,
+    "total_net": 20500,
+    "paid_count": 2,
+    "pending_count": 3
   }
 }
 ```
 
 ---
 
-### Adelantos
+### Anticipos
+*Requieren `X-Negocio-ID`*
 
 #### `GET /api/employees/:employeeId/advances`
+Lista anticipos de un empleado. Filtrable por `month` y `year`.
 
-Lista adelantos de un empleado.
-
-**Query Parameters:**
-- `month`: Mes (opcional)
-- `year`: Año (opcional)
-
-**Response:**
-```json
-{
-  "success": true,
-  "data": [
-    {
-      "id": 1,
-      "employee_id": 1,
-      "amount": 500,
-      "period_month": 3,
-      "period_year": 2024,
-      "advance_date": "2024-03-10",
-      "description": "Adelanto para gastos médicos",
-      "created_at": "2024-03-10T10:00:00Z"
-    }
-  ]
-}
-```
-
-#### `POST /api/employees/:employeeId/advances`
-
-Registra un adelanto.
-
-**Request Body:**
+#### `POST /api/employees/:employeeId/advances` ⚠️ *Sujeto a cuota `advances`*
 ```json
 {
   "amount": 1000,
-  "period_month": 3,
-  "period_year": 2024,
-  "advance_date": "2024-03-15",
-  "description": "Adelanto de quincena"
+  "period_month": 4,
+  "period_year": 2026,
+  "advance_date": "2026-04-10",
+  "description": "Anticipo de quincena"
 }
 ```
 
-**Validaciones:**
-- `amount`: requerido, 0.01-1,000,000
-- `period_month`: 1-12 (default: mes actual)
-- `period_year`: 2000-2100 (default: año actual)
-
 #### `DELETE /api/advances/:id`
-
-Elimina un adelanto.
+Elimina un anticipo.
 
 ---
 
-### Pagos de Sueldos
+### Pagos de Sueldo
+*Requieren `X-Negocio-ID`*
 
-#### `POST /api/salary-payments`
+#### `GET /api/salary-payments`
+Lista los registros de pago del negocio.
 
-Crea un registro de pago de sueldo.
+#### `POST /api/salary-payments/mark-paid` ⚠️ *Sujeto a cuota `salary_payments`*
+Marca un pago individual como realizado.
 
-**Request Body:**
 ```json
-{
-  "employee_id": 1,
-  "period_month": 3,
-  "period_year": 2024,
-  "salary_amount": 8000,
-  "advances_total": 1500,
-  "net_amount": 6500
-}
-```
-
-#### `PUT /api/salary-payments/:id/mark-paid`
-
-Marca un pago como realizado.
-
-**Request Body:**
-```json
-{
-  "paid_date": "2024-04-01"
-}
+{ "employee_id": 1, "period_month": 4, "period_year": 2026, "paid_date": "2026-04-30" }
 ```
 
 #### `POST /api/salary-payments/mark-all-paid`
+Marca todos los pagos pendientes de un período. Cuenta N usos de la cuota `salary_payments` (uno por empleado marcado). El incremento es atómico.
 
-Marca todos los pagos pendientes de un período como pagados.
-
-**Request Body:**
 ```json
+{ "period_month": 4, "period_year": 2026, "paid_date": "2026-04-30" }
+```
+
+---
+
+### Cuotas del Usuario
+
+#### `GET /api/usage/me`
+*Requiere `X-Negocio-ID`*
+
+Devuelve el uso actual y los límites del usuario para el negocio activo en el periodo corriente.
+
+```json
+// Response data
 {
-  "period_month": 3,
-  "period_year": 2024,
-  "paid_date": "2024-04-01"
+  "period": "2026-04",
+  "role": "usuario_basico",
+  "usage": {
+    "employees":        { "count": 3, "limit": 5 },
+    "job_roles":        { "count": 1, "limit": 3 },
+    "topics":           { "count": 7, "limit": 10 },
+    "notes":            { "count": 12, "limit": 20 },
+    "advances":         { "count": 2, "limit": 10 },
+    "salary_payments":  { "count": 5, "limit": 10 },
+    "events":           { "count": 4, "limit": 15 },
+    "chat":             { "count": 8, "limit": 20 }
+  }
 }
 ```
+
+Para `usuario_inteligente`, todos los `limit` son `null`.
 
 ---
 
 ### Administración
+*Solo accesible con rol administrador*
 
 #### `GET /api/admin/check`
-
 Verifica si el usuario actual es administrador.
 
-**Response:**
 ```json
-{
-  "success": true,
-  "data": {
-    "isAdmin": true
-  }
-}
+// Response data
+{ "isAdmin": true }
 ```
 
 #### `GET /api/admin/stats`
+Estadísticas globales del sistema.
 
-Obtiene estadísticas generales del sistema (solo admins).
-
-**Response:**
 ```json
+// Response data
 {
-  "success": true,
-  "data": {
-    "totalUsers": 25,
-    "totalEmails": 25,
-    "avgEmployeesPerUser": 8.5,
-    "avgEventsPerUser": 12.3,
-    "usageBreakdown": {
-      "employees": 45,
-      "salaries": 30,
-      "calendar": 25
-    }
-  }
+  "totalUsers": 32,
+  "registeredEmails": 32,
+  "avgEmployees": 7.4,
+  "avgEvents": 11.2,
+  "usage": { "employees": 48, "salaries": 30, "calendar": 22 }
 }
 ```
 
 #### `GET /api/admin/emails`
-
-Lista todos los emails de administradores (solo admins).
-
-**Response:**
-```json
-{
-  "success": true,
-  "data": [
-    {
-      "id": 1,
-      "email": "admin@example.com",
-      "added_by": "initial_admin@example.com",
-      "created_at": "2024-01-01T10:00:00Z"
-    }
-  ]
-}
-```
+Lista todos los administradores registrados.
 
 #### `POST /api/admin/emails`
-
-Agrega un email como administrador (solo admins).
-
-**Request Body:**
+Agrega un email como administrador.
 ```json
-{
-  "email": "nuevo_admin@example.com"
-}
+{ "email": "nuevo_admin@example.com" }
 ```
 
 #### `DELETE /api/admin/emails/:id`
-
-Elimina un administrador (solo admins).
+Elimina un administrador (no puede eliminar al admin inicial).
 
 ---
 
-### Chatbot (Asistente Virtual IA)
+#### `GET /api/admin/usage`
+Uso mensual desglosado por **usuario + negocio**. Devuelve una fila por cada par (usuario, negocio) que tenga actividad en el periodo actual.
+
+```json
+// Response data
+{
+  "period": "2026-04",
+  "rows": [{
+    "user_id": "google_sub_123",
+    "email": "usuario@example.com",
+    "role": "usuario_basico",
+    "negocio_id": 1,
+    "negocio_name": "Restaurante La Paloma",
+    "usage": { "employees": 3, "events": 5, "chat": 8 }
+  }]
+}
+```
+
+#### `GET /api/admin/usage-limits`
+Devuelve los límites mensuales actuales para todas las herramientas.
+
+```json
+// Response data
+{ "employees": 5, "job_roles": 3, "topics": 10, "notes": 20, "advances": 10, "salary_payments": 10, "events": 15, "chat": 20 }
+```
+
+#### `PUT /api/admin/usage-limits`
+Actualiza los límites mensuales. Solo los tools válidos son aceptados; la actualización es atómica (`db.batch`).
+
+```json
+// Request (campos parciales permitidos)
+{ "employees": 10, "chat": 50 }
+```
+
+---
+
+#### `GET /api/admin/users`
+Lista todos los usuarios registrados con su rol actual.
+
+```json
+// Response data (array)
+[{
+  "id": "google_sub_123",
+  "email": "usuario@example.com",
+  "name": "Juan Pérez",
+  "role": "usuario_basico",
+  "created_at": "2026-01-10T09:00:00Z"
+}]
+```
+
+#### `POST /api/admin/users/:userId/promote`
+Promueve a `usuario_inteligente`. No tiene efecto si ya lo es.
+
+#### `POST /api/admin/users/:userId/demote`
+Regresa a `usuario_basico`. No puede aplicarse al propio admin (devuelve `403`).
+
+---
+
+### Chatbot IA
+*Requiere `X-Negocio-ID`* ⚠️ *Sujeto a cuota `chat`*
 
 #### `POST /api/chat`
+Envía un mensaje al asistente virtual (Google Gemini 2.5 Flash).
 
-Envía una pregunta al asistente virtual potenciado por Google Gemini.
-
-**Request Body:**
 ```json
-{
-  "message": "¿Cuántos empleados activos tengo?"
-}
+// Request
+{ "message": "¿Cuántos empleados activos tengo?" }
+
+// Response data
+{ "response": "Actualmente tienes 5 empleados activos..." }
 ```
 
-**Validaciones:**
-- `message`: requerido, 1-1000 caracteres
-
-**Response (éxito):**
-```json
-{
-  "success": true,
-  "data": {
-    "response": "Actualmente tienes 5 empleados activos en tu restaurante. Los roles incluyen: 2 meseros, 1 cocinero, 1 cajero y 1 supervisor."
-  }
-}
-```
-
-**Response (error de API key):**
-```json
-{
-  "success": false,
-  "error": "GEMINI_API_KEY no está configurada"
-}
-```
-
-**Response (error de Gemini):**
-```json
-{
-  "success": false,
-  "error": "API de Gemini: [mensaje de error específico]"
-}
-```
-
-**Contexto disponible para el chatbot:**
-
-El asistente tiene acceso a los siguientes datos del usuario:
-- Lista completa de empleados (nombre, puesto, salario, estado)
-- Eventos del mes actual
-- Tópicos pendientes con fechas límite
-- Adelantos registrados
-- Estado de pagos de sueldos
-
-**Ejemplos de preguntas:**
-- "¿Cuántos empleados activos tengo?"
-- "¿Quiénes tienen tópicos vencidos?"
-- "¿Cuál es el total de sueldos de este mes?"
-- "¿Qué eventos tengo programados?"
-- "¿Cuánto debo en adelantos?"
-
-**Detalles técnicos:**
-- Modelo: Google Gemini 2.5 Flash
-- Endpoint: `https://generativelanguage.googleapis.com/v1beta/`
-- Idioma de respuestas: Español
-- Timeout: 30 segundos
-- Requiere: `GEMINI_API_KEY` configurada en secretos
+El contexto enviado a Gemini incluye: empleados activos, sueldos del mes, anticipos, eventos del mes, tópicos pendientes. Todas las respuestas son en español.
 
 ---
 
 ## Códigos de Error
 
-| Código | Descripción |
-|--------|-------------|
-| `UNAUTHORIZED` | No autenticado o sesión inválida |
-| `FORBIDDEN` | Sin permisos para esta acción |
-| `NOT_FOUND` | Recurso no encontrado |
-| `VALIDATION_ERROR` | Datos inválidos |
-| `DUPLICATE_EMAIL` | Email de admin ya existe |
-| `DATABASE_ERROR` | Error en base de datos |
-| `OAUTH_ERROR` | Error en autenticación OAuth |
-| `GEMINI_ERROR` | Error en API de Gemini (chatbot) |
-| `API_KEY_MISSING` | GEMINI_API_KEY no configurada |
+| Código | HTTP | Descripción |
+|---|---|---|
+| `UNAUTHORIZED` | 401 | Sin sesión válida |
+| `FORBIDDEN` | 403 | Sin permisos para esta acción |
+| `NOT_FOUND` | 404 | Recurso no encontrado |
+| `VALIDATION_ERROR` | 400 | Datos inválidos (detalle en `message`) |
+| `USAGE_LIMIT_EXCEEDED` | 429 | Cuota mensual alcanzada |
+| `DUPLICATE_EMAIL` | 409 | Email de admin ya registrado |
+| `DATABASE_ERROR` | 500 | Error interno de base de datos |
+| `OAUTH_ERROR` | 400 | Error en autenticación OAuth |
+| `GEMINI_ERROR` | 500 | Error en API de Gemini |
+| `API_KEY_MISSING` | 500 | `GEMINI_API_KEY` no configurada |
 
-## Rate Limiting
+---
 
-No hay rate limiting actual, pero Cloudflare Workers tiene límites:
-- **Free tier**: 100,000 requests/día
-- **Paid tier**: 10M+ requests/mes
+## Notas Generales
 
-## CORS
-
-CORS está habilitado para el dominio de la aplicación.
-
-## Paginación
-
-Actualmente no hay paginación implementada. Para datasets grandes, considerar agregar:
-
-```
-GET /api/employees?page=1&limit=20
-```
-
-## Filtering y Sorting
-
-No implementado actualmente. Filtrado se hace en cliente.
-
-Posible mejora futura:
-```
-GET /api/employees?role=Mesero&is_active=1&sort=name
-```
-
-## Webhooks
-
-No hay webhooks implementados. Todas las actualizaciones son síncronas.
-
-## Versionado
-
-No hay versionado de API actualmente. Cambios breaking serían manejados con:
-```
-/api/v2/employees
-```
-
-## Testing
-
-Puedes probar la API con:
-
-```bash
-# Login (obtener código OAuth manualmente)
-curl -X POST https://gastro-manager.mocha.app/api/sessions \
-  -H "Content-Type: application/json" \
-  -d '{"code": "oauth_code"}'
-
-# Obtener empleados (con cookie de sesión)
-curl https://gastro-manager.mocha.app/api/employees \
-  -H "Cookie: mocha_session_token=your_token"
-```
-
-## Logging
-
-Todos los endpoints de creación, actualización y eliminación registran acciones en `usage_logs` para estadísticas.
+- **Sin paginación**: todos los listados retornan el conjunto completo. Filtrado se realiza en cliente.
+- **Sin rate limiting propio**: Cloudflare Workers aplica 100,000 req/día en Free tier.
+- **CORS**: habilitado para el dominio de la aplicación.

@@ -1,171 +1,157 @@
 # Gastro Manager
 
-Sistema completo de gestión de restaurantes para administrar personal, sueldos, eventos y seguimiento de empleados.
+Sistema de gestión de restaurantes multi-usuario desplegado en Cloudflare Workers. Permite administrar personal, sueldos, calendario y seguimiento de empleados, con soporte para negocios compartidos, control de cuotas por plan de usuario y un asistente virtual potenciado por IA.
 
-## 🎯 Características Principales
+---
 
-- **Gestión de Empleados**: CRUD completo con búsqueda, filtros y estados activo/inactivo
-- **Sistema de Sueldos**: Registro de salarios mensuales, adelantos y control de pagos
-- **Calendario Integrado**: Eventos con integración de tópicos con fechas límite
-- **Sistema de Seguimiento**: Tópicos y notas por empleado con deadlines visuales
-- **Asistente Virtual con IA**: Chatbot inteligente potenciado por Google Gemini para consultas sobre tus datos
-- **Panel de Administración**: Estadísticas de uso y gestión de administradores
-- **Autenticación Segura**: Login con Google OAuth
-- **Validaciones Robustas**: Validación de datos en frontend y backend
+## Características Principales
 
-## 🏗️ Arquitectura
+| Módulo | Descripción |
+|---|---|
+| Empleados | CRUD completo con búsqueda, filtros, roles personalizados y tópicos de seguimiento |
+| Sueldos | Registro de salarios, adelantos, pagos individuales y por lote |
+| Calendario | Eventos propios + tópicos con fecha límite integrados visualmente |
+| Seguimiento | Tópicos y notas por empleado con deadlines y alertas de vencimiento |
+| Negocios compartidos | Múltiples usuarios pueden colaborar en el mismo negocio |
+| Asistente Virtual IA | Chatbot contextual sobre los datos del negocio (Google Gemini) |
+| Panel de Admin | Estadísticas globales, gestión de cuotas, roles de usuario |
 
-### Stack Tecnológico
+---
 
-- **Frontend**: React 19 + React Router 7 + Tailwind CSS
-- **Backend**: Hono (framework web ligero)
-- **Base de Datos**: Cloudflare D1 (SQLite)
-- **Hosting**: Cloudflare Workers
-- **Autenticación**: Mocha Users Service (Google OAuth)
-- **Validación**: Zod
-- **IA**: Google Gemini 2.5 Flash (Chatbot)
+## Stack Tecnológico
 
-### Estructura del Proyecto
+| Capa | Tecnología |
+|---|---|
+| Frontend | React 19 + React Router 7 + Tailwind CSS + shadcn/ui |
+| Backend | Hono (Cloudflare Workers) |
+| Base de datos | Cloudflare D1 (SQLite serverless) |
+| Autenticación | Mocha Users Service (Google OAuth) |
+| Validación | Zod |
+| IA | Google Gemini 2.5 Flash |
+| Hosting | Cloudflare Workers (edge global) |
+
+---
+
+## Arquitectura en una línea
 
 ```
-gastro-manager/
-├── docs/                    # Documentación
-│   ├── architecture.md      # Arquitectura del sistema
-│   ├── database.md          # Esquema de base de datos
-│   ├── api.md              # Endpoints de API
-│   ├── frontend.md         # Estructura del frontend
-│   ├── authentication.md   # Sistema de autenticación
-│   ├── validation.md       # Sistema de validación
-│   └── deployment.md       # Despliegue y configuración
-├── src/
-│   ├── react-app/          # Aplicación React
-│   │   ├── components/     # Componentes reutilizables
-│   │   ├── pages/          # Páginas de la aplicación
-│   │   ├── hooks/          # Custom hooks
-│   │   └── lib/            # Utilidades
-│   ├── worker/             # Backend (Cloudflare Worker)
-│   │   ├── index.ts        # API endpoints y lógica
-│   │   └── validation.ts   # Esquemas de validación Zod
-│   └── shared/             # Tipos compartidos
-└── public/                 # Archivos estáticos
+React SPA → Hono Worker (auth + quota middleware) → D1 (SQLite) + Gemini API
 ```
 
-## 🚀 Inicio Rápido
+El Worker sirve tanto el frontend estático como la API REST. No hay servidores separados.
 
-### Desarrollo Local
+---
+
+## Sistema de Multi-Negocio
+
+Cada usuario puede crear o unirse a varios **negocios**. Todos los datos (empleados, sueldos, eventos) están aislados por `negocio_id`. El frontend envía el negocio activo en el header `X-Negocio-ID` en cada petición.
+
+Los usuarios se unen a negocios mediante enlaces de invitación con token de un solo uso.
+
+---
+
+## Sistema de Roles y Cuotas
+
+### Roles de usuario
+
+| Rol | Descripción |
+|---|---|
+| `usuario_basico` | Sujeto a cuotas mensuales configurables |
+| `usuario_inteligente` | Sin cuotas, acceso ilimitado |
+
+El rol se almacena en la tabla `users` y se lee de la base de datos en cada request (no del JWT) para garantizar que los cambios sean inmediatos.
+
+### Cuotas mensuales (usuario_basico)
+
+Las cuotas son **por usuario por negocio** y se reinician mensualmente. Los límites por defecto son configurables desde el panel de administración:
+
+| Herramienta | Límite por defecto |
+|---|---|
+| Empleados | 5 / mes |
+| Puestos | 3 / mes |
+| Temas | 10 / mes |
+| Notas | 20 / mes |
+| Anticipos | 10 / mes |
+| Pagos de sueldo | 10 / mes |
+| Eventos | 15 / mes |
+| Chat IA | 20 / mes |
+
+El middleware de cuotas usa un patrón **increment-then-revert atómico** para evitar condiciones de carrera (TOCTOU).
+
+---
+
+## Módulos de la Aplicación
+
+### Dashboard
+- Resumen de estadísticas: empleados activos, eventos del día, temas pendientes
+- Acciones rápidas a todos los módulos
+
+### Empleados
+- CRUD completo con filtros por estado y búsqueda por nombre
+- Roles predefinidos + roles personalizados por negocio
+- Tópicos de seguimiento con fecha límite (aparecen en el calendario)
+- Notas por tópico
+- Banner de cuota cuando se acerca o alcanza el límite mensual
+
+### Sueldos
+- Vista mensual: salario base, adelantos, neto calculado, estado de pago
+- Registro de adelantos con monto y descripción
+- Marcar pagado: individual o todos a la vez (lote atómico)
+- Solo muestra empleados activos
+
+### Calendario
+- Vista mensual interactiva
+- Eventos propios + tópicos con deadline integrados
+- Indicadores: rojo = vencido, ámbar = pendiente
+- CRUD completo de eventos
+
+### Asistente Virtual (Chatbot IA)
+- Widget flotante accesible desde cualquier página
+- Consultas en lenguaje natural sobre los datos del negocio activo
+- Contexto incluye: empleados, sueldos, adelantos, eventos, temas pendientes
+- Historial de conversación durante la sesión
+- Potenciado por Google Gemini 2.5 Flash
+
+### Panel de Administración
+Solo visible para usuarios con rol `administrador` (configurado por email).
+
+- **Estadísticas globales**: total de usuarios, promedios de uso
+- **Cuotas del mes**: uso acumulado por herramienta y por usuario+negocio
+- **Gestión de límites**: editar cuotas globales para usuarios básicos
+- **Gestión de roles**: promover/degradar usuarios entre básico e inteligente
+- **Gestión de admins**: agregar/eliminar emails de administradores
+
+---
+
+## Inicio Rápido
+
+### Desarrollo local
 
 ```bash
-# Instalar dependencias
 npm install
-
-# Iniciar servidor de desarrollo
 npm run dev
 ```
 
-La aplicación estará disponible en `http://localhost:5173`
+La aplicación estará disponible en `http://localhost:5173`.
 
-### Build
+### Producción
 
 ```bash
-# Compilar para producción
 npm run build
-
-# Verificar configuración
 npm run check
 ```
 
-## 📚 Documentación Detallada
+### Variables de entorno requeridas
 
-Para información específica sobre cada componente del sistema, consulta:
+| Variable | Descripción |
+|---|---|
+| `GEMINI_API_KEY` | API key de Google Gemini (chatbot) |
+| `INITIAL_ADMIN_EMAIL` | Email del primer administrador del sistema |
+| `MOCHA_SESSION_TOKEN` | Secret para validar tokens de sesión |
 
-- **[Arquitectura](docs/architecture.md)**: Estructura general y patrones de diseño
-- **[Base de Datos](docs/database.md)**: Esquema, tablas y relaciones
-- **[API](docs/api.md)**: Endpoints REST y ejemplos de uso
-- **[Frontend](docs/frontend.md)**: Componentes, páginas y hooks
-- **[Autenticación](docs/authentication.md)**: Sistema de login y autorización
-- **[Validación](docs/validation.md)**: Reglas y esquemas de validación
-- **[Despliegue](docs/deployment.md)**: Configuración y variables de entorno
+---
 
-## 🎨 Diseño Visual
-
-### Tema de Colores
-
-El sistema utiliza una paleta cálida inspirada en restaurantes:
-- **Primario**: Verde bosque (#2D5940)
-- **Acento**: Ámbar (#E59645)
-- **Fondo**: Beige claro (#F8F6F2)
-
-### Tipografía
-
-- **Títulos**: Playfair Display (serif elegante)
-- **Cuerpo**: DM Sans (sans-serif moderna)
-
-### Responsive Design
-
-- **Mobile-first**: Optimizado para dispositivos móviles
-- **Sidebar adaptativo**: Slide-out en móvil, colapsible en desktop
-- **Grid flexible**: Se adapta a diferentes tamaños de pantalla
-
-## 🔐 Seguridad
-
-- Autenticación mediante Google OAuth
-- Validación de datos en cliente y servidor
-- Protección de rutas sensibles
-- Sistema de administradores con permisos elevados
-- Secretos almacenados de forma segura (no expuestos en código)
-
-## 📊 Funcionalidades por Módulo
-
-### 1. Dashboard
-- Resumen de estadísticas clave
-- Empleados activos y eventos del día
-- Temas abiertos pendientes
-- Vista rápida de sueldos mensuales
-- Acciones rápidas a todas las secciones
-
-### 2. Empleados
-- Listado completo con búsqueda y filtros
-- CRUD de empleados (crear, ver, editar, eliminar)
-- Gestión de puestos personalizados
-- Sistema de tópicos con fechas límite
-- Notas asociadas a cada tópico
-- Estados activo/inactivo
-
-### 3. Sueldos
-- Vista general mensual (salarios vs adelantos)
-- Registro de adelantos por empleado
-- Cálculo automático de sueldo neto
-- Marcado de pagos (individual o lote)
-- Histórico de períodos cerrados
-- Solo empleados activos
-
-### 4. Calendario
-- Vista mensual interactiva
-- Eventos con fecha, hora, tipo y ubicación
-- Integración con tópicos pendientes
-- Indicadores visuales (rojo: vencido, ámbar: pendiente)
-- CRUD completo de eventos
-
-### 5. Administración
-- Estadísticas generales del sistema
-- Total de usuarios y promedios
-- Uso por módulo (gráficos de distribución)
-- Gestión de emails administradores
-- Solo visible para administradores
-
-### 6. Asistente Virtual (Chatbot IA)
-- Widget flotante accesible desde cualquier página
-- Potenciado por Google Gemini 2.5 Flash
-- Consultas en lenguaje natural sobre:
-  - Empleados (cantidad, roles, estados)
-  - Sueldos y adelantos del período
-  - Eventos y calendario
-  - Tópicos pendientes y vencidos
-- Respuestas contextuales basadas en tus datos reales
-- Historial de conversación en la sesión
-- Soporte completo en español
-
-## 🛠️ Comandos NPM
+## Comandos NPM
 
 ```bash
 npm run dev          # Servidor de desarrollo
@@ -176,52 +162,39 @@ npm run knip         # Detectar código sin usar
 npm run cf-typegen   # Generar tipos de Cloudflare
 ```
 
-## 📝 Convenciones de Código
+---
 
-### TypeScript
-- Usar tipos explícitos donde sea importante
-- Interfaces para objetos compartidos
-- Tipos derivados de Zod para validación
+## Documentación Detallada
 
-### React
-- Componentes funcionales con hooks
-- Props destructuradas
-- Custom hooks para lógica reutilizable
-- Context para estado global
-
-### Estilos
-- Tailwind CSS para estilos
-- Componentes UI basados en shadcn/ui
-- Variables CSS para temas (`:root` y `.dark`)
-
-### Base de Datos
-- Nombres en snake_case
-- Timestamps automáticos (`created_at`, `updated_at`)
-- IDs autoincrement
-- Campos booleanos con prefijo `is_` o `has_`
-
-## 🤝 Contribución
-
-Este es un proyecto de gestión interna. Para modificaciones:
-
-1. Crear rama desde `main`
-2. Implementar cambios con commits descriptivos
-3. Probar localmente con `npm run check`
-4. Crear pull request con descripción detallada
-
-## 📄 Licencia
-
-Proyecto privado - Todos los derechos reservados.
-
-## 📞 Soporte
-
-Para preguntas o problemas:
-- Consultar documentación en `/docs`
-- Revisar logs en el panel de Cloudflare
-- Contactar al equipo de desarrollo
+| Documento | Contenido |
+|---|---|
+| [Arquitectura](docs/architecture.md) | Estructura general, flujos, patrones de diseño |
+| [Base de Datos](docs/database.md) | Esquema completo, tablas y relaciones |
+| [API](docs/api.md) | Endpoints REST y ejemplos de uso |
+| [Frontend](docs/frontend.md) | Componentes, páginas y hooks |
+| [Autenticación](docs/authentication.md) | Sistema de login y autorización |
+| [Validación](docs/validation.md) | Reglas y esquemas Zod |
+| [Despliegue](docs/deployment.md) | Configuración y variables de entorno |
 
 ---
 
-**Versión**: 1.0.0  
-**Última actualización**: 2024  
-**Plataforma**: [Mocha](https://getmocha.com)
+## Seguridad
+
+- Autenticación Google OAuth (sin manejo de contraseñas)
+- Rol leído de DB en cada request (inmune a tokens JWT desactualizados)
+- Aislamiento de datos por negocio en todas las queries
+- Validación Zod en servidor para todas las entradas
+- Middleware de cuotas con incremento atómico (sin TOCTOU)
+- Admin protegido por variable de entorno + tabla de emails
+
+---
+
+## Diseño Visual
+
+- **Paleta**: Verde bosque (#2D5940) + ámbar (#E59645) + beige (#F8F6F2)
+- **Tipografía**: Playfair Display (títulos) + DM Sans (cuerpo)
+- **Responsive**: Mobile-first, sidebar adaptativo
+
+---
+
+**Versión**: 2.0.0 · **Plataforma**: [Mocha](https://getmocha.com) · **Última actualización**: 2026-04-04

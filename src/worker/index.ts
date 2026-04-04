@@ -17,6 +17,7 @@ import {
   markSalaryPaidSchema,
   createNegocioSchema,
 } from "./validation";
+import { USAGE_TOOLS, type UsageTool } from "./usageTools";
 
 type Env = {
   DB: D1Database;
@@ -28,7 +29,7 @@ type Env = {
   GEMINI_API_KEY?: string;
 };
 
-type UserPayload = { id: string; email: string; name: string; picture: string };
+type UserPayload = { id: string; email: string; name: string; picture: string; role: string };
 type NegocioPayload = { id: number; name: string };
 
 type Variables = {
@@ -81,6 +82,12 @@ const authMiddleware: MiddlewareHandler<{ Bindings: Env; Variables: Variables }>
   }
   try {
     const user = await verifySession(token, c.env.JWT_SECRET);
+    // Always read role from DB so admin changes take effect immediately (no stale JWT)
+    const dbUser = await c.env.DB
+      .prepare("SELECT role FROM users WHERE id = ?")
+      .bind(user.id)
+      .first<{ role: string }>();
+    user.role = dbUser?.role ?? "usuario_basico";
     c.set("user", user);
     await next();
   } catch {
@@ -113,6 +120,61 @@ const negocioMiddleware: MiddlewareHandler<{ Bindings: Env; Variables: Variables
   c.set("negocio", { id: negocio.id, name: negocio.name });
   await next();
 };
+
+// Creates a middleware that enforces monthly usage quotas for usuario_basico.
+// Uses atomic increment-then-check (Corrección 6) to avoid TOCTOU race conditions.
+// mark-all-paid is NOT covered here — it handles N-count logic inside its own handler.
+function createUsageLimitMiddleware(tool: UsageTool): MiddlewareHandler<{ Bindings: Env; Variables: Variables }> {
+  return async (c, next) => {
+    const user = c.get("user");
+    if (user.role === "usuario_inteligente") {
+      await next();
+      return;
+    }
+    const negocio = c.get("negocio");
+    const period = new Date().toISOString().slice(0, 7); // 'YYYY-MM'
+    const db = c.env.DB;
+
+    // Atomic increment: insert or increment, return new count
+    const result = await db
+      .prepare(
+        `INSERT INTO usage_counters (user_id, negocio_id, tool, period, count, updated_at)
+         VALUES (?, ?, ?, ?, 1, datetime('now'))
+         ON CONFLICT(user_id, negocio_id, tool, period)
+         DO UPDATE SET count = count + 1, updated_at = datetime('now')
+         RETURNING count`
+      )
+      .bind(user.id, negocio.id, tool, period)
+      .first<{ count: number }>();
+
+    const newCount = result?.count ?? 1;
+
+    const limitRow = await db
+      .prepare(`SELECT "limit" FROM usage_limits WHERE tool = ?`)
+      .bind(tool)
+      .first<{ limit: number }>();
+
+    const limit = limitRow?.limit ?? Infinity;
+
+    if (newCount > limit) {
+      // Revert the increment before rejecting
+      await db
+        .prepare(
+          `UPDATE usage_counters SET count = count - 1, updated_at = datetime('now')
+           WHERE user_id = ? AND negocio_id = ? AND tool = ? AND period = ?`
+        )
+        .bind(user.id, negocio.id, tool, period)
+        .run();
+
+      return c.json(
+        apiError("USAGE_LIMIT_EXCEEDED", `Límite mensual alcanzado (${limit}). Actualiza a Usuario Inteligente para continuar.`),
+        429
+      );
+    }
+
+    await next();
+  };
+}
 
 const app = new Hono<{ Bindings: Env; Variables: Variables }>();
 
@@ -202,8 +264,27 @@ app.post("/api/sessions", async (c) => {
     });
     const googleUser = await userRes.json() as { id: string; email: string; name: string; picture: string };
 
+    // Persist user in DB (UPSERT) — role is never overwritten to preserve promotions
+    await c.env.DB
+      .prepare(
+        `INSERT INTO users (id, email, name, picture, role, created_at, updated_at)
+         VALUES (?, ?, ?, ?, 'usuario_basico', datetime('now'), datetime('now'))
+         ON CONFLICT(id) DO UPDATE SET
+           email = excluded.email,
+           name = excluded.name,
+           picture = excluded.picture,
+           updated_at = excluded.updated_at`
+      )
+      .bind(googleUser.id, googleUser.email, googleUser.name, googleUser.picture ?? "")
+      .run();
+
+    const dbUser = await c.env.DB
+      .prepare("SELECT role FROM users WHERE id = ?")
+      .bind(googleUser.id)
+      .first<{ role: string }>();
+
     const jwt = await createSession(
-      { id: googleUser.id, email: googleUser.email, name: googleUser.name, picture: googleUser.picture ?? "" },
+      { id: googleUser.id, email: googleUser.email, name: googleUser.name, picture: googleUser.picture ?? "", role: dbUser?.role ?? "usuario_basico" },
       c.env.JWT_SECRET
     );
 
@@ -632,7 +713,7 @@ app.get("/api/employees/:id", authMiddleware, negocioMiddleware, async (c) => {
   }
 });
 
-app.post("/api/employees", authMiddleware, negocioMiddleware, async (c) => {
+app.post("/api/employees", authMiddleware, negocioMiddleware, createUsageLimitMiddleware(USAGE_TOOLS.EMPLOYEES), async (c) => {
   try {
     const user = c.get("user");
     const negocio = c.get("negocio");
@@ -795,7 +876,7 @@ app.get("/api/job-roles", authMiddleware, negocioMiddleware, async (c) => {
   }
 });
 
-app.post("/api/job-roles", authMiddleware, negocioMiddleware, async (c) => {
+app.post("/api/job-roles", authMiddleware, negocioMiddleware, createUsageLimitMiddleware(USAGE_TOOLS.JOB_ROLES), async (c) => {
   try {
     const negocio = c.get("negocio");
     const body = await c.req.json();
@@ -887,7 +968,7 @@ app.get("/api/employees/:employeeId/topics", authMiddleware, negocioMiddleware, 
   }
 });
 
-app.post("/api/employees/:employeeId/topics", authMiddleware, negocioMiddleware, async (c) => {
+app.post("/api/employees/:employeeId/topics", authMiddleware, negocioMiddleware, createUsageLimitMiddleware(USAGE_TOOLS.TOPICS), async (c) => {
   try {
     const negocio = c.get("negocio");
     const employeeId = c.req.param("employeeId");
@@ -1045,7 +1126,7 @@ app.get("/api/topics/:topicId/notes", authMiddleware, negocioMiddleware, async (
   }
 });
 
-app.post("/api/topics/:topicId/notes", authMiddleware, negocioMiddleware, async (c) => {
+app.post("/api/topics/:topicId/notes", authMiddleware, negocioMiddleware, createUsageLimitMiddleware(USAGE_TOOLS.NOTES), async (c) => {
   try {
     const negocio = c.get("negocio");
     const topicId = c.req.param("topicId");
@@ -1252,7 +1333,7 @@ app.get("/api/events/:id", authMiddleware, negocioMiddleware, async (c) => {
   }
 });
 
-app.post("/api/events", authMiddleware, negocioMiddleware, async (c) => {
+app.post("/api/events", authMiddleware, negocioMiddleware, createUsageLimitMiddleware(USAGE_TOOLS.EVENTS), async (c) => {
   try {
     const user = c.get("user");
     const negocio = c.get("negocio");
@@ -1472,7 +1553,7 @@ app.get("/api/employees/:employeeId/advances", authMiddleware, negocioMiddleware
   }
 });
 
-app.post("/api/employees/:employeeId/advances", authMiddleware, negocioMiddleware, async (c) => {
+app.post("/api/employees/:employeeId/advances", authMiddleware, negocioMiddleware, createUsageLimitMiddleware(USAGE_TOOLS.ADVANCES), async (c) => {
   try {
     const user = c.get("user");
     const negocio = c.get("negocio");
@@ -1588,7 +1669,7 @@ app.get("/api/salary-payments", authMiddleware, negocioMiddleware, async (c) => 
   }
 });
 
-app.post("/api/salary-payments/mark-paid", authMiddleware, negocioMiddleware, async (c) => {
+app.post("/api/salary-payments/mark-paid", authMiddleware, negocioMiddleware, createUsageLimitMiddleware(USAGE_TOOLS.SALARY_PAYMENTS), async (c) => {
   try {
     const user = c.get("user");
     const negocio = c.get("negocio");
@@ -1689,6 +1770,48 @@ app.post("/api/salary-payments/mark-all-paid", authMiddleware, negocioMiddleware
       .prepare("SELECT id, monthly_salary FROM employees WHERE negocio_id = ? AND is_active = 1")
       .bind(negocio.id)
       .all();
+
+    // N-count quota check for usuario_basico (Corrección 4 + Corrección 6)
+    // Each employee marked counts as 1 salary_payments use.
+    if (user.role !== "usuario_inteligente" && employees.results.length > 0) {
+      const n = employees.results.length;
+      const period = new Date().toISOString().slice(0, 7);
+
+      const limitRow = await db
+        .prepare(`SELECT "limit" FROM usage_limits WHERE tool = ?`)
+        .bind(USAGE_TOOLS.SALARY_PAYMENTS)
+        .first<{ limit: number }>();
+
+      const limit = limitRow?.limit ?? Infinity;
+
+      // Atomic increment-then-revert (same pattern as createUsageLimitMiddleware, N-count variant)
+      const counterResult = await db
+        .prepare(
+          `INSERT INTO usage_counters (user_id, negocio_id, tool, period, count, updated_at)
+           VALUES (?, ?, ?, ?, ?, datetime('now'))
+           ON CONFLICT(user_id, negocio_id, tool, period)
+           DO UPDATE SET count = count + ?, updated_at = datetime('now')
+           RETURNING count`
+        )
+        .bind(user.id, negocio.id, USAGE_TOOLS.SALARY_PAYMENTS, period, n, n)
+        .first<{ count: number }>();
+
+      const newCount = counterResult?.count ?? n;
+
+      if (newCount > limit) {
+        await db
+          .prepare(
+            `UPDATE usage_counters SET count = count - ?, updated_at = datetime('now')
+             WHERE user_id = ? AND negocio_id = ? AND tool = ? AND period = ?`
+          )
+          .bind(n, user.id, negocio.id, USAGE_TOOLS.SALARY_PAYMENTS, period)
+          .run();
+        return c.json(
+          apiError("USAGE_LIMIT_EXCEEDED", `Límite mensual alcanzado (${limit}). Actualiza a Usuario Inteligente para continuar.`),
+          429
+        );
+      }
+    }
 
     const now = new Date().toISOString();
     const paidDate = now.split("T")[0];
@@ -1921,10 +2044,182 @@ app.delete("/api/admin/emails/:id", authMiddleware, async (c) => {
 });
 
 // ============================================
+// Admin — Usage & Limits
+// ============================================
+
+app.get("/api/admin/usage", authMiddleware, async (c) => {
+  const user = c.get("user");
+  const db = c.env.DB;
+  if (!await isAdmin(user.email, db, c.env)) {
+    return c.json(apiError("UNAUTHORIZED", "No tienes permisos de administrador"), 403);
+  }
+  const period = new Date().toISOString().slice(0, 7);
+
+  const usersResult = await db.prepare(
+    "SELECT id, email, role FROM users ORDER BY email"
+  ).all<{ id: string; email: string; role: string }>();
+
+  const countsResult = await db.prepare(
+    "SELECT user_id, negocio_id, tool, SUM(count) as count FROM usage_counters WHERE period = ? GROUP BY user_id, negocio_id, tool"
+  ).bind(period).all<{ user_id: string; negocio_id: number; tool: string; count: number }>();
+
+  const negociosResult = await db.prepare(
+    "SELECT id, name FROM negocios"
+  ).all<{ id: number; name: string }>();
+
+  const userMap = new Map(usersResult.results.map(u => [u.id, u]));
+  const negocioNameMap = new Map(negociosResult.results.map(n => [n.id, n.name]));
+
+  // Map: "userId:negocioId" → { tool → count }
+  const usageMap = new Map<string, Record<string, number>>();
+  for (const row of countsResult.results) {
+    const key = `${row.user_id}:${row.negocio_id}`;
+    if (!usageMap.has(key)) usageMap.set(key, {});
+    usageMap.get(key)![row.tool] = row.count;
+  }
+
+  // One row per (user, negocio) pair that has any activity
+  const rows = [...usageMap.keys()].map(key => {
+    const [userId, negocioIdStr] = key.split(":");
+    const negocioId = parseInt(negocioIdStr);
+    const u = userMap.get(userId);
+    return {
+      user_id: userId,
+      email: u?.email ?? userId,
+      role: u?.role ?? "usuario_basico",
+      negocio_id: negocioId,
+      negocio_name: negocioNameMap.get(negocioId) ?? `Negocio ${negocioId}`,
+      usage: usageMap.get(key) ?? {},
+    };
+  }).sort((a, b) => a.email.localeCompare(b.email) || a.negocio_name.localeCompare(b.negocio_name));
+
+  return c.json(apiResponse({ period, rows }), 200);
+});
+
+app.get("/api/admin/usage-limits", authMiddleware, async (c) => {
+  const user = c.get("user");
+  const db = c.env.DB;
+  if (!await isAdmin(user.email, db, c.env)) {
+    return c.json(apiError("UNAUTHORIZED", "No tienes permisos de administrador"), 403);
+  }
+  const rows = await db.prepare(
+    `SELECT tool, "limit" FROM usage_limits ORDER BY tool`
+  ).all<{ tool: string; limit: number }>();
+  const limits: Record<string, number> = {};
+  for (const r of rows.results) limits[r.tool] = r.limit;
+  return c.json(apiResponse(limits), 200);
+});
+
+app.put("/api/admin/usage-limits", authMiddleware, async (c) => {
+  const user = c.get("user");
+  const db = c.env.DB;
+  if (!await isAdmin(user.email, db, c.env)) {
+    return c.json(apiError("UNAUTHORIZED", "No tienes permisos de administrador"), 403);
+  }
+  const body = await c.req.json<Record<string, number>>();
+  const validTools = ["employees","job_roles","topics","notes","advances","salary_payments","events","chat"];
+  const entries = Object.entries(body).filter(([tool, val]) =>
+    validTools.includes(tool) && typeof val === "number" && val >= 0
+  );
+  if (entries.length === 0) {
+    return c.json(apiError("VALIDATION_ERROR", "No hay herramientas válidas para actualizar"), 400);
+  }
+  const stmts = entries.map(([tool, limit]) =>
+    db.prepare(`UPDATE usage_limits SET "limit" = ? WHERE tool = ?`).bind(limit, tool)
+  );
+  await db.batch(stmts);
+  return c.json(apiResponse({ updated: entries.length }), 200);
+});
+
+// ============================================
+// Admin — User role management (Paso 5)
+// ============================================
+
+app.get("/api/admin/users", authMiddleware, async (c) => {
+  const user = c.get("user");
+  const db = c.env.DB;
+  if (!await isAdmin(user.email, db, c.env)) {
+    return c.json(apiError("UNAUTHORIZED", "No tienes permisos de administrador"), 403);
+  }
+  const rows = await db.prepare(
+    "SELECT id, email, name, role, created_at FROM users ORDER BY email"
+  ).all<{ id: string; email: string; name: string; role: string; created_at: string }>();
+  return c.json(apiResponse(rows.results), 200);
+});
+
+app.post("/api/admin/users/:userId/promote", authMiddleware, async (c) => {
+  const user = c.get("user");
+  const db = c.env.DB;
+  if (!await isAdmin(user.email, db, c.env)) {
+    return c.json(apiError("UNAUTHORIZED", "No tienes permisos de administrador"), 403);
+  }
+  const targetId = c.req.param("userId");
+  const target = await db.prepare("SELECT id, email FROM users WHERE id = ?")
+    .bind(targetId).first<{ id: string; email: string }>();
+  if (!target) {
+    return c.json(apiError("NOT_FOUND", "Usuario no encontrado"), 404);
+  }
+  await db.prepare("UPDATE users SET role = 'usuario_inteligente', updated_at = datetime('now') WHERE id = ?")
+    .bind(targetId).run();
+  return c.json(apiResponse({ id: targetId, role: "usuario_inteligente" }), 200);
+});
+
+app.post("/api/admin/users/:userId/demote", authMiddleware, async (c) => {
+  const user = c.get("user");
+  const db = c.env.DB;
+  if (!await isAdmin(user.email, db, c.env)) {
+    return c.json(apiError("UNAUTHORIZED", "No tienes permisos de administrador"), 403);
+  }
+  const targetId = c.req.param("userId");
+  // Corrección 8 — prevent self-demotion
+  if (targetId === user.id) {
+    return c.json(apiError("FORBIDDEN", "No puedes cambiar tu propio rol desde el panel admin"), 403);
+  }
+  const target = await db.prepare("SELECT id, email FROM users WHERE id = ?")
+    .bind(targetId).first<{ id: string; email: string }>();
+  if (!target) {
+    return c.json(apiError("NOT_FOUND", "Usuario no encontrado"), 404);
+  }
+  await db.prepare("UPDATE users SET role = 'usuario_basico', updated_at = datetime('now') WHERE id = ?")
+    .bind(targetId).run();
+  return c.json(apiResponse({ id: targetId, role: "usuario_basico" }), 200);
+});
+
+// ============================================
+// Usage — Current user quota (Corrección 7)
+// ============================================
+
+app.get("/api/usage/me", authMiddleware, negocioMiddleware, async (c) => {
+  const user = c.get("user");
+  const negocio = c.get("negocio");
+  const period = new Date().toISOString().slice(0, 7);
+  const db = c.env.DB;
+
+  const rows = await db.prepare(`
+    SELECT ul.tool, COALESCE(uc.count, 0) as count, ul."limit"
+    FROM usage_limits ul
+    LEFT JOIN usage_counters uc
+      ON ul.tool = uc.tool
+      AND uc.user_id = ?
+      AND uc.negocio_id = ?
+      AND uc.period = ?
+    ORDER BY ul.tool
+  `).bind(user.id, negocio.id, period).all<{ tool: string; count: number; limit: number }>();
+
+  const isIntelligente = user.role === "usuario_inteligente";
+  const usage: Record<string, { count: number; limit: number | null }> = {};
+  for (const row of rows.results) {
+    usage[row.tool] = { count: row.count, limit: isIntelligente ? null : row.limit };
+  }
+
+  return c.json(apiResponse({ period, role: user.role, usage }), 200);
+});
+
+// ============================================
 // Chatbot Routes (Protected + Negocio)
 // ============================================
 
-app.post("/api/chat", authMiddleware, negocioMiddleware, async (c) => {
+app.post("/api/chat", authMiddleware, negocioMiddleware, createUsageLimitMiddleware(USAGE_TOOLS.CHAT), async (c) => {
   try {
     const negocio = c.get("negocio");
     const db = c.env.DB;

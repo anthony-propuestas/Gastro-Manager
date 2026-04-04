@@ -1,6 +1,8 @@
 import { useState, useRef, useEffect } from "react";
 import { MessageCircle, X, Send, Trash2 } from "lucide-react";
 import { useChat } from "@/react-app/hooks/useChat";
+import { useMyUsage } from "@/react-app/hooks/useMyUsage";
+import { UsageBanner } from "@/react-app/components/UsageBanner";
 import { Button } from "@/react-app/components/ui/button";
 import { Input } from "@/react-app/components/ui/input";
 
@@ -8,6 +10,7 @@ export function ChatWidget() {
   const [isOpen, setIsOpen] = useState(false);
   const [inputValue, setInputValue] = useState("");
   const { messages, isLoading, error, sendMessage, clearMessages } = useChat();
+  const { data: myUsage } = useMyUsage();
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll to bottom when new messages arrive
@@ -61,6 +64,7 @@ export function ChatWidget() {
 
           {/* Messages */}
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            <UsageBanner label="Chat IA" usage={myUsage?.usage["chat"]} />
             {messages.length === 0 && (
               <div className="text-center text-muted-foreground text-sm mt-8">
                 <MessageCircle className="h-12 w-12 mx-auto mb-3 opacity-30" />

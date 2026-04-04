@@ -6,6 +6,7 @@ export interface AuthUser {
   email: string;
   name: string;
   picture: string;
+  role: string;
 }
 
 interface AuthContextValue {

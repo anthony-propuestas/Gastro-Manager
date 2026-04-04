@@ -15,6 +15,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/react-app/components
 import { useToast } from "@/react-app/components/ui/toast";
 import { useEvents, type CalendarEvent, type EventFormData } from "@/react-app/hooks/useEvents";
 import { useTopicDeadlines } from "@/react-app/hooks/useTopics";
+import { useMyUsage } from "@/react-app/hooks/useMyUsage";
+import { UsageBanner } from "@/react-app/components/UsageBanner";
 import { EventModal } from "@/react-app/components/EventModal";
 
 const daysOfWeek = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
@@ -47,6 +49,7 @@ export default function CalendarPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null);
   const toast = useToast();
+  const { data: myUsage } = useMyUsage();
 
   const {
     isLoading,
@@ -195,6 +198,7 @@ export default function CalendarPage() {
 
   return (
     <div className="space-y-6">
+      <UsageBanner label="Eventos" usage={myUsage?.usage["events"]} />
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>

@@ -18,6 +18,8 @@ import { Card, CardContent } from "@/react-app/components/ui/card";
 import { Badge } from "@/react-app/components/ui/badge";
 import { useToast } from "@/react-app/components/ui/toast";
 import { useEmployees, type Employee, type EmployeeInput } from "@/react-app/hooks/useEmployees";
+import { useMyUsage } from "@/react-app/hooks/useMyUsage";
+import { UsageBanner } from "@/react-app/components/UsageBanner";
 import EmployeeModal from "@/react-app/components/employees/EmployeeModal";
 import EmployeeDetailModal from "@/react-app/components/employees/EmployeeDetailModal";
 import JobRolesModal from "@/react-app/components/employees/JobRolesModal";
@@ -26,6 +28,7 @@ type FilterType = "all" | "active" | "inactive";
 
 export default function Employees() {
   const { employees, isLoading, error, createEmployee, updateEmployee, deleteEmployee } = useEmployees();
+  const { data: myUsage } = useMyUsage();
   const toast = useToast();
   const [searchQuery, setSearchQuery] = useState("");
   const [filter, setFilter] = useState<FilterType>("all");
@@ -119,6 +122,7 @@ export default function Employees() {
 
   return (
     <div className="space-y-6">
+      <UsageBanner label="Empleados" usage={myUsage?.usage["employees"]} />
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>

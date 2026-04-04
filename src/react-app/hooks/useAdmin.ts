@@ -1,5 +1,36 @@
 import { useState, useEffect } from "react";
 
+export interface UserUsage {
+  user_id: string;
+  email: string;
+  role: string;
+  usage: Partial<Record<string, number>>;
+}
+
+export interface UserNegocioUsage {
+  user_id: string;
+  email: string;
+  role: string;
+  negocio_id: number;
+  negocio_name: string;
+  usage: Partial<Record<string, number>>;
+}
+
+export interface AdminUsageData {
+  period: string;
+  rows: UserNegocioUsage[];
+}
+
+export type UsageLimits = Record<string, number>;
+
+export interface AdminUser {
+  id: string;
+  email: string;
+  name: string;
+  role: string;
+  created_at: string;
+}
+
 export interface AdminStats {
   totalUsers: number;
   registeredEmails: number;
@@ -25,6 +56,9 @@ export function useAdmin() {
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<AdminStats | null>(null);
   const [emails, setEmails] = useState<AdminEmail[]>([]);
+  const [usageData, setUsageData] = useState<AdminUsageData | null>(null);
+  const [limits, setLimits] = useState<UsageLimits>({});
+  const [users, setUsers] = useState<AdminUser[]>([]);
 
   useEffect(() => {
     checkAdminStatus();
@@ -87,6 +121,67 @@ export function useAdmin() {
     }
   };
 
+  const fetchUsage = async () => {
+    try {
+      const res = await fetch("/api/admin/usage");
+      const data = await res.json();
+      if (data.success) setUsageData(data.data);
+    } catch { /* silent */ }
+  };
+
+  const fetchLimits = async () => {
+    try {
+      const res = await fetch("/api/admin/usage-limits");
+      const data = await res.json();
+      if (data.success) setLimits(data.data);
+    } catch { /* silent */ }
+  };
+
+  const updateLimits = async (newLimits: Partial<UsageLimits>): Promise<{ success: boolean; error?: string }> => {
+    try {
+      const res = await fetch("/api/admin/usage-limits", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(newLimits),
+      });
+      const data = await res.json();
+      if (data.success) { await fetchLimits(); return { success: true }; }
+      return { success: false, error: data.error?.message };
+    } catch {
+      return { success: false, error: "Error al actualizar límites" };
+    }
+  };
+
+  const fetchUsers = async () => {
+    try {
+      const res = await fetch("/api/admin/users");
+      const data = await res.json();
+      if (data.success) setUsers(data.data);
+    } catch { /* silent */ }
+  };
+
+  const promoteUser = async (userId: string): Promise<{ success: boolean; error?: string }> => {
+    try {
+      const res = await fetch(`/api/admin/users/${userId}/promote`, { method: "POST" });
+      const data = await res.json();
+      if (data.success) { await fetchUsers(); return { success: true }; }
+      return { success: false, error: data.error?.message };
+    } catch {
+      return { success: false, error: "Error al promover usuario" };
+    }
+  };
+
+  const demoteUser = async (userId: string): Promise<{ success: boolean; error?: string }> => {
+    try {
+      const res = await fetch(`/api/admin/users/${userId}/demote`, { method: "POST" });
+      const data = await res.json();
+      if (data.success) { await fetchUsers(); return { success: true }; }
+      return { success: false, error: data.error?.message };
+    } catch {
+      return { success: false, error: "Error al regresar usuario a Básico" };
+    }
+  };
+
   const deleteEmail = async (id: number) => {
     try {
       const response = await fetch(`/api/admin/emails/${id}`, {
@@ -113,5 +208,14 @@ export function useAdmin() {
     fetchEmails,
     addEmail,
     deleteEmail,
+    usageData,
+    limits,
+    fetchUsage,
+    fetchLimits,
+    updateLimits,
+    users,
+    fetchUsers,
+    promoteUser,
+    demoteUser,
   };
 }

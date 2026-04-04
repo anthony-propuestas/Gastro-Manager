@@ -3,22 +3,47 @@ import { useAdmin } from "@/react-app/hooks/useAdmin";
 import { Button } from "@/react-app/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/react-app/components/ui/card";
 import { Input } from "@/react-app/components/ui/input";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/react-app/components/ui/table";
+import { Badge } from "@/react-app/components/ui/badge";
 import { useToast } from "@/react-app/components/ui/toast";
-import { Shield, Users, Mail, TrendingUp, Calendar, Banknote, UserPlus, Trash2, AlertCircle } from "lucide-react";
+import { Shield, Users, Mail, TrendingUp, Calendar, Banknote, UserPlus, Trash2, AlertCircle, BarChart3, Settings2, Crown, UserMinus } from "lucide-react";
+
+const TOOL_LABELS = [
+  { key: "employees",       label: "Empleados",  color: "bg-green-500" },
+  { key: "job_roles",       label: "Roles",      color: "bg-teal-500" },
+  { key: "topics",          label: "Temas",      color: "bg-blue-500" },
+  { key: "notes",           label: "Notas",      color: "bg-sky-500" },
+  { key: "advances",        label: "Anticipos",  color: "bg-amber-500" },
+  { key: "salary_payments", label: "Pagos",      color: "bg-orange-500" },
+  { key: "events",          label: "Eventos",    color: "bg-purple-500" },
+  { key: "chat",            label: "Chat IA",    color: "bg-pink-500" },
+] as const;
 
 export default function Admin() {
-  const { isAdmin, loading, stats, emails, fetchStats, fetchEmails, addEmail, deleteEmail } = useAdmin();
+  const { isAdmin, loading, stats, emails, fetchStats, fetchEmails, addEmail, deleteEmail,
+          usageData, limits, fetchUsage, fetchLimits, updateLimits,
+          users, fetchUsers, promoteUser, demoteUser } = useAdmin();
   const { showToast } = useToast();
   const [newEmail, setNewEmail] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [limitEdits, setLimitEdits] = useState<Record<string, number>>({});
+  const [isSavingLimits, setIsSavingLimits] = useState(false);
+  const [userSearch, setUserSearch] = useState("");
 
   useEffect(() => {
     if (isAdmin) {
       fetchStats();
       fetchEmails();
+      fetchUsage();
+      fetchLimits();
+      fetchUsers();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAdmin]);
+
+  useEffect(() => {
+    if (Object.keys(limits).length > 0) setLimitEdits(limits);
+  }, [limits]);
 
   const handleAddEmail = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -225,6 +250,243 @@ export default function Admin() {
               />
             </div>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* 4.3 — Cuotas usadas este mes */}
+      {usageData && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <BarChart3 className="h-5 w-5" />
+              Cuotas Usadas Este Mes
+            </CardTitle>
+            <CardDescription>
+              Uso acumulado de todos los usuarios en {usageData.period}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {TOOL_LABELS.map(({ key, label, color }) => {
+                const totalCount = usageData.rows.reduce((sum, r) => sum + (r.usage[key] ?? 0), 0);
+                const limit = limits[key] ?? 0;
+                const pairCount = usageData.rows.length;
+                const avgPct = limit > 0 && pairCount > 0
+                  ? Math.min((totalCount / (limit * pairCount)) * 100, 100)
+                  : 0;
+                return (
+                  <div key={key} className="space-y-1">
+                    <div className="text-sm font-medium">{label}</div>
+                    <div className="text-2xl font-bold">{totalCount}</div>
+                    <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                      <div className={`h-full ${color} transition-all`} style={{ width: `${avgPct}%` }} />
+                    </div>
+                    <div className="text-xs text-muted-foreground">Límite: {limit}/usuario</div>
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* 4.1 — Tabla de uso por usuario */}
+      {usageData && usageData.rows.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Users className="h-5 w-5" />
+              Uso por Usuario — {usageData.period}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Usuario</TableHead>
+                  <TableHead>Rol</TableHead>
+                  <TableHead>Negocio</TableHead>
+                  {TOOL_LABELS.map(t => (
+                    <TableHead key={t.key} className="text-center">{t.label}</TableHead>
+                  ))}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {usageData.rows.map(u => (
+                  <TableRow key={u.user_id + "-" + u.negocio_id}>
+                    <TableCell className="font-medium">{u.email}</TableCell>
+                    <TableCell>
+                      <Badge variant={u.role === "usuario_inteligente" ? "default" : "secondary"}>
+                        {u.role === "usuario_inteligente" ? "Inteligente" : "Básico"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground text-sm">{u.negocio_name}</TableCell>
+                    {TOOL_LABELS.map(t => (
+                      <TableCell key={t.key} className="text-center">
+                        {u.usage[t.key] ?? 0}
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* 4.2 — Configurar límites mensuales */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Settings2 className="h-5 w-5" />
+            Límites Mensuales
+          </CardTitle>
+          <CardDescription>
+            Cuotas para usuarios Básicos. Los usuarios Inteligentes no tienen límite.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {TOOL_LABELS.map(({ key, label }) => (
+              <div key={key} className="space-y-1">
+                <label className="text-sm font-medium">{label}</label>
+                <Input
+                  type="number"
+                  min={0}
+                  value={limitEdits[key] ?? ""}
+                  onChange={e => setLimitEdits(prev => ({ ...prev, [key]: parseInt(e.target.value) || 0 }))}
+                  disabled={isSavingLimits}
+                />
+              </div>
+            ))}
+          </div>
+          <Button
+            className="mt-4"
+            disabled={isSavingLimits || Object.keys(limitEdits).length === 0}
+            onClick={async () => {
+              setIsSavingLimits(true);
+              const result = await updateLimits(limitEdits);
+              setIsSavingLimits(false);
+              if (result.success) showToast("Límites actualizados", "success");
+              else showToast(result.error || "Error al guardar", "error");
+            }}
+          >
+            Guardar límites
+          </Button>
+        </CardContent>
+      </Card>
+
+      {/* Paso 5 — Gestión de Roles de Usuario */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Crown className="h-5 w-5" />
+            Gestión de Roles de Usuario
+          </CardTitle>
+          <CardDescription>
+            Promueve usuarios a Inteligente (sin límites) o regrésa los a Básico.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* Search & promote */}
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Buscar usuario por email</label>
+            <Input
+              type="text"
+              placeholder="correo@ejemplo.com"
+              value={userSearch}
+              onChange={e => setUserSearch(e.target.value)}
+            />
+            {(() => {
+              const q = userSearch.trim().toLowerCase();
+              if (!q) return null;
+              const matches = users.filter(u => u.email.toLowerCase().includes(q));
+              if (matches.length === 0) {
+                return <p className="text-sm text-muted-foreground">Sin resultados.</p>;
+              }
+              return (
+                <div className="space-y-2">
+                  {matches.map(u => (
+                    <div key={u.id} className="flex items-center justify-between p-3 border rounded-lg bg-card">
+                      <div>
+                        <div className="font-medium">{u.email}</div>
+                        <div className="text-xs text-muted-foreground">{u.name}</div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Badge variant={u.role === "usuario_inteligente" ? "default" : "secondary"}>
+                          {u.role === "usuario_inteligente" ? "Inteligente" : "Básico"}
+                        </Badge>
+                        {u.role === "usuario_basico" ? (
+                          <Button
+                            size="sm"
+                            onClick={async () => {
+                              const result = await promoteUser(u.id);
+                              if (result.success) showToast(`${u.email} promovido a Inteligente`, "success");
+                              else showToast(result.error || "Error al promover", "error");
+                            }}
+                          >
+                            <Crown className="h-3 w-3 mr-1" />
+                            Promover
+                          </Button>
+                        ) : (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={async () => {
+                              const result = await demoteUser(u.id);
+                              if (result.success) showToast(`${u.email} regresado a Básico`, "success");
+                              else showToast(result.error || "Error al cambiar rol", "error");
+                            }}
+                          >
+                            <UserMinus className="h-3 w-3 mr-1" />
+                            Regresar a Básico
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
+          </div>
+
+          {/* Table of usuario_inteligente */}
+          {users.filter(u => u.role === "usuario_inteligente").length > 0 && (
+            <div className="space-y-2">
+              <h3 className="text-sm font-medium">Usuarios Inteligentes actuales</h3>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Email</TableHead>
+                    <TableHead>Nombre</TableHead>
+                    <TableHead className="text-right">Acción</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {users.filter(u => u.role === "usuario_inteligente").map(u => (
+                    <TableRow key={u.id}>
+                      <TableCell className="font-medium">{u.email}</TableCell>
+                      <TableCell>{u.name}</TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={async () => {
+                            const result = await demoteUser(u.id);
+                            if (result.success) showToast(`${u.email} regresado a Básico`, "success");
+                            else showToast(result.error || "Error al cambiar rol", "error");
+                          }}
+                        >
+                          <UserMinus className="h-3 w-3 mr-1" />
+                          Regresar a Básico
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
         </CardContent>
       </Card>
 

@@ -3,6 +3,8 @@ import { DollarSign, TrendingUp, TrendingDown, CheckCircle2, Plus } from "lucide
 import { Button } from "@/react-app/components/ui/button";
 import { useSalaries, type EmployeeSalary } from "@/react-app/hooks/useSalaries";
 import { useToast } from "@/react-app/components/ui/toast";
+import { useMyUsage } from "@/react-app/hooks/useMyUsage";
+import { UsageBanner } from "@/react-app/components/UsageBanner";
 import AdvanceModal from "@/react-app/components/salaries/AdvanceModal";
 import EmployeeAdvancesModal from "@/react-app/components/salaries/EmployeeAdvancesModal";
 
@@ -25,6 +27,7 @@ type SalaryOverview = {
 export default function Salaries() {
   const { fetchOverview, markAsPaid, markAllAsPaid } = useSalaries();
   const { showToast } = useToast();
+  const { data: myUsage } = useMyUsage();
   
   const [overview, setOverview] = useState<SalaryOverview | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -100,6 +103,8 @@ export default function Salaries() {
 
   return (
     <div className="space-y-6">
+      <UsageBanner label="Pagos de sueldo" usage={myUsage?.usage["salary_payments"]} />
+      <UsageBanner label="Anticipos" usage={myUsage?.usage["advances"]} />
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
