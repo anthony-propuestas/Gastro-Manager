@@ -38,7 +38,7 @@
     "knip": "^5.51.0"
   },
   "scripts": {
-    "build": "tsc -b && vite build",
+    "build": "tsc -b --noEmit && vite build",
     "cf-typegen": "wrangler types",
     "check": "tsc && vite build && wrangler deploy --dry-run",
     "dev": "vite",

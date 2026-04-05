@@ -15,11 +15,11 @@ export interface Topic {
   updated_at: string;
 }
 
-export interface TopicWithEmployee extends Topic {
+interface TopicWithEmployee extends Topic {
   employee_name: string;
 }
 
-export interface Note {
+interface Note {
   id: number;
   topic_id: number;
   content: string;

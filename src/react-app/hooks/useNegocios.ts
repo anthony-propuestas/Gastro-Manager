@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import type { Negocio, NegocioMember, Invitation } from "../../shared/types";
+import type { Negocio, NegocioMember, Invitation } from "@/shared/types";
 
 export function useNegocios() {
   const [isLoading, setIsLoading] = useState(false);

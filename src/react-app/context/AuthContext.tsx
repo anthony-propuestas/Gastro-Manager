@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useState, useCallback, ReactNode } from "react";
-import type { Negocio } from "../../shared/types";
+import type { Negocio } from "@/shared/types";
 
-export interface AuthUser {
+interface AuthUser {
   id: string;
   email: string;
   name: string;

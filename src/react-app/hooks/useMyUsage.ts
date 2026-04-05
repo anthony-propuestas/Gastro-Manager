@@ -6,7 +6,7 @@ export interface ToolUsage {
   limit: number | null; // null = usuario_inteligente (sin límite)
 }
 
-export interface MyUsageData {
+interface MyUsageData {
   period: string;
   role: string;
   usage: Record<string, ToolUsage>;

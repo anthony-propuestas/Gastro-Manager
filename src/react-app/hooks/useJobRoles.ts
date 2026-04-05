@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
 import { apiFetch } from "../lib/api";
 
-export interface JobRole {
+interface JobRole {
   id: number;
   negocio_id: number;
   name: string;
@@ -10,7 +10,7 @@ export interface JobRole {
   updated_at: string;
 }
 
-export interface JobRoleInput {
+interface JobRoleInput {
   name: string;
 }
 

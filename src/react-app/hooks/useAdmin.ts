@@ -1,13 +1,7 @@
 import { useState, useEffect } from "react";
 
-export interface UserUsage {
-  user_id: string;
-  email: string;
-  role: string;
-  usage: Partial<Record<string, number>>;
-}
 
-export interface UserNegocioUsage {
+interface UserNegocioUsage {
   user_id: string;
   email: string;
   role: string;
@@ -16,14 +10,14 @@ export interface UserNegocioUsage {
   usage: Partial<Record<string, number>>;
 }
 
-export interface AdminUsageData {
+interface AdminUsageData {
   period: string;
   rows: UserNegocioUsage[];
 }
 
-export type UsageLimits = Record<string, number>;
+type UsageLimits = Record<string, number>;
 
-export interface AdminUser {
+interface AdminUser {
   id: string;
   email: string;
   name: string;
@@ -31,7 +25,7 @@ export interface AdminUser {
   created_at: string;
 }
 
-export interface AdminStats {
+interface AdminStats {
   totalUsers: number;
   registeredEmails: number;
   avgEmployees: number;
@@ -43,7 +37,7 @@ export interface AdminStats {
   };
 }
 
-export interface AdminEmail {
+interface AdminEmail {
   id: number;
   email: string;
   added_by: string;

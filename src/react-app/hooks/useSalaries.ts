@@ -16,7 +16,7 @@ export interface Advance {
   updated_at: string;
 }
 
-export interface AdvanceInput {
+interface AdvanceInput {
   amount: number;
   period_month?: number;
   period_year?: number;
@@ -33,7 +33,7 @@ export interface EmployeeSalary {
   remaining: number;
 }
 
-export interface SalaryOverview {
+interface SalaryOverview {
   employees: EmployeeSalary[];
   totals: {
     total_salaries: number;

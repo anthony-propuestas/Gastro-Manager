@@ -19,17 +19,3 @@ export const USAGE_TOOLS = {
 } as const;
 
 export type UsageTool = typeof USAGE_TOOLS[keyof typeof USAGE_TOOLS];
-
-// Default monthly limits for usuario_basico.
-// These are the seed values inserted in migration 9 into usage_limits.
-// They can be overridden from the Admin panel (PUT /api/admin/usage-limits).
-export const DEFAULT_USAGE_LIMITS: Record<UsageTool, number> = {
-  employees:        5,
-  job_roles:        3,
-  topics:           10,
-  notes:            20,
-  advances:         10,
-  salary_payments:  10,
-  events:           15,
-  chat:             20,
-};
