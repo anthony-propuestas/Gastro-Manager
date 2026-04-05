@@ -173,7 +173,7 @@ POST /api/chat { message }
 
 ```
 gastro-manager/
-├── migrations/           # 10 migraciones SQL (inmutables)
+├── migrations/           # 11 migraciones SQL (inmutables)
 ├── docs/                 # Documentación
 ├── src/
 │   ├── worker/
@@ -182,10 +182,13 @@ gastro-manager/
 │   │   └── validation.ts # Esquemas Zod
 │   └── react-app/
 │       ├── context/
-│       │   └── AuthContext.tsx    # user, role, currentNegocio
+│       │   ├── AuthContext.tsx        # user, role, currentNegocio
+│       │   └── ModulePrefsContext.tsx # preferencias de módulos
 │       ├── hooks/
-│       │   ├── useAdmin.ts        # Panel de admin
+│       │   ├── useAdmin.ts        # Panel de admin (14+ funciones)
 │       │   ├── useMyUsage.ts      # Cuotas propias
+│       │   ├── useModulePrefs.ts  # Visibilidad de módulos (optimistic)
+│       │   ├── useNegocios.ts     # Multi-tenancy: CRUD negocios
 │       │   ├── useChat.ts         # Chatbot
 │       │   └── use*.ts            # Hooks por módulo
 │       ├── components/
@@ -193,11 +196,16 @@ gastro-manager/
 │       │   ├── ChatWidget.tsx     # Widget flotante del chatbot
 │       │   └── ui/                # shadcn/ui components
 │       └── pages/
-│           ├── Admin.tsx          # Panel de administración
+│           ├── Admin.tsx          # Panel de administración (6 secciones)
 │           ├── Dashboard.tsx
 │           ├── Employees.tsx
 │           ├── Salaries.tsx
 │           ├── CalendarPage.tsx
+│           ├── NegocioSetup.tsx   # Selección/creación de negocio
+│           ├── InvitePage.tsx     # Flujo de invitación
+│           └── ...
+└── public/
+```
 │           └── ...
 └── public/
 ```
@@ -228,7 +236,7 @@ gastro-manager/
 Cada módulo tiene un hook (`useEmployees`, `useSalaries`, etc.) que encapsula el estado y las llamadas a API. Los componentes solo consumen el hook.
 
 ### Context API para estado global
-`AuthContext` expone `user`, `role`, `currentNegocio`, y la lista de negocios. `ToastContext` para notificaciones. `SidebarContext` para estado del menú.
+`AuthContext` expone `user`, `role`, `currentNegocio`, y la lista de negocios. `ToastContext` para notificaciones. `SidebarContext` para estado del menú. `ModulePrefsContext` distribuye las preferencias de visibilidad de módulos al Sidebar y Settings.
 
 ### Formato de respuesta uniforme
 Todos los endpoints devuelven `{ success: true, data }` o `{ success: false, error: { code, message } }`.

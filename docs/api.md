@@ -135,6 +135,27 @@ El usuario actual abandona el negocio.
 
 ---
 
+### Preferencias de Módulos
+*Solo requieren autenticación (sin `X-Negocio-ID`)*
+
+#### `GET /api/modules/prefs`
+Obtiene las preferencias de visibilidad de módulos del usuario. Módulos sin fila devuelven `true` por defecto.
+
+```json
+// Response data
+{ "calendario": true, "personal": true, "sueldos": false }
+```
+
+#### `PUT /api/modules/prefs`
+Activa o desactiva un módulo para el usuario. Upsert via `ON CONFLICT`.
+
+```json
+// Request
+{ "module_key": "sueldos", "is_active": false }
+```
+
+---
+
 ### Empleados
 *Requieren `X-Negocio-ID`*
 
@@ -518,4 +539,4 @@ El contexto enviado a Gemini incluye: empleados activos, sueldos del mes, antici
 
 - **Sin paginación**: todos los listados retornan el conjunto completo. Filtrado se realiza en cliente.
 - **Sin rate limiting propio**: Cloudflare Workers aplica 100,000 req/día en Free tier.
-- **CORS**: habilitado para el dominio de la aplicación.
+- **CORS**: no configurado explícitamente; funciona por same-origin (SPA y API servidos por el mismo Worker via `not_found_handling: single-page-application`).

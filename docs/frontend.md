@@ -88,35 +88,41 @@ Navegación lateral adaptativa.
 - Overlay oscuro
 
 ```tsx
-// Navegación
+// Navegación — items con moduleKey se filtran según preferencias de módulo
 const navItems = [
-  { label: "Dashboard", icon: Home, path: "/" },
-  { label: "Empleados", icon: Users, path: "/empleados" },
-  { label: "Sueldos", icon: Banknote, path: "/sueldos" },
-  { label: "Calendario", icon: Calendar, path: "/calendario" },
+  { label: "Dashboard", icon: LayoutDashboard, path: "/" },
+  { label: "Calendario", icon: Calendar, path: "/calendario", moduleKey: "calendario" },
+  { label: "Personal", icon: Users, path: "/empleados", moduleKey: "personal" },
+  { label: "Sueldos", icon: Banknote, path: "/sueldos", moduleKey: "sueldos" },
   { label: "Configuración", icon: Settings, path: "/configuracion" },
-  { label: "Admin", icon: Shield, path: "/admin" }, // Solo admins
 ];
+
+// El enlace Admin se renderiza condicionalmente fuera de navItems
+{isAdmin && <NavLink to="/admin" ... />}
 ```
+
+**Selector de negocio:** El sidebar incluye un dropdown para cambiar entre negocios del usuario (icono `Building2` + `ChevronDown`), con opción de crear un nuevo negocio directamente desde el menú.
+
+**Filtrado por módulos:** Los items con `moduleKey` se ocultan si el usuario ha desactivado ese módulo en la página de Configuración (via `useModulePrefsContext`).
 
 ## Páginas
 
 ### Dashboard (`pages/Dashboard.tsx`)
 
-Vista principal con resumen.
+Vista principal con resumen del negocio activo.
 
 **Características:**
-- 4 tarjetas de estadísticas (empleados, eventos, temas, sueldos)
-- Lista de empleados recientes
-- Eventos del día
-- Acciones rápidas
+- 4 tarjetas de estadísticas clicables (Empleados Activos, Eventos Hoy, Temas Abiertos, Sueldos del Mes)
+- Lista de los primeros 5 empleados
+- Eventos del día (filtrados desde la consulta mensual)
+- Acciones rápidas (Ver Personal, Gestionar Sueldos, Ver Calendario, Configuración)
+- **Sección de invitaciones:** genera URLs de invitación para el negocio actual via `POST /api/negocios/{id}/invitations`
 
 **Datos:**
 ```tsx
 const { employees } = useEmployees();
 const { fetchOverview } = useSalaries();
-const [eventsToday, setEventsToday] = useState([]);
-const [openTopics, setOpenTopics] = useState(0);
+// Eventos y tópicos se obtienen via fetch directo a /api/events y /api/topics/deadlines
 ```
 
 ### Employees (`pages/Employees.tsx`)
@@ -179,34 +185,47 @@ Calendario mensual con eventos y tópicos.
 </div>
 ```
 
-### Settings (`pages/Settings.tsx`)
+### NegocioSetup (`pages/NegocioSetup.tsx`)
 
-Configuración de la cuenta.
+Pantalla completa para selección o creación de negocio. Se muestra cuando un usuario autenticado no tiene ningún negocio seleccionado.
 
 **Características:**
-- Información del usuario
-- Preferencias (futuro)
-- Cerrar sesión
+- Lista de negocios existentes del usuario con conteo de miembros
+- Formulario de creación de nuevo negocio con validación
+- Link de logout para cambiar de cuenta
+- Usa `useNegocios` y `useAuth`
+
+### InvitePage (`pages/InvitePage.tsx`)
+
+Flujo de invitación accesible desde `/invite/:token`.
+
+**Máquina de estados:**
+1. **Loading** → consulta `GET /api/invitations/:token` para previsualizar
+2. **Preview** → muestra nombre del negocio, quién invita, fecha de expiración
+3. **Redeeming** → si el usuario está autenticado, botón "Unirme" canjea el token
+4. **Success** → refresca negocios, establece el nuevo como actual
+5. Si no está autenticado → redirige a login con `?next=/invite/:token`
+
+### Settings (`pages/Settings.tsx`)
+
+Configuración de la cuenta y del negocio.
+
+**Características:**
+- **Perfil:** Card con header (contenido pendiente de implementar)
+- **Módulos de Gestión:** Switches para activar/desactivar los 3 módulos visibles en el sidebar (calendario, personal, sueldos) via `useModulePrefsContext`
+- **Administradores del negocio:** Lista de miembros del negocio actual, botón para remover miembros (solo el creador), y botón para abandonar el negocio
 
 ### Admin (`pages/Admin.tsx`)
 
-Panel de administración (solo admins).
+Panel de administración (solo admins). Si el usuario no es admin, muestra una tarjeta de "Acceso Restringido".
 
-**Características:**
-- Estadísticas del sistema
-- Gráfico de uso por módulo
-- Gestión de emails administradores
-
-**Protección:**
-```tsx
-const { isAdmin } = useAdmin();
-
-useEffect(() => {
-  if (!isAdmin) {
-    navigate("/");
-  }
-}, [isAdmin]);
-```
+**6 secciones:**
+1. **Stats cards:** Total de usuarios, emails registrados, promedio de empleados y eventos por negocio
+2. **Estadísticas de uso:** Gráficos de barras por módulo (empleados, sueldos, calendario)
+3. **Cuotas mensuales usadas:** Grid de 8 herramientas (employees, job_roles, topics, notes, advances, salary_payments, events, chat) con tabla de uso por usuario/negocio
+4. **Configuración de límites mensuales:** Inputs editables por herramienta para usuarios "Básico", con botón guardar (`updateLimits`)
+5. **Gestión de roles de usuario:** Buscar usuarios por email, promover a "Usuario Inteligente" (sin límites) o degradar a "Básico", tabla de usuarios inteligentes actuales
+6. **Gestión de emails administradores:** Agregar/eliminar emails admin
 
 ### Login (`pages/Login.tsx`)
 
@@ -351,24 +370,32 @@ Funcionalidades de administración.
 ```tsx
 export function useAdmin() {
   const [isAdmin, setIsAdmin] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState(null);
   const [adminEmails, setAdminEmails] = useState([]);
+  const [usageData, setUsageData] = useState(null);
+  const [limits, setLimits] = useState(null);
+  const [users, setUsers] = useState([]);
 
-  const checkAdmin = async () => { ... };
+  const checkAdminStatus = async () => { ... };  // auto-runs on mount
   const fetchStats = async () => { ... };
   const fetchAdminEmails = async () => { ... };
   const addAdminEmail = async (email) => { ... };
   const removeAdminEmail = async (id) => { ... };
+  const fetchUsage = async () => { ... };           // GET /api/admin/usage
+  const fetchLimits = async () => { ... };           // GET /api/admin/usage-limits
+  const updateLimits = async (limits) => { ... };    // PUT /api/admin/usage-limits
+  const fetchUsers = async () => { ... };            // GET /api/admin/users
+  const promoteUser = async (userId) => { ... };     // POST /api/admin/users/:id/promote
+  const demoteUser = async (userId) => { ... };      // POST /api/admin/users/:id/demote
 
   return {
-    isAdmin,
-    stats,
-    adminEmails,
-    checkAdmin,
-    fetchStats,
-    fetchAdminEmails,
-    addAdminEmail,
-    removeAdminEmail,
+    isAdmin, loading, stats, adminEmails,
+    usageData, limits, users,
+    checkAdminStatus, fetchStats, fetchAdminEmails,
+    addAdminEmail, removeAdminEmail,
+    fetchUsage, fetchLimits, updateLimits,
+    fetchUsers, promoteUser, demoteUser,
   };
 }
 ```
@@ -393,6 +420,65 @@ export function useSidebar() {
   };
 }
 ```
+
+### useNegocios
+
+Gestión de negocios (multi-tenancy). Usa `fetch()` directo (cookie-based, sin `X-Negocio-ID`).
+
+```tsx
+export function useNegocios() {
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const createNegocio = async (name) => { ... };          // POST /api/negocios
+  const getNegocioDetail = async (id) => { ... };          // GET /api/negocios/:id
+  const generateInvitation = async (id) => { ... };        // POST /api/negocios/:id/invitations
+  const removeMember = async (negocioId, userId) => { ... }; // DELETE /api/negocios/:id/members/:userId
+  const leaveNegocio = async (id) => { ... };              // DELETE /api/negocios/:id/leave
+
+  return { isLoading, error, createNegocio, getNegocioDetail,
+           generateInvitation, removeMember, leaveNegocio };
+}
+```
+
+> **Nota:** comparte un solo estado `isLoading`/`error` para todas las operaciones; llamadas concurrentes pueden colisionar.
+
+### useModulePrefs
+
+Preferencias de visibilidad de módulos en el sidebar. Optimistic updates con revert on failure.
+
+```tsx
+export function useModulePrefs() {
+  const [prefs, setPrefs] = useState<Record<ModuleKey, boolean>>(
+    { calendario: true, personal: true, sueldos: true }
+  );
+
+  const toggleModule = async (key: ModuleKey) => { ... };  // PUT /api/modules/prefs
+
+  return { prefs, toggleModule };
+}
+
+// Constante exportada con metadata de cada módulo
+export const MODULES: { key, label, order, path, description }[];
+```
+
+**Runtime type guards:** Valida la forma de la respuesta del server (`isModulePrefsResponse`, `isToggleModuleResponse`). Es el único hook con validación de shape en runtime.
+
+### useMyUsage
+
+Cuotas de uso del usuario actual para el negocio activo.
+
+```tsx
+export function useMyUsage() {
+  const [data, setData] = useState(null);  // { period, role, usage: Record<tool, {count, limit}> }
+  const [isLoading, setIsLoading] = useState(false);
+
+  // Fetches GET /api/usage/me on currentNegocio.id change
+  return { data, isLoading };
+}
+```
+
+Usado por `ChatWidget` para mostrar `UsageBanner` del tool "chat".
 
 ### useChat
 
@@ -501,7 +587,31 @@ Estado del sidebar.
 </SidebarProvider>
 ```
 
+### ModulePrefsProvider
+
+Distribuye las preferencias de módulos (`useModulePrefs`) al árbol de componentes. Consumido por el Sidebar (para filtrar navItems) y por Settings (para los switches de toggle).
+
+```tsx
+<ModulePrefsProvider>
+  {children}
+</ModulePrefsProvider>
+
+// Uso en componentes
+const { prefs, toggleModule } = useModulePrefsContext();
+```
+
 ## Componentes Especiales
+
+### UsageBanner (`components/UsageBanner.tsx`)
+
+Banner de advertencia de cuota mensual. Se integra en componentes que consumen herramientas con límite (e.g. ChatWidget).
+
+**Props:** `label` (string), `usage` ({ count, limit })
+
+**Comportamiento:**
+- No se muestra si `usage` es undefined, `limit` es null (`usuario_inteligente`), o uso < 80%
+- **80-99%:** Banner ámbar — "Acercándote al límite mensual"
+- **100%+:** Banner rojo — "Límite mensual alcanzado. Actualiza a Usuario Inteligente para continuar"
 
 ### ChatWidget (Asistente Virtual IA)
 
@@ -511,12 +621,13 @@ Widget flotante para interactuar con el asistente virtual potenciado por Google 
 
 **Características:**
 - Botón flotante en esquina inferior derecha
-- Panel de chat expandible
+- Panel de chat expandible (`w-[380px]`, altura 500px)
+- Integra `UsageBanner` para la herramienta "chat" (via `useMyUsage`)
 - Historial de mensajes en la sesión
-- Indicador de carga mientras procesa
+- Animación de carga con puntos rebotando
 - Botón para limpiar historial
 - Soporte completo en español
-- Diseño responsive (se adapta a móvil)
+- Mensaje de bienvenida con lista de capacidades
 
 **Estructura:**
 ```tsx
@@ -527,12 +638,15 @@ Widget flotante para interactuar con el asistente virtual potenciado por Google 
   </button>
   
   {/* Panel de chat (cuando está abierto) */}
-  <div className="fixed bottom-24 right-6 w-80 md:w-96">
-    {/* Header */}
-    <div className="bg-primary text-white">
+  <div className="fixed bottom-24 right-6 w-[380px]">
+    {/* Header gradient */}
+    <div className="bg-gradient-to-br from-emerald-500 to-emerald-600 text-white">
       Asistente Virtual
       <button onClick={clearMessages}><Trash /></button>
     </div>
+
+    {/* UsageBanner del tool "chat" */}
+    <UsageBanner label="Chat IA" usage={chatUsage} />
     
     {/* Mensajes */}
     <div className="messages-container">
@@ -540,6 +654,9 @@ Widget flotante para interactuar con el asistente virtual potenciado por Google 
         <MessageBubble role={msg.role} content={msg.content} />
       ))}
     </div>
+    
+    {/* Error (estado separado, no como mensaje) */}
+    {error && <div className="error-box red">{error}</div>}
     
     {/* Input */}
     <form onSubmit={sendMessage}>
@@ -553,7 +670,7 @@ Widget flotante para interactuar con el asistente virtual potenciado por Google 
 **Estilos de mensajes:**
 - **Usuario:** Burbujas verdes alineadas a la derecha
 - **Asistente:** Burbujas grises alineadas a la izquierda
-- **Error:** Burbujas rojas con mensaje de error
+- **Error:** Caja roja separada del historial (no como burbuja de mensaje)
 
 **Ejemplos de uso:**
 ```
@@ -614,19 +731,21 @@ Por página individual.
   {/* Public */}
   <Route path="/login" element={<Login />} />
   <Route path="/auth/callback" element={<AuthCallback />} />
+  <Route path="/invite/:token" element={<InvitePage />} />
 
-  {/* Protected */}
-  <Route path="/" element={
-    <ProtectedRoute>
-      <MainLayout>
-        <PageErrorBoundary>
-          <Dashboard />
-        </PageErrorBoundary>
-      </MainLayout>
-    </ProtectedRoute>
-  } />
-  {/* ... más rutas protegidas */}
+  {/* Protected — sin requerir negocio */}
+  <Route path="/negocio/setup" element={<ProtectedRoute><NegocioSetup /></ProtectedRoute>} />
+
+  {/* Protected — requieren negocio activo */}
+  <Route path="/" element={<ProtectedRoute><MainLayout><Dashboard /></MainLayout></ProtectedRoute>} />
+  <Route path="/empleados" element={<ProtectedRoute><MainLayout><Employees /></MainLayout></ProtectedRoute>} />
+  <Route path="/sueldos" element={<ProtectedRoute><MainLayout><Salaries /></MainLayout></ProtectedRoute>} />
+  <Route path="/calendario" element={<ProtectedRoute><MainLayout><CalendarPage /></MainLayout></ProtectedRoute>} />
+  <Route path="/configuracion" element={<ProtectedRoute><MainLayout><Settings /></MainLayout></ProtectedRoute>} />
+  <Route path="/admin" element={<ProtectedRoute><MainLayout><Admin /></MainLayout></ProtectedRoute>} />
 </Routes>
+
+{/* Provider hierarchy: ErrorBoundary > AuthProvider > ToastProvider > Router > ModulePrefsProvider > SidebarProvider > ChatWidget */}
 ```
 
 ## Estilos y Tema

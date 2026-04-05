@@ -109,7 +109,30 @@ export default function Settings() {
             </div>
           </div>
         </CardHeader>
-        <CardContent />
+        <CardContent>
+          {user ? (
+            <div className="flex items-center gap-4">
+              {user.picture ? (
+                <img
+                  src={user.picture}
+                  alt={user.name}
+                  className="w-12 h-12 rounded-full object-cover"
+                  referrerPolicy="no-referrer"
+                />
+              ) : (
+                <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center text-lg font-semibold text-muted-foreground">
+                  {user.name.charAt(0).toUpperCase()}
+                </div>
+              )}
+              <div className="min-w-0">
+                <p className="font-medium truncate">{user.name}</p>
+                <p className="text-sm text-muted-foreground truncate">{user.email}</p>
+              </div>
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">Cargando información del perfil…</p>
+          )}
+        </CardContent>
       </Card>
 
       {/* Módulos de Gestión */}

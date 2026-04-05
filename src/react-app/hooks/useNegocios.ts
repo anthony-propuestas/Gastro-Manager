@@ -2,11 +2,16 @@ import { useState, useCallback } from "react";
 import type { Negocio, NegocioMember, Invitation } from "@/shared/types";
 
 export function useNegocios() {
-  const [isLoading, setIsLoading] = useState(false);
+  const [operationLoading, setOperationLoading] = useState<Record<string, boolean>>({});
   const [error, setError] = useState<string | null>(null);
 
+  const startOp = (key: string) => setOperationLoading((prev) => ({ ...prev, [key]: true }));
+  const endOp = (key: string) => setOperationLoading((prev) => ({ ...prev, [key]: false }));
+
+  const isLoading = Object.values(operationLoading).some(Boolean);
+
   const createNegocio = useCallback(async (name: string): Promise<Negocio | null> => {
-    setIsLoading(true);
+    startOp("create");
     setError(null);
     try {
       const res = await fetch("/api/negocios", {
@@ -22,13 +27,13 @@ export function useNegocios() {
       setError("Sin conexión. Revisa tu internet.");
       return null;
     } finally {
-      setIsLoading(false);
+      endOp("create");
     }
   }, []);
 
   const getNegocioDetail = useCallback(
     async (negocioId: number): Promise<(Negocio & { members: NegocioMember[] }) | null> => {
-      setIsLoading(true);
+      startOp("detail");
       setError(null);
       try {
         const res = await fetch(`/api/negocios/${negocioId}`);
@@ -40,7 +45,7 @@ export function useNegocios() {
         setError("Sin conexión. Revisa tu internet.");
         return null;
       } finally {
-        setIsLoading(false);
+        endOp("detail");
       }
     },
     []
@@ -48,7 +53,7 @@ export function useNegocios() {
 
   const generateInvitation = useCallback(
     async (negocioId: number): Promise<Invitation | null> => {
-      setIsLoading(true);
+      startOp("invite");
       setError(null);
       try {
         const res = await fetch(`/api/negocios/${negocioId}/invitations`, {
@@ -63,7 +68,7 @@ export function useNegocios() {
         setError("Sin conexión. Revisa tu internet.");
         return null;
       } finally {
-        setIsLoading(false);
+        endOp("invite");
       }
     },
     []
@@ -71,7 +76,7 @@ export function useNegocios() {
 
   const removeMember = useCallback(
     async (negocioId: number, userId: string): Promise<boolean> => {
-      setIsLoading(true);
+      startOp("remove");
       setError(null);
       try {
         const res = await fetch(`/api/negocios/${negocioId}/members/${userId}`, {
@@ -86,14 +91,14 @@ export function useNegocios() {
         setError("Sin conexión. Revisa tu internet.");
         return false;
       } finally {
-        setIsLoading(false);
+        endOp("remove");
       }
     },
     []
   );
 
   const leaveNegocio = useCallback(async (negocioId: number): Promise<boolean> => {
-    setIsLoading(true);
+    startOp("leave");
     setError(null);
     try {
       const res = await fetch(`/api/negocios/${negocioId}/leave`, {
@@ -108,7 +113,7 @@ export function useNegocios() {
       setError("Sin conexión. Revisa tu internet.");
       return false;
     } finally {
-      setIsLoading(false);
+      endOp("leave");
     }
   }, []);
 
