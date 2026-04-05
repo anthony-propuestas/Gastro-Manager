@@ -5,6 +5,7 @@ import ProtectedRoute from "@/react-app/components/auth/ProtectedRoute";
 import { ToastProvider } from "@/react-app/components/ui/toast";
 import { ErrorBoundary, PageErrorBoundary } from "@/react-app/components/ErrorBoundary";
 import { SidebarProvider } from "@/react-app/hooks/useSidebar";
+import { ModulePrefsProvider } from "@/react-app/context/ModulePrefsContext";
 import { ChatWidget } from "@/react-app/components/ChatWidget";
 import Dashboard from "@/react-app/pages/Dashboard";
 import Employees from "@/react-app/pages/Employees";
@@ -23,6 +24,7 @@ export default function App() {
       <AuthProvider>
         <ToastProvider>
           <Router>
+            <ModulePrefsProvider>
             <SidebarProvider>
             <ChatWidget />
             <Routes>
@@ -116,6 +118,7 @@ export default function App() {
               />
             </Routes>
             </SidebarProvider>
+            </ModulePrefsProvider>
           </Router>
         </ToastProvider>
       </AuthProvider>

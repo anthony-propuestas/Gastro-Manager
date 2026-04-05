@@ -658,6 +658,73 @@ app.delete("/api/negocios/:id/leave", authMiddleware, async (c) => {
 });
 
 // ============================================
+// Módulos de usuario (Protected, no negocio)
+// ============================================
+
+const VALID_MODULE_KEYS = ["calendario", "personal", "sueldos"] as const;
+type ModuleKey = (typeof VALID_MODULE_KEYS)[number];
+
+app.get("/api/modules/prefs", authMiddleware, async (c) => {
+  try {
+    const user = c.get("user");
+    const db = c.env.DB;
+
+    const rows = await db
+      .prepare("SELECT module_key, is_active FROM user_module_prefs WHERE user_id = ?")
+      .bind(user.id)
+      .all<{ module_key: string; is_active: number }>();
+
+    const data: Record<string, boolean> = {
+      calendario: true,
+      personal: true,
+      sueldos: true,
+    };
+
+    for (const row of rows.results) {
+      if (VALID_MODULE_KEYS.includes(row.module_key as ModuleKey)) {
+        data[row.module_key] = row.is_active === 1;
+      }
+    }
+
+    return c.json({ success: true, data });
+  } catch (error) {
+    console.error("Error fetching module prefs:", error);
+    return c.json(apiError("FETCH_ERROR", "Error al obtener preferencias de módulos"), 500);
+  }
+});
+
+app.put("/api/modules/prefs", authMiddleware, async (c) => {
+  try {
+    const user = c.get("user");
+    const db = c.env.DB;
+    const body = await c.req.json<{ module_key: string; is_active: boolean }>();
+
+    if (!VALID_MODULE_KEYS.includes(body.module_key as ModuleKey)) {
+      return c.json(apiError("INVALID_MODULE", "Módulo no válido"), 400);
+    }
+    if (typeof body.is_active !== "boolean") {
+      return c.json(apiError("INVALID_VALUE", "is_active debe ser boolean"), 400);
+    }
+
+    await db
+      .prepare(
+        `INSERT INTO user_module_prefs (user_id, module_key, is_active, updated_at)
+         VALUES (?, ?, ?, datetime('now'))
+         ON CONFLICT(user_id, module_key) DO UPDATE SET
+           is_active  = excluded.is_active,
+           updated_at = excluded.updated_at`
+      )
+      .bind(user.id, body.module_key, body.is_active ? 1 : 0)
+      .run();
+
+    return c.json({ success: true, data: { module_key: body.module_key, is_active: body.is_active } });
+  } catch (error) {
+    console.error("Error updating module prefs:", error);
+    return c.json(apiError("UPDATE_ERROR", "Error al actualizar preferencias de módulos"), 500);
+  }
+});
+
+// ============================================
 // Employee Routes (Protected + Negocio)
 // ============================================
 

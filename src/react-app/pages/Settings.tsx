@@ -1,16 +1,26 @@
 import { useEffect, useState } from "react";
-import { User, UsersRound, UserMinus, LogOut } from "lucide-react";
+import { User, UsersRound, UserMinus, LogOut, Calendar, Users, Banknote, LayoutGrid } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/react-app/components/ui/card";
 import { Button } from "@/react-app/components/ui/button";
 import { Separator } from "@/react-app/components/ui/separator";
+import { Switch } from "@/react-app/components/ui/switch";
 
 import { useAuth } from "@/react-app/context/AuthContext";
 import { useNegocios } from "@/react-app/hooks/useNegocios";
+import { useModulePrefsContext } from "@/react-app/context/ModulePrefsContext";
+import { MODULES } from "@/react-app/hooks/useModulePrefs";
 import type { NegocioMember } from "@/shared/types";
+
+const MODULE_ICONS = {
+  calendario: Calendar,
+  personal: Users,
+  sueldos: Banknote,
+} as const;
 
 export default function Settings() {
   const { user, currentNegocio, setCurrentNegocio, refreshNegocios } = useAuth();
   const { getNegocioDetail, removeMember, leaveNegocio } = useNegocios();
+  const { prefs, toggleModule } = useModulePrefsContext();
   const [members, setMembers] = useState<NegocioMember[]>([]);
   const [isCreator, setIsCreator] = useState(false);
   const [teamError, setTeamError] = useState("");
@@ -100,6 +110,49 @@ export default function Settings() {
           </div>
         </CardHeader>
         <CardContent />
+      </Card>
+
+      {/* Módulos de Gestión */}
+      <Card className="border-0 shadow-sm">
+        <CardHeader>
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-primary/10">
+              <LayoutGrid className="w-5 h-5 text-primary" />
+            </div>
+            <div>
+              <CardTitle className="text-lg font-serif">Módulos de Gestión</CardTitle>
+              <CardDescription>
+                Personaliza las herramientas visibles en el menú lateral
+              </CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {MODULES.map((mod) => {
+            const Icon = MODULE_ICONS[mod.key];
+            return (
+              <div
+                key={mod.key}
+                className="flex items-center justify-between gap-4 rounded-lg border p-4"
+              >
+                <div className="flex items-center gap-3">
+                  <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md bg-primary/10 text-xs font-bold text-primary">
+                    {mod.order}
+                  </span>
+                  <Icon className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                  <div>
+                    <p className="font-medium text-sm">{mod.label}</p>
+                    <p className="text-xs text-muted-foreground">{mod.description}</p>
+                  </div>
+                </div>
+                <Switch
+                  checked={prefs[mod.key] !== false}
+                  onCheckedChange={() => toggleModule(mod.key)}
+                />
+              </div>
+            );
+          })}
+        </CardContent>
       </Card>
 
       <Card className="border-0 shadow-sm">

@@ -20,13 +20,14 @@ import {
 import { cn } from "@/react-app/lib/utils";
 import { useState, useEffect } from "react";
 import { useSidebar } from "@/react-app/hooks/useSidebar";
+import { useModulePrefsContext } from "@/react-app/context/ModulePrefsContext";
 import type { Negocio } from "@/shared/types";
 
 const navItems = [
-  { path: "/", label: "Dashboard", icon: LayoutDashboard },
-  { path: "/empleados", label: "Personal", icon: Users },
-  { path: "/sueldos", label: "Sueldos", icon: Banknote },
-  { path: "/calendario", label: "Calendario", icon: Calendar },
+  { path: "/",             label: "Dashboard",    icon: LayoutDashboard },
+  { path: "/calendario",   label: "Calendario",   icon: Calendar,  moduleKey: "calendario" as const },
+  { path: "/empleados",    label: "Personal",     icon: Users,     moduleKey: "personal"   as const },
+  { path: "/sueldos",      label: "Sueldos",      icon: Banknote,  moduleKey: "sueldos"    as const },
   { path: "/configuracion", label: "Configuración", icon: Settings },
 ];
 
@@ -38,6 +39,8 @@ export default function Sidebar() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [showNegocioDropdown, setShowNegocioDropdown] = useState(false);
   const { isOpen, isCollapsed, setIsOpen, toggleCollapsed } = useSidebar();
+  const { prefs } = useModulePrefsContext();
+  const visibleNavItems = navItems.filter((item) => !item.moduleKey || prefs[item.moduleKey] !== false);
 
   // Check admin status
   useEffect(() => {
@@ -191,7 +194,7 @@ export default function Sidebar() {
 
         {/* Navigation */}
         <nav className="flex-1 p-3 lg:p-4 space-y-1 overflow-y-auto">
-          {navItems.map((item) => {
+          {visibleNavItems.map((item) => {
             const isActive =
               item.path === "/"
                 ? location.pathname === "/"
