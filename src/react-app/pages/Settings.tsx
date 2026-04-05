@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { User, UsersRound, UserMinus, LogOut, Calendar, Users, Banknote, LayoutGrid } from "lucide-react";
+import { User, UsersRound, UserMinus, LogOut, Calendar, Users, Banknote, LayoutGrid, Crown, Loader2, Lock } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/react-app/components/ui/card";
 import { Button } from "@/react-app/components/ui/button";
 import { Separator } from "@/react-app/components/ui/separator";
@@ -17,15 +17,19 @@ const MODULE_ICONS = {
   sueldos: Banknote,
 } as const;
 
+type OwnerStatus = 'loading' | 'owner' | 'pending' | 'none';
+
 export default function Settings() {
   const { user, currentNegocio, setCurrentNegocio, refreshNegocios } = useAuth();
   const { getNegocioDetail, removeMember, leaveNegocio } = useNegocios();
-  const { prefs, toggleModule } = useModulePrefsContext();
+  const { prefs, toggleModule, negocioRestrictions, isGerente } = useModulePrefsContext();
   const [members, setMembers] = useState<NegocioMember[]>([]);
   const [isCreator, setIsCreator] = useState(false);
   const [teamError, setTeamError] = useState("");
   const [loadingMember, setLoadingMember] = useState<string | null>(null);
   const [leaving, setLeaving] = useState(false);
+  const [ownerStatus, setOwnerStatus] = useState<OwnerStatus>('loading');
+  const [requestingOwner, setRequestingOwner] = useState(false);
 
   useEffect(() => {
     const loadTeam = async () => {
@@ -47,6 +51,41 @@ export default function Settings() {
 
     loadTeam();
   }, [currentNegocio, getNegocioDetail, user?.id]);
+
+  const negocioId = currentNegocio?.id;
+
+  useEffect(() => {
+    if (negocioId == null || user?.role !== 'usuario_inteligente') {
+      setOwnerStatus('none');
+      return;
+    }
+
+    setOwnerStatus('loading');
+    fetch(`/api/negocios/${negocioId}/my-owner-request`)
+      .then((r) => r.json())
+      .then((json) => {
+        if (json.success) setOwnerStatus(json.data.status as OwnerStatus);
+        else setOwnerStatus('none');
+      })
+      .catch(() => setOwnerStatus('none'));
+  }, [negocioId, user?.role]);
+
+  const handleRequestOwner = async () => {
+    if (!currentNegocio) return;
+    setRequestingOwner(true);
+    try {
+      const res = await fetch(`/api/negocios/${currentNegocio.id}/request-owner`, { method: "POST" });
+      const json = await res.json();
+      if (json.success) {
+        setOwnerStatus(json.data.status as OwnerStatus);
+        if (json.data.status === 'approved') await refreshNegocios();
+      }
+    } catch {
+      // silently fail
+    } finally {
+      setRequestingOwner(false);
+    }
+  };
 
   const handleRemoveMember = async (userId: string) => {
     if (!currentNegocio) return;
@@ -153,6 +192,7 @@ export default function Settings() {
         <CardContent className="space-y-3">
           {MODULES.map((mod) => {
             const Icon = MODULE_ICONS[mod.key];
+            const restricted = isGerente && negocioRestrictions[mod.key];
             return (
               <div
                 key={mod.key}
@@ -165,18 +205,76 @@ export default function Settings() {
                   <Icon className="w-4 h-4 text-muted-foreground flex-shrink-0" />
                   <div>
                     <p className="font-medium text-sm">{mod.label}</p>
-                    <p className="text-xs text-muted-foreground">{mod.description}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {restricted ? (
+                        <span className="flex items-center gap-1 text-amber-600">
+                          <Lock className="w-3 h-3" /> Restringido por el owner
+                        </span>
+                      ) : mod.description}
+                    </p>
                   </div>
                 </div>
                 <Switch
                   checked={prefs[mod.key] !== false}
                   onCheckedChange={() => toggleModule(mod.key)}
+                  disabled={restricted}
                 />
               </div>
             );
           })}
         </CardContent>
       </Card>
+
+      {/* Owner card — only for usuario_inteligente */}
+      {user?.role === 'usuario_inteligente' && currentNegocio && (
+        <Card className="border-0 shadow-sm">
+          <CardHeader>
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-amber-500/10">
+                <Crown className="w-5 h-5 text-amber-500" />
+              </div>
+              <div>
+                <CardTitle className="text-lg font-serif">Rol de Owner</CardTitle>
+                <CardDescription>
+                  Conviértete en dueño de este negocio para acceder al panel de gestión
+                </CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {ownerStatus === 'loading' && (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Verificando estado...
+              </div>
+            )}
+            {ownerStatus === 'owner' && (
+              <div className="flex items-center gap-2 text-sm font-medium text-amber-600">
+                <Crown className="w-4 h-4" />
+                Eres Owner de este negocio
+              </div>
+            )}
+            {ownerStatus === 'pending' && (
+              <p className="text-sm text-muted-foreground">
+                Tu solicitud está pendiente de aprobación por un owner existente.
+              </p>
+            )}
+            {ownerStatus === 'none' && (
+              <Button
+                onClick={handleRequestOwner}
+                disabled={requestingOwner}
+                className="bg-amber-500 hover:bg-amber-600 text-white"
+              >
+                {requestingOwner ? (
+                  <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Procesando...</>
+                ) : (
+                  <><Crown className="w-4 h-4 mr-2" />Identifícame como Dueño</>
+                )}
+              </Button>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       <Card className="border-0 shadow-sm">
         <CardHeader>

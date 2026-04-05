@@ -52,9 +52,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (data.success) {
         const list: Negocio[] = data.data;
         setNegocios(list);
-        // If currentNegocio is stale (removed from memberships), clear it
-        if (currentNegocio && !list.some(n => n.id === currentNegocio.id)) {
-          setCurrentNegocio(null);
+        if (currentNegocio) {
+          const updated = list.find(n => n.id === currentNegocio.id);
+          if (updated) {
+            // Re-sync with fresh data including my_role
+            setCurrentNegocioState(updated);
+            localStorage.setItem("currentNegocio", JSON.stringify(updated));
+          } else {
+            setCurrentNegocio(null);
+          }
         }
       }
     } catch {

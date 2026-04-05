@@ -9,6 +9,7 @@ export type Negocio = {
   member_count?: number;
   created_at: string;
   updated_at: string;
+  my_role?: 'gerente' | 'owner';
 };
 
 export type NegocioMember = {
@@ -17,6 +18,23 @@ export type NegocioMember = {
   user_name: string;
   invited_by: string;
   joined_at: string;
+  negocio_role: 'gerente' | 'owner';
+};
+
+export type OwnerRequest = {
+  id: number;
+  negocio_id: number;
+  user_id: string;
+  user_name: string;
+  user_email: string;
+  status: 'pending' | 'approved' | 'rejected';
+  requested_at: string;
+};
+
+export type NegocioModuleRestrictions = {
+  calendario: boolean;
+  personal: boolean;
+  sueldos: boolean;
 };
 
 export type Invitation = {

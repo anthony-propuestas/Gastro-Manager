@@ -333,10 +333,10 @@ app.post("/api/negocios", authMiddleware, async (c) => {
 
     const negocioId = result.meta.last_row_id;
 
-    // Add creator as first member
+    // Add creator as first member with owner role
     await db
       .prepare(
-        "INSERT INTO negocio_members (negocio_id, user_id, user_email, user_name, invited_by, joined_at) VALUES (?, ?, ?, ?, ?, ?)"
+        "INSERT INTO negocio_members (negocio_id, user_id, user_email, user_name, invited_by, joined_at, negocio_role) VALUES (?, ?, ?, ?, ?, ?, 'owner')"
       )
       .bind(negocioId, user.id, user.email, user.name, user.id, now)
       .run();
@@ -358,7 +358,8 @@ app.get("/api/negocios", authMiddleware, async (c) => {
     const negocios = await db
       .prepare(
         `SELECT n.*,
-          (SELECT COUNT(*) FROM negocio_members WHERE negocio_id = n.id) as member_count
+          (SELECT COUNT(*) FROM negocio_members WHERE negocio_id = n.id) as member_count,
+          nm.negocio_role as my_role
          FROM negocios n
          JOIN negocio_members nm ON n.id = nm.negocio_id
          WHERE nm.user_id = ?
@@ -402,7 +403,7 @@ app.get("/api/negocios/:id", authMiddleware, async (c) => {
 
     const members = await db
       .prepare(
-        "SELECT user_id, user_email, user_name, invited_by, joined_at FROM negocio_members WHERE negocio_id = ? ORDER BY joined_at ASC"
+        "SELECT user_id, user_email, user_name, invited_by, joined_at, negocio_role FROM negocio_members WHERE negocio_id = ? ORDER BY joined_at ASC"
       )
       .bind(negocioId)
       .all();
@@ -645,6 +646,28 @@ app.delete("/api/negocios/:id/leave", authMiddleware, async (c) => {
       }
     }
 
+    // Last owner cannot leave if there are other members
+    const memberRole = await db
+      .prepare("SELECT negocio_role FROM negocio_members WHERE negocio_id = ? AND user_id = ?")
+      .bind(negocioId, user.id)
+      .first() as { negocio_role: string } | null;
+
+    if (memberRole?.negocio_role === 'owner') {
+      const ownerCount = await db
+        .prepare("SELECT COUNT(*) as count FROM negocio_members WHERE negocio_id = ? AND negocio_role = 'owner'")
+        .bind(negocioId)
+        .first() as { count: number } | null;
+
+      const totalCount = await db
+        .prepare("SELECT COUNT(*) as count FROM negocio_members WHERE negocio_id = ?")
+        .bind(negocioId)
+        .first() as { count: number } | null;
+
+      if ((ownerCount?.count ?? 0) <= 1 && (totalCount?.count ?? 0) > 1) {
+        return c.json(apiError("LAST_OWNER_CANNOT_LEAVE", "Eres el único owner. Aprueba otro owner antes de salir."), 409);
+      }
+    }
+
     await db
       .prepare("DELETE FROM negocio_members WHERE negocio_id = ? AND user_id = ?")
       .bind(negocioId, user.id)
@@ -654,6 +677,309 @@ app.delete("/api/negocios/:id/leave", authMiddleware, async (c) => {
   } catch (error) {
     console.error("Error leaving negocio:", error);
     return c.json(apiError("DELETE_ERROR", "Error al salir del negocio"), 500);
+  }
+});
+
+// ============================================
+// Owner role system
+// ============================================
+
+// Get current user's owner status in a negocio
+app.get("/api/negocios/:id/my-owner-request", authMiddleware, async (c) => {
+  try {
+    const user = c.get("user");
+    const negocioId = Number(c.req.param("id"));
+    const db = c.env.DB;
+
+    const membership = await db
+      .prepare("SELECT negocio_role FROM negocio_members WHERE negocio_id = ? AND user_id = ?")
+      .bind(negocioId, user.id)
+      .first<{ negocio_role: string }>();
+
+    if (!membership) {
+      return c.json(apiError("NEGOCIO_ACCESS_DENIED", "No eres miembro de este negocio"), 403);
+    }
+
+    if (membership.negocio_role === 'owner') {
+      return c.json(apiResponse({ status: 'owner' }), 200);
+    }
+
+    const pendingRequest = await db
+      .prepare("SELECT id FROM owner_requests WHERE negocio_id = ? AND user_id = ? AND status = 'pending'")
+      .bind(negocioId, user.id)
+      .first();
+
+    return c.json(apiResponse({ status: pendingRequest ? 'pending' : 'none' }), 200);
+  } catch (error) {
+    console.error("Error fetching owner request status:", error);
+    return c.json(apiError("FETCH_ERROR", "Error al obtener estado"), 500);
+  }
+});
+
+// Request to become owner
+app.post("/api/negocios/:id/request-owner", authMiddleware, async (c) => {
+  try {
+    const user = c.get("user");
+    const negocioId = Number(c.req.param("id"));
+    const db = c.env.DB;
+
+    if (user.role !== 'usuario_inteligente') {
+      return c.json(apiError("FORBIDDEN", "Solo los usuarios inteligentes pueden solicitar ser owner"), 403);
+    }
+
+    const membership = await db
+      .prepare("SELECT negocio_role FROM negocio_members WHERE negocio_id = ? AND user_id = ?")
+      .bind(negocioId, user.id)
+      .first<{ negocio_role: string }>();
+
+    if (!membership) {
+      return c.json(apiError("NEGOCIO_ACCESS_DENIED", "No eres miembro de este negocio"), 403);
+    }
+
+    if (membership.negocio_role === 'owner') {
+      return c.json(apiError("ALREADY_OWNER", "Ya eres owner de este negocio"), 409);
+    }
+
+    const pendingRequest = await db
+      .prepare("SELECT id FROM owner_requests WHERE negocio_id = ? AND user_id = ? AND status = 'pending'")
+      .bind(negocioId, user.id)
+      .first();
+
+    if (pendingRequest) {
+      return c.json(apiError("REQUEST_PENDING", "Ya tienes una solicitud pendiente"), 409);
+    }
+
+    const ownerCount = await db
+      .prepare("SELECT COUNT(*) as count FROM negocio_members WHERE negocio_id = ? AND negocio_role = 'owner'")
+      .bind(negocioId)
+      .first<{ count: number }>();
+
+    const now = new Date().toISOString();
+
+    if ((ownerCount?.count ?? 0) === 0) {
+      // First owner — auto-approve
+      await db.batch([
+        db.prepare("UPDATE negocio_members SET negocio_role = 'owner' WHERE negocio_id = ? AND user_id = ?")
+          .bind(negocioId, user.id),
+        db.prepare("INSERT INTO owner_requests (negocio_id, user_id, status, requested_at, resolved_at, resolved_by) VALUES (?, ?, 'approved', ?, ?, ?)")
+          .bind(negocioId, user.id, now, now, user.id),
+      ]);
+      return c.json(apiResponse({ status: 'approved' }), 200);
+    }
+
+    // Existing owners — create pending request
+    await db
+      .prepare("INSERT INTO owner_requests (negocio_id, user_id, requested_at) VALUES (?, ?, ?)")
+      .bind(negocioId, user.id, now)
+      .run();
+
+    return c.json(apiResponse({ status: 'pending' }), 200);
+  } catch (error) {
+    console.error("Error requesting owner:", error);
+    return c.json(apiError("CREATE_ERROR", "Error al solicitar ser owner"), 500);
+  }
+});
+
+// List pending owner requests (owner only)
+app.get("/api/negocios/:id/owner-requests", authMiddleware, async (c) => {
+  try {
+    const user = c.get("user");
+    const negocioId = Number(c.req.param("id"));
+    const db = c.env.DB;
+
+    const membership = await db
+      .prepare("SELECT negocio_role FROM negocio_members WHERE negocio_id = ? AND user_id = ?")
+      .bind(negocioId, user.id)
+      .first<{ negocio_role: string }>();
+
+    if (!membership || membership.negocio_role !== 'owner') {
+      return c.json(apiError("NEGOCIO_ACCESS_DENIED", "Solo los owners pueden ver las solicitudes"), 403);
+    }
+
+    const requests = await db
+      .prepare(
+        `SELECT or2.id, or2.negocio_id, or2.user_id, or2.status, or2.requested_at,
+                nm.user_name, nm.user_email
+         FROM owner_requests or2
+         JOIN negocio_members nm ON nm.negocio_id = or2.negocio_id AND nm.user_id = or2.user_id
+         WHERE or2.negocio_id = ? AND or2.status = 'pending'
+         ORDER BY or2.requested_at ASC`
+      )
+      .bind(negocioId)
+      .all();
+
+    return c.json(apiResponse(requests.results), 200);
+  } catch (error) {
+    console.error("Error fetching owner requests:", error);
+    return c.json(apiError("FETCH_ERROR", "Error al obtener solicitudes"), 500);
+  }
+});
+
+// Approve owner request (owner only)
+app.post("/api/negocios/:id/owner-requests/:requestId/approve", authMiddleware, async (c) => {
+  try {
+    const user = c.get("user");
+    const negocioId = Number(c.req.param("id"));
+    const requestId = Number(c.req.param("requestId"));
+    const db = c.env.DB;
+
+    const membership = await db
+      .prepare("SELECT negocio_role FROM negocio_members WHERE negocio_id = ? AND user_id = ?")
+      .bind(negocioId, user.id)
+      .first<{ negocio_role: string }>();
+
+    if (!membership || membership.negocio_role !== 'owner') {
+      return c.json(apiError("NEGOCIO_ACCESS_DENIED", "Solo los owners pueden aprobar solicitudes"), 403);
+    }
+
+    const request = await db
+      .prepare("SELECT user_id, status FROM owner_requests WHERE id = ? AND negocio_id = ?")
+      .bind(requestId, negocioId)
+      .first<{ user_id: string; status: string }>();
+
+    if (!request) {
+      return c.json(apiError("NOT_FOUND", "Solicitud no encontrada"), 404);
+    }
+
+    if (request.status !== 'pending') {
+      return c.json(apiError("REQUEST_NOT_PENDING", "La solicitud ya fue procesada"), 409);
+    }
+
+    const now = new Date().toISOString();
+    await db.batch([
+      db.prepare("UPDATE negocio_members SET negocio_role = 'owner' WHERE negocio_id = ? AND user_id = ?")
+        .bind(negocioId, request.user_id),
+      db.prepare("UPDATE owner_requests SET status = 'approved', resolved_at = ?, resolved_by = ? WHERE id = ?")
+        .bind(now, user.id, requestId),
+    ]);
+
+    return c.json(apiResponse({ approved: true }), 200);
+  } catch (error) {
+    console.error("Error approving owner request:", error);
+    return c.json(apiError("UPDATE_ERROR", "Error al aprobar la solicitud"), 500);
+  }
+});
+
+// Reject owner request (owner only)
+app.post("/api/negocios/:id/owner-requests/:requestId/reject", authMiddleware, async (c) => {
+  try {
+    const user = c.get("user");
+    const negocioId = Number(c.req.param("id"));
+    const requestId = Number(c.req.param("requestId"));
+    const db = c.env.DB;
+
+    const membership = await db
+      .prepare("SELECT negocio_role FROM negocio_members WHERE negocio_id = ? AND user_id = ?")
+      .bind(negocioId, user.id)
+      .first<{ negocio_role: string }>();
+
+    if (!membership || membership.negocio_role !== 'owner') {
+      return c.json(apiError("NEGOCIO_ACCESS_DENIED", "Solo los owners pueden rechazar solicitudes"), 403);
+    }
+
+    const request = await db
+      .prepare("SELECT status FROM owner_requests WHERE id = ? AND negocio_id = ?")
+      .bind(requestId, negocioId)
+      .first<{ status: string }>();
+
+    if (!request) {
+      return c.json(apiError("NOT_FOUND", "Solicitud no encontrada"), 404);
+    }
+
+    if (request.status !== 'pending') {
+      return c.json(apiError("REQUEST_NOT_PENDING", "La solicitud ya fue procesada"), 409);
+    }
+
+    const now = new Date().toISOString();
+    await db
+      .prepare("UPDATE owner_requests SET status = 'rejected', resolved_at = ?, resolved_by = ? WHERE id = ?")
+      .bind(now, user.id, requestId)
+      .run();
+
+    return c.json(apiResponse({ rejected: true }), 200);
+  } catch (error) {
+    console.error("Error rejecting owner request:", error);
+    return c.json(apiError("UPDATE_ERROR", "Error al rechazar la solicitud"), 500);
+  }
+});
+
+// Get module restrictions for a negocio
+app.get("/api/negocios/:id/module-restrictions", authMiddleware, async (c) => {
+  try {
+    const user = c.get("user");
+    const negocioId = Number(c.req.param("id"));
+    const db = c.env.DB;
+
+    const membership = await db
+      .prepare("SELECT negocio_id FROM negocio_members WHERE negocio_id = ? AND user_id = ?")
+      .bind(negocioId, user.id)
+      .first();
+
+    if (!membership) {
+      return c.json(apiError("NEGOCIO_ACCESS_DENIED", "No tienes acceso a este negocio"), 403);
+    }
+
+    const rows = await db
+      .prepare("SELECT module_key, is_restricted FROM negocio_module_restrictions WHERE negocio_id = ?")
+      .bind(negocioId)
+      .all<{ module_key: string; is_restricted: number }>();
+
+    const data: Record<string, boolean> = {
+      calendario: false,
+      personal: false,
+      sueldos: false,
+    };
+
+    for (const row of rows.results) {
+      data[row.module_key] = row.is_restricted === 1;
+    }
+
+    return c.json(apiResponse(data), 200);
+  } catch (error) {
+    console.error("Error fetching module restrictions:", error);
+    return c.json(apiError("FETCH_ERROR", "Error al obtener restricciones"), 500);
+  }
+});
+
+// Update module restriction (owner only)
+app.put("/api/negocios/:id/module-restrictions", authMiddleware, async (c) => {
+  try {
+    const user = c.get("user");
+    const negocioId = Number(c.req.param("id"));
+    const db = c.env.DB;
+
+    const membership = await db
+      .prepare("SELECT negocio_role FROM negocio_members WHERE negocio_id = ? AND user_id = ?")
+      .bind(negocioId, user.id)
+      .first<{ negocio_role: string }>();
+
+    if (!membership || membership.negocio_role !== 'owner') {
+      return c.json(apiError("NEGOCIO_ACCESS_DENIED", "Solo los owners pueden cambiar restricciones"), 403);
+    }
+
+    const body = await c.req.json() as { module_key?: string; is_restricted?: boolean };
+    const VALID_KEYS = ['calendario', 'personal', 'sueldos'];
+
+    if (!body.module_key || !VALID_KEYS.includes(body.module_key) || typeof body.is_restricted !== 'boolean') {
+      return c.json(apiError("VALIDATION_ERROR", "module_key y is_restricted son requeridos"), 400);
+    }
+
+    const now = new Date().toISOString();
+    await db
+      .prepare(
+        `INSERT INTO negocio_module_restrictions (negocio_id, module_key, is_restricted, updated_at)
+         VALUES (?, ?, ?, ?)
+         ON CONFLICT(negocio_id, module_key) DO UPDATE SET
+           is_restricted = excluded.is_restricted,
+           updated_at    = excluded.updated_at`
+      )
+      .bind(negocioId, body.module_key, body.is_restricted ? 1 : 0, now)
+      .run();
+
+    return c.json(apiResponse({ module_key: body.module_key, is_restricted: body.is_restricted }), 200);
+  } catch (error) {
+    console.error("Error updating module restriction:", error);
+    return c.json(apiError("UPDATE_ERROR", "Error al actualizar restricción"), 500);
   }
 });
 

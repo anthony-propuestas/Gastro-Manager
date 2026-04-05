@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/react-app/context/AuthContext";
+import type { NegocioModuleRestrictions } from "@/shared/types";
 
 export const MODULES = [
   { key: "calendario", label: "Calendario", order: 1, path: "/calendario", description: "Gestión de eventos y agenda" },
@@ -45,9 +46,17 @@ function isToggleModuleResponse(value: unknown): value is ToggleModuleResponse {
   return isRecord(value) && typeof value.success === "boolean";
 }
 
+const DEFAULT_RESTRICTIONS: NegocioModuleRestrictions = {
+  calendario: false,
+  personal: false,
+  sueldos: false,
+};
+
 export function useModulePrefs() {
-  const { user } = useAuth();
+  const { user, currentNegocio } = useAuth();
   const [prefs, setPrefs] = useState<Record<ModuleKey, boolean>>(DEFAULT_PREFS);
+  const [negocioRestrictions, setNegocioRestrictions] = useState<NegocioModuleRestrictions>(DEFAULT_RESTRICTIONS);
+  const isGerente = currentNegocio?.my_role === 'gerente';
 
   useEffect(() => {
     if (!user) return;
@@ -65,6 +74,24 @@ export function useModulePrefs() {
       })
       .catch((err) => console.error("Error loading module prefs:", err));
   }, [user]);
+
+  const negocioId = currentNegocio?.id;
+
+  useEffect(() => {
+    if (!user || negocioId == null) {
+      setNegocioRestrictions(DEFAULT_RESTRICTIONS);
+      return;
+    }
+
+    fetch(`/api/negocios/${negocioId}/module-restrictions`)
+      .then((r) => r.json())
+      .then((json) => {
+        if (json.success && typeof json.data === 'object') {
+          setNegocioRestrictions({ ...DEFAULT_RESTRICTIONS, ...json.data });
+        }
+      })
+      .catch((err) => console.error("Error loading module restrictions:", err));
+  }, [user, negocioId]);
 
   const toggleModule = useCallback(async (key: ModuleKey) => {
     const newValue = !prefs[key];
@@ -91,5 +118,5 @@ export function useModulePrefs() {
     }
   }, [prefs]);
 
-  return { prefs, toggleModule };
+  return { prefs, toggleModule, negocioRestrictions, isGerente };
 }

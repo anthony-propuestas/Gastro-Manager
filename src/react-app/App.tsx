@@ -13,6 +13,7 @@ import Salaries from "@/react-app/pages/Salaries";
 import CalendarPage from "@/react-app/pages/CalendarPage";
 import Settings from "@/react-app/pages/Settings";
 import Admin from "@/react-app/pages/Admin";
+import OwnerPanel from "@/react-app/pages/OwnerPanel";
 import Login from "@/react-app/pages/Login";
 import AuthCallback from "@/react-app/pages/AuthCallback";
 import NegocioSetup from "@/react-app/pages/NegocioSetup";
@@ -111,6 +112,18 @@ export default function App() {
                     <MainLayout>
                       <PageErrorBoundary>
                         <Admin />
+                      </PageErrorBoundary>
+                    </MainLayout>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/owner"
+                element={
+                  <ProtectedRoute>
+                    <MainLayout>
+                      <PageErrorBoundary>
+                        <OwnerPanel />
                       </PageErrorBoundary>
                     </MainLayout>
                   </ProtectedRoute>
