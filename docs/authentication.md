@@ -1,29 +1,30 @@
 # Autenticación
 
-Sistema de autenticación basado en Google OAuth mediante Mocha Users Service.
+Sistema de autenticación basado en Google OAuth nativo con sesiones JWT firmadas por el propio Worker.
 
 ## Flujo de Autenticación
 
 ### 1. Login Inicial
 
 ```
-Usuario → Click "Login con Google" 
+Usuario → Click "Login con Google"
         ↓
 GET /api/oauth/google/redirect_url
-        ↓
-Redirect a Google OAuth
+        ↓ Construye URL de Google OAuth con GOOGLE_CLIENT_ID
+Redirect a accounts.google.com/o/oauth2/v2/auth
         ↓
 Usuario autoriza la app
         ↓
 Google redirect a /auth/callback?code=XXX
         ↓
-POST /api/sessions con código OAuth
+POST /api/sessions { code }
+        ↓ Worker intercambia code con Google (oauth2.googleapis.com/token)
+        ↓ Fetch info del usuario (googleapis.com/oauth2/v2/userinfo)
+        ↓ UPSERT en tabla users (sin sobrescribir role)
+        ↓ Crea JWT firmado con JWT_SECRET (jose, HS256, TTL 7 días)
+Cookie session_token=<jwt> (HttpOnly, Secure, SameSite=Lax)
         ↓
-Backend intercambia código por session token
-        ↓
-Token guardado en cookie httpOnly
-        ↓
-Redirect a Dashboard
+Redirect a /dashboard
 ```
 
 ### 2. Requests Subsecuentes
@@ -33,12 +34,12 @@ Usuario navega en la app
         ↓
 Request a /api/endpoint
         ↓
-Cookie con session token enviada automáticamente
+Cookie session_token enviada automáticamente
         ↓
-authMiddleware verifica token
-        ↓
-Si válido: procesa request
-Si inválido: 401 Unauthorized
+authMiddleware: jwtVerify(token, JWT_SECRET)
+        ↓ Lee role fresco de tabla users (nunca confía en el JWT para role)
+Si válido → continúa con el handler
+Si inválido → 401 INVALID_SESSION
 ```
 
 ### 3. Logout
@@ -46,579 +47,275 @@ Si inválido: 401 Unauthorized
 ```
 Usuario → Click "Cerrar Sesión"
         ↓
-DELETE /api/sessions
+GET /api/logout
         ↓
-Cookie eliminada
+Cookie session_token eliminada (Max-Age=0)
         ↓
 Redirect a /login
 ```
 
+---
+
+## Variables de Entorno Requeridas
+
+| Variable | Descripción |
+|---|---|
+| `GOOGLE_CLIENT_ID` | Client ID de la app en Google Cloud Console |
+| `GOOGLE_CLIENT_SECRET` | Client Secret de Google OAuth |
+| `JWT_SECRET` | Clave secreta para firmar/verificar JWTs (mínimo 32 bytes, hex aleatorio) |
+| `INITIAL_ADMIN_EMAIL` | Email del primer administrador del sistema |
+
+---
+
 ## Implementación Backend
 
-### Mocha Users Service
+### JWT / Sesiones
 
-SDK oficial de Mocha para autenticación.
+El Worker usa la librería `jose` para crear y verificar JWTs. No hay servicio externo de autenticación.
 
-**Instalación:**
-```bash
-npm install @getmocha/users-service
+```typescript
+import { SignJWT, jwtVerify } from "jose";
+
+const COOKIE_NAME = "session_token";
+
+// Crear sesión (en POST /api/sessions)
+async function createSession(payload: UserPayload, secret: string): Promise<string> {
+  return new SignJWT(payload as unknown as Record<string, unknown>)
+    .setProtectedHeader({ alg: "HS256" })
+    .setExpirationTime("7d")
+    .sign(new TextEncoder().encode(secret));
+}
+
+// Verificar sesión (en authMiddleware)
+async function verifySession(token: string, secret: string): Promise<UserPayload> {
+  const { payload } = await jwtVerify(token, new TextEncoder().encode(secret));
+  return payload as unknown as UserPayload;
+}
 ```
-
-**Variables de entorno (auto-inyectadas):**
-- `MOCHA_USERS_SERVICE_API_URL`: URL del servicio de usuarios
-- `MOCHA_USERS_SERVICE_API_KEY`: API key de autenticación
 
 ### Endpoints de Auth
 
 #### Obtener URL de redirect
 
 ```typescript
-import { getOAuthRedirectUrl } from "@getmocha/users-service/backend";
-
-app.get("/api/oauth/google/redirect_url", async (c) => {
-  const redirectUrl = await getOAuthRedirectUrl("google", {
-    apiUrl: c.env.MOCHA_USERS_SERVICE_API_URL,
-    apiKey: c.env.MOCHA_USERS_SERVICE_API_KEY,
-  });
-
-  return c.json({ redirectUrl }, 200);
+app.get("/api/oauth/google/redirect_url", (c) => {
+  const origin = new URL(c.req.url).origin;
+  const redirectUri = `${origin}/auth/callback`;
+  const url =
+    `https://accounts.google.com/o/oauth2/v2/auth?` +
+    `client_id=${encodeURIComponent(c.env.GOOGLE_CLIENT_ID)}` +
+    `&redirect_uri=${encodeURIComponent(redirectUri)}` +
+    `&response_type=code` +
+    `&scope=openid%20email%20profile`;
+  return c.json({ success: true, data: { redirect_url: url } });
 });
 ```
 
-#### Intercambiar código por token
+#### Intercambiar código por sesión
 
 ```typescript
-import { exchangeCodeForSessionToken } from "@getmocha/users-service/backend";
-
 app.post("/api/sessions", async (c) => {
   const { code } = await c.req.json();
 
-  const { sessionToken } = await exchangeCodeForSessionToken(code, {
-    apiUrl: c.env.MOCHA_USERS_SERVICE_API_URL,
-    apiKey: c.env.MOCHA_USERS_SERVICE_API_KEY,
+  // 1. Intercambiar code con Google
+  const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      code,
+      client_id: c.env.GOOGLE_CLIENT_ID,
+      client_secret: c.env.GOOGLE_CLIENT_SECRET,
+      redirect_uri: `${origin}/auth/callback`,
+      grant_type: "authorization_code",
+    }),
   });
+  const { access_token } = await tokenRes.json();
 
-  // Guardar token en cookie
-  setCookie(c, MOCHA_SESSION_TOKEN_COOKIE_NAME, sessionToken, {
-    httpOnly: true,
-    secure: true,
-    sameSite: "Lax",
-    path: "/",
-    maxAge: 60 * 60 * 24 * 7, // 7 días
+  // 2. Obtener datos del usuario de Google
+  const userRes = await fetch("https://www.googleapis.com/oauth2/v2/userinfo", {
+    headers: { Authorization: `Bearer ${access_token}` },
   });
+  const googleUser = await userRes.json();
 
-  return c.json({ success: true, data: { token: sessionToken } });
+  // 3. UPSERT en users (role nunca se sobreescribe)
+  await db.prepare(`
+    INSERT INTO users (id, email, name, picture, role, created_at, updated_at)
+    VALUES (?, ?, ?, ?, 'usuario_basico', datetime('now'), datetime('now'))
+    ON CONFLICT(id) DO UPDATE SET
+      email = excluded.email, name = excluded.name,
+      picture = excluded.picture, updated_at = excluded.updated_at
+  `).bind(googleUser.id, googleUser.email, googleUser.name, googleUser.picture).run();
+
+  // 4. Leer role asignado (puede haber sido promovido previamente)
+  const dbUser = await db.prepare("SELECT role FROM users WHERE id = ?")
+    .bind(googleUser.id).first();
+
+  // 5. Crear JWT y setear cookie
+  const jwt = await createSession(
+    { id: googleUser.id, email: googleUser.email, name: googleUser.name,
+      picture: googleUser.picture, role: dbUser?.role ?? "usuario_basico" },
+    c.env.JWT_SECRET
+  );
+
+  c.header("Set-Cookie",
+    `${COOKIE_NAME}=${jwt}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=604800`
+  );
+  return c.json({ success: true }, 200);
 });
 ```
 
 #### Cerrar sesión
 
 ```typescript
-import { deleteSession } from "@getmocha/users-service/backend";
-
-app.delete("/api/sessions", async (c) => {
-  const sessionToken = getCookie(c, MOCHA_SESSION_TOKEN_COOKIE_NAME);
-
-  if (sessionToken) {
-    await deleteSession(sessionToken, {
-      apiUrl: c.env.MOCHA_USERS_SERVICE_API_URL,
-      apiKey: c.env.MOCHA_USERS_SERVICE_API_KEY,
-    });
-  }
-
-  // Eliminar cookie
-  setCookie(c, MOCHA_SESSION_TOKEN_COOKIE_NAME, "", {
-    httpOnly: true,
-    secure: true,
-    sameSite: "Lax",
-    path: "/",
-    maxAge: 0,
-  });
-
-  return c.json({ success: true, data: {} });
+app.get("/api/logout", (c) => {
+  c.header("Set-Cookie",
+    `${COOKIE_NAME}=; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=0`
+  );
+  return c.json({ success: true }, 200);
 });
 ```
 
 ### Auth Middleware
 
-Protege rutas que requieren autenticación.
+Protege todas las rutas `/api/*` excepto las de OAuth.
 
 ```typescript
-import { authMiddleware } from "@getmocha/users-service/backend";
+const authMiddleware = async (c, next) => {
+  const token = getCookie(c, "session_token");
+  if (!token) {
+    return c.json({ success: false, error: { code: "UNAUTHORIZED" } }, 401);
+  }
 
-// Aplicar a todas las rutas /api/*
-app.use("/api/*", authMiddleware({
-  apiUrl: c.env.MOCHA_USERS_SERVICE_API_URL,
-  apiKey: c.env.MOCHA_USERS_SERVICE_API_KEY,
-  excludePaths: [
-    "/api/oauth/google/redirect_url",
-    "/api/sessions",
-  ],
-}));
+  try {
+    const user = await verifySession(token, c.env.JWT_SECRET);
 
-// En handlers, acceder al usuario
-app.get("/api/employees", async (c) => {
-  const user = c.get("user"); // { id: "...", email: "..." }
-  
-  // Filtrar datos por user_id
-  const employees = await db
-    .prepare("SELECT * FROM employees WHERE user_id = ?")
-    .bind(user.id)
-    .all();
-    
-  return c.json({ success: true, data: employees.results });
-});
+    // Rol siempre desde DB, nunca del JWT (para que cambios del admin sean inmediatos)
+    const dbUser = await c.env.DB
+      .prepare("SELECT role FROM users WHERE id = ?")
+      .bind(user.id)
+      .first();
+    user.role = dbUser?.role ?? "usuario_basico";
+
+    c.set("user", user);
+    await next();
+  } catch {
+    return c.json(
+      { success: false, error: { code: "INVALID_SESSION", message: "Sesión inválida o expirada" } },
+      401
+    );
+  }
+};
 ```
 
-### Obtener Info del Usuario
-
-```typescript
-app.get("/api/users/me", async (c) => {
-  const user = c.get("user");
-  
-  return c.json({
-    success: true,
-    data: {
-      id: user.id,
-      email: user.email,
-      name: user.name,
-      picture: user.picture,
-    },
-  });
-});
-```
+---
 
 ## Implementación Frontend
 
-### AuthProvider
+### AuthContext
 
-Wrapper de la aplicación con contexto de auth.
+El contexto de autenticación está implementado en `src/react-app/context/AuthContext.tsx`. Expone:
 
 ```tsx
-import { AuthProvider } from "@getmocha/users-service/react";
-
-function App() {
-  return (
-    <AuthProvider>
-      <Router>
-        {/* Rutas */}
-      </Router>
-    </AuthProvider>
-  );
-}
+const { user, role, currentNegocio, negocios, logout } = useAuth();
 ```
+
+Al montar la app, llama a `GET /api/users/me`. Si la cookie `session_token` es válida, el servidor devuelve los datos del usuario. Si no, redirige a `/login`.
 
 ### ProtectedRoute
 
-Componente para proteger rutas.
-
 ```tsx
 // components/auth/ProtectedRoute.tsx
-import { useAuth } from "@getmocha/users-service/react";
-import { Navigate } from "react-router";
-
 export default function ProtectedRoute({ children }) {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { user, isLoading } = useAuth();
 
-  if (isLoading) {
-    return <div>Cargando...</div>;
-  }
-
-  if (!isAuthenticated) {
-    return <Navigate to="/login" replace />;
-  }
-
+  if (isLoading) return <div>Cargando...</div>;
+  if (!user) return <Navigate to="/login" replace />;
   return <>{children}</>;
 }
-```
-
-**Uso:**
-```tsx
-<Route path="/empleados" element={
-  <ProtectedRoute>
-    <Employees />
-  </ProtectedRoute>
-} />
 ```
 
 ### Login Page
 
 ```tsx
 // pages/Login.tsx
-import { useAuth } from "@getmocha/users-service/react";
-
-export default function Login() {
-  const { isAuthenticated } = useAuth();
-  const navigate = useNavigate();
-
-  useEffect(() => {
-    if (isAuthenticated) {
-      navigate("/");
-    }
-  }, [isAuthenticated]);
-
-  const handleLogin = async () => {
-    // Obtener URL de redirect
-    const response = await fetch("/api/oauth/google/redirect_url");
-    const { redirectUrl } = await response.json();
-    
-    // Redirigir a Google
-    window.location.href = redirectUrl;
-  };
-
-  return (
-    <div className="login-container">
-      <h1>Gastro Manager</h1>
-      <button onClick={handleLogin}>
-        Login con Google
-      </button>
-    </div>
-  );
-}
+const handleLogin = async () => {
+  const response = await fetch("/api/oauth/google/redirect_url");
+  const { data } = await response.json();
+  window.location.href = data.redirect_url;
+};
 ```
 
 ### Auth Callback
 
 ```tsx
 // pages/AuthCallback.tsx
-export default function AuthCallback() {
-  const navigate = useNavigate();
+useEffect(() => {
+  const params = new URLSearchParams(window.location.search);
+  const code = params.get("code");
 
-  useEffect(() => {
-    const handleCallback = async () => {
-      // Extraer código de URL
-      const params = new URLSearchParams(window.location.search);
-      const code = params.get("code");
-
-      if (!code) {
-        navigate("/login");
-        return;
-      }
-
-      try {
-        // Intercambiar código por token
-        const response = await fetch("/api/sessions", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ code }),
-        });
-
-        const data = await response.json();
-
-        if (data.success) {
-          // Token guardado en cookie, redirigir a dashboard
-          navigate("/");
-        } else {
-          navigate("/login");
-        }
-      } catch (error) {
-        console.error("Error en callback:", error);
-        navigate("/login");
-      }
-    };
-
-    handleCallback();
-  }, []);
-
-  return <div>Autenticando...</div>;
-}
+  fetch("/api/sessions", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ code }),
+  }).then(res => res.json()).then(data => {
+    if (data.success) navigate("/dashboard");
+    else navigate("/login");
+  });
+}, []);
 ```
 
-### Logout
+---
 
-```tsx
-// En cualquier componente
-const handleLogout = async () => {
-  await fetch("/api/sessions", { method: "DELETE" });
-  window.location.href = "/login";
-};
+## Sistema de Roles
 
-<button onClick={handleLogout}>
-  Cerrar Sesión
-</button>
-```
+| Rol | Acceso |
+|---|---|
+| `usuario_basico` | Acceso estándar con cuotas mensuales |
+| `usuario_inteligente` | Sin cuotas; acceso ilimitado a todas las herramientas |
 
-### Obtener Usuario Actual
+El rol se almacena en `users.role` y el `authMiddleware` lo lee de la DB en **cada request** — nunca del JWT — para que los cambios aplicados por el admin sean efectivos de inmediato.
 
-```tsx
-import { useAuth } from "@getmocha/users-service/react";
-
-function UserProfile() {
-  const { user } = useAuth();
-
-  return (
-    <div>
-      <img src={user.picture} alt={user.name} />
-      <p>{user.name}</p>
-      <p>{user.email}</p>
-    </div>
-  );
-}
-```
-
-## Isolación de Datos
-
-Cada usuario solo puede acceder a sus propios datos.
-
-### En Backend
-
-**Todas las queries filtran por user_id:**
-
-```typescript
-// ✅ CORRECTO
-const employees = await db
-  .prepare("SELECT * FROM employees WHERE user_id = ?")
-  .bind(user.id)
-  .all();
-
-// ❌ INCORRECTO - Expone datos de todos los usuarios
-const employees = await db
-  .prepare("SELECT * FROM employees")
-  .all();
-```
-
-### Verificación de Propiedad
-
-Antes de operaciones UPDATE/DELETE:
-
-```typescript
-app.delete("/api/employees/:id", async (c) => {
-  const user = c.get("user");
-  const employeeId = c.req.param("id");
-
-  // Verificar que el empleado pertenece al usuario
-  const employee = await db
-    .prepare("SELECT * FROM employees WHERE id = ? AND user_id = ?")
-    .bind(employeeId, user.id)
-    .first();
-
-  if (!employee) {
-    return c.json(
-      { success: false, error: { code: "NOT_FOUND", message: "Empleado no encontrado" } },
-      404
-    );
-  }
-
-  // Eliminar
-  await db
-    .prepare("DELETE FROM employees WHERE id = ?")
-    .bind(employeeId)
-    .run();
-
-  return c.json({ success: true, data: {} });
-});
-```
+---
 
 ## Sistema de Administradores
 
-Usuarios con permisos elevados para ver estadísticas globales.
-
-### Verificar Admin
+Los admins tienen acceso a `/api/admin/*`. No es un rol en `users.role`; se determina por email:
 
 ```typescript
 async function isAdmin(email: string, db: D1Database, env: Env): Promise<boolean> {
-  // Verificar admin inicial (variable de entorno)
+  // Admin inicial configurado como variable de entorno
   if (email.toLowerCase() === env.INITIAL_ADMIN_EMAIL?.toLowerCase()) {
     return true;
   }
-  
-  // Verificar en tabla admin_emails
+  // Admins adicionales en tabla admin_emails
   const result = await db
     .prepare("SELECT id FROM admin_emails WHERE LOWER(email) = LOWER(?)")
     .bind(email)
     .first();
-  
   return !!result;
 }
 ```
 
-### Endpoints Solo Admin
-
-```typescript
-app.get("/api/admin/stats", async (c) => {
-  const user = c.get("user");
-  const adminStatus = await isAdmin(user.email, c.env.DB, c.env);
-
-  if (!adminStatus) {
-    return c.json(
-      { success: false, error: { code: "FORBIDDEN", message: "No autorizado" } },
-      403
-    );
-  }
-
-  // Obtener estadísticas globales
-  const stats = await fetchGlobalStats(c.env.DB);
-  
-  return c.json({ success: true, data: stats });
-});
-```
-
-### Frontend
-
-```tsx
-// hooks/useAdmin.ts
-export function useAdmin() {
-  const [isAdmin, setIsAdmin] = useState(false);
-
-  useEffect(() => {
-    const checkAdmin = async () => {
-      const response = await fetch("/api/admin/check");
-      const data = await response.json();
-      setIsAdmin(data.data?.isAdmin || false);
-    };
-    checkAdmin();
-  }, []);
-
-  return { isAdmin };
-}
-
-// En componente
-const { isAdmin } = useAdmin();
-
-if (!isAdmin) {
-  return <Navigate to="/" />;
-}
-```
+---
 
 ## Seguridad
 
-### Cookies httpOnly
+| Mecanismo | Detalle |
+|---|---|
+| `httpOnly` | Cookie no accesible desde JavaScript (protege XSS) |
+| `Secure` | Solo enviada sobre HTTPS |
+| `SameSite=Lax` | Previene CSRF |
+| `Max-Age=604800` | Expira en 7 días |
+| Rol fresco | Role leído de DB, nunca del JWT |
+| UPSERT sin sobrescribir role | El login nunca revierte una promoción a `usuario_inteligente` |
 
-Las cookies de sesión usan `httpOnly: true`:
-- **No accesibles** desde JavaScript
-- **Solo enviadas** en requests HTTP
-- **Protección contra XSS**
-
-### Secure Flag
-
-En producción, `secure: true`:
-- Solo enviadas sobre HTTPS
-- Protección contra man-in-the-middle
-
-### SameSite
-
-`sameSite: "Lax"`:
-- Previene CSRF (Cross-Site Request Forgery)
-- Cookies solo en requests same-site
-
-### Token Expiration
-
-Tokens expiran después de 7 días (configurable).
-
-### No Secrets en Cliente
-
-Variables de entorno nunca se exponen al frontend:
-- `MOCHA_USERS_SERVICE_API_KEY`: Solo en backend
-- Admin email: Solo en backend
-
-## Manejo de Errores
-
-### Token Inválido
-
-```typescript
-// Middleware detecta token inválido
-// Response: 401 Unauthorized
-
-// Frontend debe redirigir a login
-if (response.status === 401) {
-  window.location.href = "/login";
-}
-```
-
-### Session Expirada
-
-```typescript
-// Global fetch interceptor (opcional)
-const originalFetch = window.fetch;
-window.fetch = async (...args) => {
-  const response = await originalFetch(...args);
-  
-  if (response.status === 401) {
-    window.location.href = "/login";
-  }
-  
-  return response;
-};
-```
-
-## Testing de Auth
-
-### Mock de Usuario
-
-```typescript
-// En tests
-const mockUser = {
-  id: "test_user_123",
-  email: "test@example.com",
-  name: "Test User",
-};
-
-c.set("user", mockUser);
-```
-
-### Bypass de Auth en Dev
-
-**NO HACER ESTO EN PRODUCCIÓN:**
-
-```typescript
-// Solo para desarrollo local
-if (process.env.NODE_ENV === "development") {
-  app.use("/api/*", async (c, next) => {
-    c.set("user", {
-      id: "dev_user",
-      email: "dev@example.com",
-    });
-    await next();
-  });
-}
-```
-
-## Limitaciones
-
-### Scopes de Google OAuth
-
-Mocha Users Service **solo incluye scopes básicos**:
-- `email`
-- `profile`
-
-**NO incluye:**
-- Google Calendar
-- Google Drive
-- Otros servicios de Google
-
-Para acceder a otros servicios, necesitarías configurar OAuth separado.
-
-### Single Provider
-
-Actualmente solo soporta Google OAuth. 
-
-Para agregar otros providers (GitHub, Facebook):
-- Requiere configuración adicional en Mocha
-- O implementar OAuth por separado
-
-## Mejores Prácticas
-
-1. **Siempre filtrar por user_id** en queries
-2. **Verificar propiedad** antes de UPDATE/DELETE
-3. **Usar authMiddleware** en todas las rutas API
-4. **No confiar en datos del cliente** - validar en backend
-5. **Logs de seguridad** para acciones sensibles
-6. **Rotación de tokens** periódica (futuro)
-7. **2FA** para admins (futuro)
+---
 
 ## Debugging
 
 ### Verificar Cookie
 
-En DevTools → Application → Cookies:
-- Buscar `mocha_session_token`
-- Debe tener flags: HttpOnly, Secure (prod), SameSite
-
-### Logs de Auth
-
-```typescript
-console.log("User authenticated:", c.get("user"));
-```
+En DevTools → Application → Cookies: buscar `session_token`. Debe tener flags `HttpOnly` y `Secure` (en producción).
 
 ### Testing Manual
 
@@ -629,9 +326,13 @@ curl http://localhost:5173/api/oauth/google/redirect_url
 # Intercambiar código
 curl -X POST http://localhost:5173/api/sessions \
   -H "Content-Type: application/json" \
-  -d '{"code": "oauth_code"}'
+  -d '{"code": "oauth_code_from_google"}'
 
 # Request autenticado
 curl http://localhost:5173/api/employees \
-  -H "Cookie: mocha_session_token=your_token"
+  -H "Cookie: session_token=<jwt>" \
+  -H "X-Negocio-ID: 1"
+
+# Logout
+curl http://localhost:5173/api/logout
 ```

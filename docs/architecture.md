@@ -18,7 +18,7 @@ Cloudflare Worker (Hono)
          └── Route handlers → D1 (SQLite)
                               └── Google Gemini API (chatbot)
 
-Mocha Users Service (OAuth) ← validado en authMiddleware
+Google OAuth (accounts.google.com) ← intercambio de código en POST /api/sessions
 ```
 
 ---
@@ -32,7 +32,7 @@ Mocha Users Service (OAuth) ← validado en authMiddleware
 | Backend | Hono | latest |
 | Runtime | Cloudflare Workers | Edge |
 | Base de datos | Cloudflare D1 (SQLite) | — |
-| Autenticación | Mocha Users Service (Google OAuth) | — |
+| Autenticación | Google OAuth nativo + JWT (jose) | — |
 | Validación | Zod | — |
 | IA | Google Gemini 2.5 Flash | v1beta |
 
@@ -44,7 +44,7 @@ Mocha Users Service (OAuth) ← validado en authMiddleware
 
 Ejecuta en todas las rutas `/api/*` (excepto OAuth).
 
-1. Lee la cookie `mocha_session_token` y la verifica con Mocha Users Service.
+1. Lee la cookie `session_token` y la verifica con `jwtVerify` (jose, JWT_SECRET).
 2. Decodifica el JWT para obtener `user.id`.
 3. **Lee el `role` fresco de la tabla `users` en D1** (no confía en el JWT para el rol).
 4. Si el usuario no existe en `users`, asigna `role = 'usuario_basico'` por defecto.
@@ -130,10 +130,11 @@ Las cuotas son **por usuario por negocio por mes** (`UNIQUE(user_id, negocio_id,
 2. Usuario se autentica en Google
 3. Google redirige con ?code=...
 4. Frontend → POST /api/sessions { code }
-5. Worker intercambia code por token con Mocha
-6. Worker hace UPSERT en users (sin sobrescribir role)
-7. Cookie mocha_session_token seteada (httpOnly)
-8. Redirección a dashboard
+5. Worker intercambia code con Google (oauth2.googleapis.com/token)
+6. Worker obtiene datos del usuario (googleapis.com/oauth2/v2/userinfo)
+7. Worker hace UPSERT en users (sin sobrescribir role)
+8. Cookie session_token seteada (httpOnly, JWT firmado con JWT_SECRET)
+9. Redirección a dashboard
 ```
 
 ### Operación con cuota (ejemplo: crear empleado)

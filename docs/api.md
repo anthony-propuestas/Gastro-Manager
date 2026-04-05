@@ -5,7 +5,7 @@ API RESTful construida con Hono en Cloudflare Workers.
 ## Base URL
 
 ```
-Producción:  https://gastro-manager.mocha.app
+Producción:  https://<tu-worker>.workers.dev  (o dominio personalizado)
 Desarrollo:  http://localhost:5173
 ```
 
@@ -16,7 +16,7 @@ Desarrollo:  http://localhost:5173
 Todas las rutas `/api/*` (excepto OAuth) requieren una cookie de sesión válida.
 
 ```
-Cookie: mocha_session_token=<token>
+Cookie: session_token=<jwt>
 ```
 
 El token se establece automáticamente tras el login con Google OAuth.
@@ -62,11 +62,8 @@ Intercambia el código OAuth por una cookie de sesión. Persiste al usuario en l
 { "code": "oauth_code_from_google" }
 ```
 
-#### `DELETE /api/sessions`
-Cierra la sesión del usuario actual.
-
 #### `GET /api/logout`
-Redirección de logout (alias del anterior).
+Cierra la sesión del usuario actual. Elimina la cookie `session_token`.
 
 #### `GET /api/users/me`
 Información del usuario autenticado.
@@ -116,7 +113,7 @@ Genera un enlace de invitación de un solo uso para unirse al negocio.
 
 ```json
 // Response data
-{ "inviteUrl": "https://gastro-manager.mocha.app/join/abc123token" }
+{ "inviteUrl": "https://<dominio>/invite/abc123token" }
 ```
 
 #### `GET /api/invitations/:token`

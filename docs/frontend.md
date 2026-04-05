@@ -30,58 +30,31 @@ src/react-app/
 
 ## Componentes UI Base
 
-Todos en `components/ui/`, basados en Radix UI:
-
-### Core Components
+Todos en `components/ui/`, basados en Radix UI (shadcn/ui):
 
 - **Button** (`button.tsx`): Botones con variantes (default, destructive, outline, ghost)
 - **Card** (`card.tsx`): Contenedores con header, content, footer
-- **Dialog** (`dialog.tsx`): Modales y diálogos
 - **Input** (`input.tsx`): Campos de texto
 - **Select** (`select.tsx`): Dropdowns y selects
 - **Textarea** (`textarea.tsx`): Áreas de texto multilinea
 - **Label** (`label.tsx`): Etiquetas de formulario
 - **Badge** (`badge.tsx`): Etiquetas de estado
 - **Separator** (`separator.tsx`): Líneas divisoras
-- **Tabs** (`tabs.tsx`): Navegación por pestañas
 - **Table** (`table.tsx`): Tablas de datos
-
-### Feedback Components
-
 - **Toast** (`toast.tsx`): Notificaciones temporales (success, error, info, warning)
-- **Alert Dialog** (`alert-dialog.tsx`): Confirmaciones
-- **Skeleton** (`skeleton.tsx`): Loading states
-- **Progress** (`progress.tsx`): Barras de progreso
-
-### Advanced Components
-
-- **Popover** (`popover.tsx`): Contenido flotante
-- **Dropdown Menu** (`dropdown-menu.tsx`): Menús contextuales
-- **Accordion** (`accordion.tsx`): Secciones colapsables
-- **Collapsible** (`collapsible.tsx`): Contenido expandible
-- **Scroll Area** (`scroll-area.tsx`): Áreas scrollables personalizadas
-
-### Form Components
-
-- **Field** (`field.tsx`): Wrapper para campos de formulario con label y error
-- **Input Group** (`input-group.tsx`): Inputs con prefijos/sufijos
-- **Checkbox** (`checkbox.tsx`): Casillas de verificación
-- **Radio Group** (`radio-group.tsx`): Grupos de radio buttons
-- **Switch** (`switch.tsx`): Interruptores on/off
-- **Slider** (`slider.tsx`): Controles deslizantes
 
 **Uso:**
 ```tsx
 import { Button } from "@/react-app/components/ui/button";
-import { Card } from "@/react-app/components/ui/card";
+import { Card, CardHeader, CardTitle, CardContent } from "@/react-app/components/ui/card";
+import { Badge } from "@/react-app/components/ui/badge";
 
 <Button variant="default">Guardar</Button>
 <Card>
-  <CardHeader>
-    <CardTitle>Título</CardTitle>
-  </CardHeader>
+  <CardHeader><CardTitle>Título</CardTitle></CardHeader>
   <CardContent>Contenido</CardContent>
 </Card>
+<Badge variant="outline">Activo</Badge>
 ```
 
 ## Layouts
@@ -491,10 +464,10 @@ export function useChat() {
 
 ### AuthProvider
 
-Proveedor de autenticación de Mocha.
+Proveedor de autenticación implementado en `context/AuthContext.tsx`. Al montar la app llama a `GET /api/users/me` para verificar la sesión activa y expone `user`, `role`, `currentNegocio`, `negocios` y `logout` al árbol de componentes.
 
 ```tsx
-import { AuthProvider } from "@getmocha/users-service/react";
+import { AuthProvider } from "@/react-app/context/AuthContext";
 
 <AuthProvider>
   <App />
@@ -596,23 +569,15 @@ Asistente: Hoy tienes 2 eventos programados: Reunión de equipo a las 10:00 y En
 
 **Integración:**
 ```tsx
-// App.tsx
+// main.tsx
 import { ChatWidget } from "./components/ChatWidget";
 
-function App() {
-  return (
-    <AuthProvider>
-      <ToastProvider>
-        <SidebarProvider>
-          <Routes>
-            {/* ... rutas ... */}
-          </Routes>
-          <ChatWidget /> {/* Siempre visible para usuarios autenticados */}
-        </SidebarProvider>
-      </ToastProvider>
-    </AuthProvider>
-  );
-}
+// ChatWidget se monta dentro del layout principal,
+// visible para todos los usuarios autenticados
+<MainLayout>
+  <Outlet />
+  <ChatWidget />
+</MainLayout>
 ```
 
 ## Error Boundaries
@@ -779,7 +744,7 @@ Para componentes pesados:
 ```tsx
 const HeavyComponent = lazy(() => import("./HeavyComponent"));
 
-<Suspense fallback={<Skeleton />}>
+<Suspense fallback={<div>Cargando...</div>}>
   <HeavyComponent />
 </Suspense>
 ```
@@ -822,15 +787,7 @@ Todos los componentes son navegables con teclado.
 
 ### Focus Management
 
-Los modales atrapan el foco:
-
-```tsx
-<Dialog>
-  {/* Foco automático en primer elemento */}
-  {/* Tab navega dentro del modal */}
-  {/* Escape cierra el modal */}
-</Dialog>
-```
+Los modales usan `focus-trap` nativo de Radix UI: el foco queda atrapado dentro mientras están abiertos y se restaura al elemento anterior al cerrarse. `Escape` cierra el modal activo.
 
 ## Testing
 

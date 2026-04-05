@@ -1,129 +1,90 @@
 # Despliegue y Configuración
 
-Guía para configurar variables de entorno, secretos y desplegar la aplicación.
+Guía para configurar variables de entorno y desplegar la aplicación en Cloudflare Workers.
 
 ## Plataforma
 
-**Mocha** - Plataforma de desarrollo de aplicaciones basada en Cloudflare Workers.
+**Cloudflare Workers** — Runtime serverless edge. El Worker sirve tanto el frontend React (SPA) como la API REST desde el mismo proceso. La base de datos es Cloudflare D1 (SQLite serverless).
 
-### Características
-- Despliegue automático a Cloudflare Edge
-- Base de datos D1 administrada
-- Autenticación integrada
-- Gestión de secretos
-- Versionado de aplicaciones
+---
 
 ## Variables de Entorno
 
-### Auto-inyectadas por Mocha
+Todas las variables se configuran manualmente. No hay ningún servicio externo que las inyecte automáticamente.
 
-Estas variables están disponibles automáticamente en el entorno de ejecución:
+### Para desarrollo local (`.dev.vars`)
 
-#### `MOCHA_USERS_SERVICE_API_URL`
-- **Tipo:** String (URL)
-- **Descripción:** URL del servicio de autenticación de Mocha
-- **Uso:** Autenticación OAuth
-- **Configuración:** Automática, no requiere acción
-
-#### `MOCHA_USERS_SERVICE_API_KEY`
-- **Tipo:** String (API Key)
-- **Descripción:** API key para autenticar con el servicio de usuarios
-- **Uso:** Autenticación OAuth
-- **Configuración:** Automática, no requiere acción
-
-**Ejemplo de uso:**
-```typescript
-const redirectUrl = await getOAuthRedirectUrl("google", {
-  apiUrl: c.env.MOCHA_USERS_SERVICE_API_URL,
-  apiKey: c.env.MOCHA_USERS_SERVICE_API_KEY,
-});
-```
-
-### Secretos Configurados
-
-#### `INITIAL_ADMIN_EMAIL`
-- **Tipo:** String (Email)
-- **Descripción:** Email del administrador inicial del sistema
-- **Valor:** (configurado en secretos, no expuesto aquí)
-- **Uso:** Identificar al usuario con permisos de administrador
-- **Configuración:** Via Mocha Dashboard → Settings → Secrets
-
-**Acceso en código:**
-```typescript
-type Env = {
-  INITIAL_ADMIN_EMAIL?: string;
-  // ...
-};
-
-async function isAdmin(email: string, env: Env) {
-  if (email.toLowerCase() === env.INITIAL_ADMIN_EMAIL?.toLowerCase()) {
-    return true;
-  }
-  // ...
-}
-```
-
-**IMPORTANTE:** Este valor nunca debe aparecer en:
-- Código fuente
-- Documentación pública
-- Logs
-- Respuestas de API
-
-## Configurar Secretos
-
-### Via Mocha Dashboard
-
-1. Ir a tu app en [Mocha](https://getmocha.com)
-2. Click en el dropdown del nombre de la app (top left)
-3. Seleccionar **Settings**
-4. Tab **Secrets**
-5. Click **Add Secret**
-6. Ingresar:
-   - **Name:** `INITIAL_ADMIN_EMAIL` (UPPER_SNAKE_CASE)
-   - **Value:** El email del administrador
-7. Click **Save**
-
-### Via Wrangler CLI (Alternativa)
+Crea un archivo `.dev.vars` en la raíz del proyecto:
 
 ```bash
-# Configurar secreto
-wrangler secret put INITIAL_ADMIN_EMAIL
+# Google OAuth (obtener en https://console.cloud.google.com)
+GOOGLE_CLIENT_ID=tu_google_client_id
+GOOGLE_CLIENT_SECRET=tu_google_client_secret
 
-# Se abrirá prompt para ingresar el valor
-# No se mostrará en pantalla al escribir
+# JWT Secret (genera con: node -e "console.log(require('crypto').randomBytes(32).toString('hex'))")
+JWT_SECRET=string_hex_64_caracteres_aleatorio
+
+# Google Gemini AI (obtener en https://aistudio.google.com)
+GEMINI_API_KEY=tu_gemini_api_key
+
+# Primer administrador del sistema
+INITIAL_ADMIN_EMAIL=tu_email@gmail.com
 ```
 
-## Bindings de Cloudflare
+### Para producción (Cloudflare Dashboard o Wrangler)
 
-Configurados en `wrangler.json`:
+#### Via Wrangler CLI
 
-### D1 Database
+```bash
+wrangler secret put GOOGLE_CLIENT_ID
+wrangler secret put GOOGLE_CLIENT_SECRET
+wrangler secret put JWT_SECRET
+wrangler secret put GEMINI_API_KEY
+wrangler secret put INITIAL_ADMIN_EMAIL
+```
+
+#### Via Cloudflare Dashboard
+
+1. Ir a [dash.cloudflare.com](https://dash.cloudflare.com)
+2. Workers & Pages → seleccionar worker `gastro-manager`
+3. Settings → Variables and Secrets
+4. Agregar cada variable como **Secret**
+
+---
+
+## Referencia de Variables
+
+| Variable | Tipo | Descripción |
+|---|---|---|
+| `GOOGLE_CLIENT_ID` | Secret | Client ID de Google OAuth app |
+| `GOOGLE_CLIENT_SECRET` | Secret | Client Secret de Google OAuth |
+| `JWT_SECRET` | Secret | Clave para firmar sesiones JWT (HS256) |
+| `GEMINI_API_KEY` | Secret | API key para el chatbot IA (opcional) |
+| `INITIAL_ADMIN_EMAIL` | Secret | Email del primer administrador |
+
+**Nota:** `GEMINI_API_KEY` es opcional. Si no está configurada, el endpoint `/api/chat` devuelve error `API_KEY_MISSING`. El resto de la app funciona normalmente.
+
+---
+
+## Bindings de Cloudflare (`wrangler.json`)
 
 ```json
 {
+  "name": "gastro-manager",
+  "main": "./src/worker/index.ts",
+  "compatibility_date": "2025-06-17",
+  "compatibility_flags": ["nodejs_compat"],
   "d1_databases": [
     {
       "binding": "DB",
-      "database_name": "019d212b-537a-7ac0-9cb2-7cd6072f876a",
-      "database_id": "019d212b-537a-7ac0-9cb2-7cd6072f876a"
+      "database_name": "gastro-manager-db",
+      "database_id": "<tu-database-id>"
     }
-  ]
-}
-```
-
-**Acceso en código:**
-```typescript
-const result = await c.env.DB.prepare("SELECT * FROM employees").all();
-```
-
-### R2 Bucket (Object Storage)
-
-```json
-{
+  ],
   "r2_buckets": [
     {
       "binding": "R2_BUCKET",
-      "bucket_name": "019d212b-537a-7ac0-9cb2-7cd6072f876a"
+      "bucket_name": "gastro-manager-files"
     }
   ]
 }
@@ -131,128 +92,75 @@ const result = await c.env.DB.prepare("SELECT * FROM employees").all();
 
 **Acceso en código:**
 ```typescript
-await c.env.R2_BUCKET.put("file.txt", fileContent);
-```
-
-**Nota:** Actualmente no se usa R2 en la aplicación, pero está disponible para almacenar archivos en el futuro.
-
-### Email Service
-
-```json
-{
-  "services": [
-    {
-      "binding": "EMAILS",
-      "service": "emails-service",
-      "entrypoint": "EmailService",
-      "props": {
-        "appId": "019d212b-537a-7ac0-9cb2-7cd6072f876a"
-      }
-    }
-  ]
-}
-```
-
-**Acceso en código:**
-```typescript
-await c.env.EMAILS.send({
-  to: "usuario@example.com",
-  subject: "Bienvenido",
-  html: "<p>Hola!</p>",
-});
-```
-
-**Nota:** Actualmente no se usa email service, pero está disponible para notificaciones futuras.
-
-## Tipos de TypeScript
-
-Definir tipos para el entorno:
-
-```typescript
-// src/worker/index.ts
 type Env = {
   DB: D1Database;
   R2_BUCKET: R2Bucket;
-  MOCHA_USERS_SERVICE_API_URL: string;
-  MOCHA_USERS_SERVICE_API_KEY: string;
+  GOOGLE_CLIENT_ID: string;
+  GOOGLE_CLIENT_SECRET: string;
+  JWT_SECRET: string;
   INITIAL_ADMIN_EMAIL?: string;
+  GEMINI_API_KEY?: string;
 };
-
-const app = new Hono<{ Bindings: Env; Variables: Variables }>();
 ```
+
+**Nota:** R2 está configurado pero actualmente no se usa. Está disponible para almacenamiento de archivos en el futuro.
+
+---
 
 ## Migraciones de Base de Datos
 
-### Crear Migración
+Las migraciones SQL están en `migrations/` (archivos `1.sql` a `10.sql`). Son **inmutables** — una vez aplicadas no se modifican.
 
-Via Mocha CLI o creando migration files:
+### Aplicar en desarrollo
 
-```typescript
-// up_sql: Aplicar cambios
-CREATE TABLE nueva_tabla (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  ...
-);
-
-// down_sql: Revertir cambios
-DROP TABLE nueva_tabla;
+```bash
+# Aplicar todas las migraciones en DB local de desarrollo
+wrangler d1 migrations apply gastro-manager-db --local
 ```
 
-### Aplicar Migraciones
+### Aplicar en producción
 
-**Automático:** Al publicar la app, migraciones se aplican automáticamente.
+```bash
+# Aplicar todas las migraciones en DB de producción
+wrangler d1 migrations apply gastro-manager-db
+```
 
-**Importante:** Las migraciones son **inmutables** - no se pueden editar o eliminar una vez creadas.
+### Crear nueva migración
 
-### Rollback
+Crear un nuevo archivo SQL numerado en `migrations/`, por ejemplo `11.sql`:
 
-Si una migración causa problemas:
+```sql
+-- migrations/11.sql
+ALTER TABLE employees ADD COLUMN nueva_columna TEXT;
+```
 
-1. Ir a Mocha Dashboard
-2. Click en dropdown del nombre de la app
-3. Seleccionar **Versions**
-4. Hacer click en "Restore" en la versión anterior
-5. Esto revertirá código Y migraciones
+---
 
 ## Desarrollo Local
 
-### Iniciar Servidor
+### Iniciar servidor
 
 ```bash
 npm run dev
 ```
 
-- Frontend: `http://localhost:5173`
-- Backend: Same origin (Vite proxy)
+Esto inicia Vite con el plugin de Cloudflare (`@cloudflare/vite-plugin`):
+- Frontend React: `http://localhost:5173`
+- API REST: mismo origen (no hay proxy separado)
+- Base de datos: instancia D1 local de desarrollo
 
-### Base de Datos Local
-
-Mocha usa base de datos de **desarrollo** separada.
-
-**Importante:** 
-- Datos en dev NO se transfieren a producción al publicar
-- Migraciones sí se aplican en ambos ambientes
-- Para datos iniciales, usar migraciones con INSERT statements
+**Importante:** La base de datos de desarrollo es **completamente separada** de producción. Los datos locales no se transfieren al publicar.
 
 ### Hot Reload
 
-Vite recarga automáticamente en cambios:
-- Archivos React: Hot Module Replacement (HMR)
-- Archivos Worker: Restart del servidor dev
+- Archivos React: Hot Module Replacement (HMR) automático
+- Archivos Worker: Reinicio del servidor dev automático
+
+---
 
 ## Publicar a Producción
 
-### Via Mocha Dashboard
-
-1. Hacer cambios en código
-2. Mocha detecta cambios automáticamente
-3. Click **Publish** en la barra superior
-4. Esperar despliegue (~30 segundos)
-5. App publicada en `https://tu-app.mocha.app`
-
-### Build Local
-
-Verificar que todo compila:
+### Build
 
 ```bash
 npm run build
@@ -263,47 +171,57 @@ Esto ejecuta:
 2. Vite build (frontend)
 3. Worker build (backend)
 
-### Check Pre-publish
+### Check pre-deploy
 
 ```bash
 npm run check
 ```
 
-Esto ejecuta:
-1. TypeScript compilation
-2. Vite build
-3. Wrangler dry-run (verifica config)
+Verifica que todo compile y hace un dry-run de Wrangler para detectar errores de configuración antes de publicar.
+
+### Deploy
+
+```bash
+wrangler deploy
+```
+
+O via Cloudflare Dashboard: Workers & Pages → seleccionar worker → Deploy.
+
+---
 
 ## Ambientes
 
-### Development
+| Ambiente | URL | Base de datos |
+|---|---|---|
+| Development | `http://localhost:5173` | D1 local (`.wrangler/`) |
+| Production | `https://<worker>.workers.dev` | D1 producción |
 
-- **URL:** `http://localhost:5173`
-- **Base de datos:** D1 development instance
-- **Secrets:** Configurados localmente
-- **Logs:** Console del navegador + terminal
+---
 
-### Production
+## Configurar Google OAuth
 
-- **URL:** `https://gastro-manager.mocha.app`
-- **Base de datos:** D1 production instance
-- **Secrets:** Configurados en Mocha Dashboard
-- **Logs:** Cloudflare Dashboard → Workers → Logs
+Para que el login con Google funcione, la app debe estar registrada en Google Cloud Console:
 
-**IMPORTANTE:** Dev y production tienen bases de datos **completamente separadas**.
+1. Ir a [console.cloud.google.com](https://console.cloud.google.com)
+2. APIs & Services → Credentials → Create OAuth 2.0 Client ID
+3. Application type: **Web application**
+4. Authorized redirect URIs:
+   - Desarrollo: `http://localhost:5173/auth/callback`
+   - Producción: `https://<tu-dominio>/auth/callback`
+5. Copiar Client ID y Client Secret a las variables de entorno
+
+---
 
 ## Monitoreo
 
-### Logs en Producción
+### Logs en producción
 
-1. Ir a [Cloudflare Dashboard](https://dash.cloudflare.com)
-2. Workers & Pages
-3. Seleccionar tu worker
-4. Tab **Logs**
+```bash
+# Stream de logs en tiempo real
+wrangler tail
+```
 
-**O** via Mocha:
-1. Dashboard → Dropdown de app
-2. **Debug** → **View Logs**
+O via Cloudflare Dashboard: Workers & Pages → seleccionar worker → Logs.
 
 ### Métricas
 
@@ -311,203 +229,61 @@ Cloudflare Dashboard muestra:
 - Requests/segundo
 - CPU time usado
 - Errores
-- Latencia
+- Latencia p50/p99
 
-### Alertas
+---
 
-Configurar en Cloudflare para:
-- Error rate alto
-- Latencia alta
-- Uso de recursos
+## Límites Free Tier de Cloudflare
+
+| Recurso | Límite |
+|---|---|
+| Requests | 100,000/día |
+| CPU time | 10ms/request |
+| D1 Storage | 5GB |
+| D1 Reads | 5M/día |
+| D1 Writes | 100,000/día |
+
+---
+
+## Backup de Base de Datos
+
+```bash
+# Exportar base de datos de producción a SQL
+wrangler d1 export gastro-manager-db --output backup.sql
+
+# Exportar DB local de desarrollo
+wrangler d1 export gastro-manager-db --local --output backup-dev.sql
+```
+
+---
 
 ## Troubleshooting
 
-### "App no carga"
+### "Auth error al hacer login"
 
-1. Verificar logs en Cloudflare Dashboard
-2. Verificar que migraciones se aplicaron
-3. Revisar secretos configurados
-4. Hacer rollback a versión anterior
+- Verificar `GOOGLE_CLIENT_ID` y `GOOGLE_CLIENT_SECRET` están configurados
+- Verificar que `http://localhost:5173/auth/callback` (dev) o la URL de producción están en los Authorized redirect URIs de Google Cloud
 
-### "Base de datos vacía después de publicar"
+### "Secreto no definido en runtime"
 
-**Normal** - dev y prod son separados.
-
-**Solución:** Poblar datos en producción:
-- Crear contenido manualmente
-- O usar migraciones con INSERT statements
-
-### "Secreto no definido"
-
-Verificar:
-1. Secreto está configurado en Mocha Dashboard
-2. Nombre es exactamente igual (case-sensitive)
-3. Tipo `Env` incluye el secreto
+- Verificar que el secret está configurado en Cloudflare Dashboard o con `wrangler secret put`
+- El nombre es case-sensitive — debe coincidir exactamente con el tipo `Env` en `index.ts`
 
 ### "Migración fallida"
 
-1. Ir a Mocha Dashboard → Versions
-2. Restaurar versión anterior
-3. Corregir migración
-4. Volver a publicar
+1. Hacer rollback via Cloudflare Dashboard → Workers → Deployments → previous version
+2. Corregir la migración (crear nueva, no editar)
+3. Volver a publicar
 
-**Recuerda:** Migraciones son inmutables, no se pueden editar.
-
-## Seguridad en Producción
-
-### HTTPS
-
-- **Automático** en Mocha apps
-- Certificados SSL gestionados por Cloudflare
-- Forzar HTTPS: siempre habilitado
-
-### Cookies Seguras
-
-En producción, cookies usan:
-```typescript
-setCookie(c, "cookie_name", value, {
-  httpOnly: true,
-  secure: true, // Solo HTTPS
-  sameSite: "Lax",
-});
-```
-
-### Headers de Seguridad
-
-Cloudflare añade automáticamente:
-- `X-Content-Type-Options: nosniff`
-- `X-Frame-Options: SAMEORIGIN`
-- `Strict-Transport-Security`
-
-### Rate Limiting
-
-**Free tier:**
-- 100,000 requests/día
-- Límites por IP automáticos
-
-**Para más:** Upgrade a plan pago en Cloudflare.
-
-## Backup y Recuperación
-
-### Código
-
-- Git: Todos los cambios en repositorio
-- Mocha Versions: Historial completo de versiones
-
-### Base de Datos
-
-- **Backups automáticos:** Cloudflare hace snapshots diarios
-- **Point-in-time recovery:** Disponible en planes pagos
-- **Manual export:** Via Wrangler CLI
-
-```bash
-# Exportar base de datos
-wrangler d1 export <database_name> --output backup.sql
-```
-
-### Restaurar Versión Anterior
-
-1. Mocha Dashboard → Versions
-2. Seleccionar versión
-3. Click **Restore**
-4. Confirma restauración
-
-Esto restaura:
-- Código
-- Migraciones aplicadas
-- Configuración
-
-**NO restaura:**
-- Datos en base de datos
-- Archivos en R2
-
-## Escalado
-
-### Automático
-
-Workers escalan automáticamente:
-- Sin configuración necesaria
-- Paga por uso
-- Sin límite de instancias
-
-### Límites Free Tier
-
-- **Requests:** 100,000/día
-- **CPU time:** 10ms/request
-- **D1 Storage:** 5GB
-
-### Upgrade
-
-Para más recursos:
-1. Cloudflare Dashboard
-2. Workers & Pages → Plan
-3. Seleccionar plan pago
-
-## Dominios Personalizados
-
-### Configurar Dominio
-
-1. Mocha Dashboard → Settings → Domains
-2. Agregar dominio personalizado
-3. Configurar DNS según instrucciones
-4. Esperar verificación
-
-**O** via Cloudflare:
-1. Agregar ruta en Workers
-2. Configurar DNS en Cloudflare
-
-## CI/CD (Futuro)
-
-Para automatizar despliegues:
-
-```yaml
-# .github/workflows/deploy.yml
-name: Deploy
-on:
-  push:
-    branches: [main]
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      - run: npm ci
-      - run: npm run build
-      - run: npm run deploy
-```
-
-## Mejores Prácticas
-
-1. **Nunca commitear secretos** en git
-2. **Testear localmente** antes de publicar
-3. **Usar versions** para rollback fácil
-4. **Monitorear logs** regularmente
-5. **Backups** antes de cambios grandes
-6. **Documentar** cambios de schema
-7. **Versionado semántico** para releases
-
-## Recursos
-
-- **Mocha Docs:** [https://docs.getmocha.com](https://docs.getmocha.com)
-- **Cloudflare Workers:** [https://workers.cloudflare.com](https://workers.cloudflare.com)
-- **D1 Database:** [https://developers.cloudflare.com/d1](https://developers.cloudflare.com/d1)
-- **Soporte Mocha:** support@getmocha.com
-- **Discord:** Mocha community
+---
 
 ## Checklist de Despliegue
 
 Antes de publicar cambios importantes:
 
 - [ ] Código compila sin errores (`npm run check`)
-- [ ] Migraciones tienen `up_sql` y `down_sql`
-- [ ] Secretos configurados correctamente
+- [ ] Migraciones nuevas creadas (si hay cambios de schema)
+- [ ] Secrets configurados en producción
 - [ ] Cambios testeados en desarrollo
 - [ ] Documentación actualizada
-- [ ] Version anterior funcional (para rollback)
-- [ ] Usuarios notificados de downtime (si aplica)
-
----
-
-**Última actualización:** 2024  
-**Plataforma:** Mocha v3  
-**Cloudflare Workers:** Runtime
+- [ ] Versión anterior estable (para rollback si es necesario)

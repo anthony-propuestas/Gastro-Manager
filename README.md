@@ -25,7 +25,7 @@ Sistema de gestión de restaurantes multi-usuario desplegado en Cloudflare Worke
 | Frontend | React 19 + React Router 7 + Tailwind CSS + shadcn/ui |
 | Backend | Hono (Cloudflare Workers) |
 | Base de datos | Cloudflare D1 (SQLite serverless) |
-| Autenticación | Mocha Users Service (Google OAuth) |
+| Autenticación | Google OAuth nativo + JWT (jose) |
 | Validación | Zod |
 | IA | Google Gemini 2.5 Flash |
 | Hosting | Cloudflare Workers (edge global) |
@@ -145,9 +145,11 @@ npm run check
 
 | Variable | Descripción |
 |---|---|
-| `GEMINI_API_KEY` | API key de Google Gemini (chatbot) |
+| `GOOGLE_CLIENT_ID` | Client ID de Google OAuth |
+| `GOOGLE_CLIENT_SECRET` | Client Secret de Google OAuth |
+| `JWT_SECRET` | Clave secreta para firmar sesiones JWT |
+| `GEMINI_API_KEY` | API key de Google Gemini (chatbot, opcional) |
 | `INITIAL_ADMIN_EMAIL` | Email del primer administrador del sistema |
-| `MOCHA_SESSION_TOKEN` | Secret para validar tokens de sesión |
 
 ---
 
@@ -197,4 +199,4 @@ npm run cf-typegen   # Generar tipos de Cloudflare
 
 ---
 
-**Versión**: 2.0.0 · **Plataforma**: [Mocha](https://getmocha.com) · **Última actualización**: 2026-04-04
+**Versión**: 2.0.0 · **Plataforma**: Cloudflare Workers · **Última actualización**: 2026-04-05
