@@ -40,7 +40,7 @@ export default function Sidebar() {
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [showNegocioDropdown, setShowNegocioDropdown] = useState(false);
-  const { isOpen, isCollapsed, setIsOpen, toggleCollapsed } = useSidebar();
+  const { isCollapsed, setIsOpen, toggleCollapsed } = useSidebar();
   const { prefs, negocioRestrictions, isGerente } = useModulePrefsContext();
   const visibleNavItems = navItems.filter((item) => {
     if (!item.moduleKey) return true;
@@ -115,26 +115,16 @@ export default function Sidebar() {
 
   return (
     <>
-      {/* Mobile overlay */}
-      {isOpen && (
-        <div
-          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
-          onClick={() => setIsOpen(false)}
-        />
-      )}
-
       {/* Negocio dropdown overlay */}
       {showNegocioDropdown && (
         <div className="fixed inset-0 z-[45]" onClick={() => setShowNegocioDropdown(false)} />
       )}
 
-      {/* Sidebar */}
+      {/* Sidebar — solo visible en desktop (lg+) */}
       <aside
         className={cn(
           "fixed left-0 top-0 h-screen bg-sidebar text-sidebar-foreground flex flex-col z-50 transition-all duration-300",
-          "max-lg:-translate-x-full max-lg:w-64",
-          isOpen && "max-lg:translate-x-0",
-          "lg:translate-x-0",
+          "hidden lg:flex",
           isCollapsed ? "lg:w-20" : "lg:w-64"
         )}
       >

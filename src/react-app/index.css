@@ -1,84 +1,85 @@
-@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=DM+Sans:wght@400;500;600;700&display=swap');
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
   :root {
-    /* Warm restaurant palette - forest green & amber */
-    --background: 40 30% 97%;
-    --foreground: 150 20% 15%;
-    --card: 40 40% 99%;
-    --card-foreground: 150 20% 15%;
-    --popover: 40 40% 99%;
-    --popover-foreground: 150 20% 15%;
-    --primary: 152 45% 28%;
-    --primary-foreground: 40 30% 97%;
-    --secondary: 35 60% 92%;
-    --secondary-foreground: 150 20% 15%;
-    --muted: 40 20% 94%;
-    --muted-foreground: 150 10% 45%;
-    --accent: 35 85% 55%;
-    --accent-foreground: 150 20% 10%;
+    /* WhatsApp palette - light mode */
+    --background: 0 0% 100%;
+    --foreground: 202 34% 10%;
+    --card: 0 0% 100%;
+    --card-foreground: 202 34% 10%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 202 34% 10%;
+    --primary: 170 100% 25%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 213 20% 96%;
+    --secondary-foreground: 202 34% 10%;
+    --muted: 213 20% 96%;
+    --muted-foreground: 202 9% 44%;
+    --accent: 142 70% 49%;
+    --accent-foreground: 202 34% 10%;
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 100%;
-    --border: 40 20% 88%;
-    --input: 40 20% 88%;
-    --ring: 152 45% 28%;
+    --border: 213 14% 88%;
+    --input: 213 14% 88%;
+    --ring: 170 100% 25%;
     --radius: 0.5rem;
-    --chart-1: 152 45% 35%;
-    --chart-2: 35 85% 55%;
-    --chart-3: 152 30% 50%;
-    --chart-4: 35 70% 45%;
-    --chart-5: 152 40% 25%;
-    --sidebar: 152 35% 18%;
-    --sidebar-foreground: 40 30% 95%;
-    --sidebar-primary: 35 85% 55%;
-    --sidebar-primary-foreground: 150 20% 10%;
-    --sidebar-accent: 152 30% 25%;
-    --sidebar-accent-foreground: 40 30% 95%;
-    --sidebar-border: 152 25% 25%;
-    --sidebar-ring: 35 85% 55%;
-    --success: 152 55% 40%;
-    --success-foreground: 40 30% 97%;
+    --chart-1: 170 100% 25%;
+    --chart-2: 142 70% 49%;
+    --chart-3: 170 60% 45%;
+    --chart-4: 142 50% 35%;
+    --chart-5: 170 80% 20%;
+    --sidebar: 173 89% 20%;
+    --sidebar-foreground: 0 0% 97%;
+    --sidebar-primary: 142 70% 49%;
+    --sidebar-primary-foreground: 202 34% 10%;
+    --sidebar-accent: 174 78% 30%;
+    --sidebar-accent-foreground: 0 0% 97%;
+    --sidebar-border: 173 60% 27%;
+    --sidebar-ring: 142 70% 49%;
+    --success: 142 70% 49%;
+    --success-foreground: 0 0% 100%;
   }
 
-  .dark {
-    --background: 150 15% 8%;
-    --foreground: 40 25% 95%;
-    --card: 150 15% 12%;
-    --card-foreground: 40 25% 95%;
-    --popover: 150 15% 12%;
-    --popover-foreground: 40 25% 95%;
-    --primary: 152 50% 45%;
-    --primary-foreground: 150 20% 8%;
-    --secondary: 150 12% 18%;
-    --secondary-foreground: 40 25% 95%;
-    --muted: 150 12% 18%;
-    --muted-foreground: 40 15% 60%;
-    --accent: 35 85% 55%;
-    --accent-foreground: 150 20% 8%;
-    --destructive: 0 72% 51%;
-    --destructive-foreground: 0 0% 100%;
-    --border: 150 12% 22%;
-    --input: 150 12% 22%;
-    --ring: 152 50% 45%;
-    --chart-1: 152 50% 50%;
-    --chart-2: 35 85% 55%;
-    --chart-3: 152 40% 60%;
-    --chart-4: 35 70% 50%;
-    --chart-5: 152 45% 40%;
-    --sidebar: 150 18% 6%;
-    --sidebar-foreground: 40 25% 95%;
-    --sidebar-primary: 35 85% 55%;
-    --sidebar-primary-foreground: 150 20% 8%;
-    --sidebar-accent: 150 15% 15%;
-    --sidebar-accent-foreground: 40 25% 95%;
-    --sidebar-border: 150 12% 18%;
-    --sidebar-ring: 35 85% 55%;
-    --success: 152 55% 45%;
-    --success-foreground: 150 15% 8%;
+  @media (prefers-color-scheme: dark) {
+    :root {
+      /* WhatsApp palette - dark mode */
+      --background: 202 34% 10%;
+      --foreground: 197 19% 93%;
+      --card: 202 23% 17%;
+      --card-foreground: 197 19% 93%;
+      --popover: 202 23% 17%;
+      --popover-foreground: 197 19% 93%;
+      --primary: 168 100% 33%;
+      --primary-foreground: 202 34% 10%;
+      --secondary: 200 22% 21%;
+      --secondary-foreground: 197 19% 93%;
+      --muted: 200 22% 21%;
+      --muted-foreground: 200 13% 58%;
+      --accent: 142 70% 49%;
+      --accent-foreground: 202 34% 10%;
+      --destructive: 0 72% 51%;
+      --destructive-foreground: 0 0% 100%;
+      --border: 202 17% 24%;
+      --input: 202 17% 24%;
+      --ring: 168 100% 33%;
+      --chart-1: 168 100% 33%;
+      --chart-2: 142 70% 49%;
+      --chart-3: 168 60% 50%;
+      --chart-4: 142 50% 45%;
+      --chart-5: 168 80% 30%;
+      --sidebar: 204 43% 8%;
+      --sidebar-foreground: 197 19% 93%;
+      --sidebar-primary: 142 70% 49%;
+      --sidebar-primary-foreground: 202 34% 10%;
+      --sidebar-accent: 202 23% 17%;
+      --sidebar-accent-foreground: 197 19% 93%;
+      --sidebar-border: 202 17% 24%;
+      --sidebar-ring: 142 70% 49%;
+      --success: 142 70% 49%;
+      --success-foreground: 202 34% 10%;
+    }
   }
 }
 
@@ -89,11 +90,7 @@
 
   body {
     @apply bg-background text-foreground antialiased;
-    font-family: "DM Sans", system-ui, sans-serif;
-  }
-
-  h1, h2, h3, h4, h5, h6 {
-    font-family: "Playfair Display", Georgia, serif;
+    font-family: system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
   }
 
   button:not([disabled]),
@@ -107,18 +104,32 @@
   .scrollbar-thin::-webkit-scrollbar {
     width: 6px;
   }
-  
+
   .scrollbar-thin::-webkit-scrollbar-track {
     background: hsl(var(--muted));
     border-radius: 3px;
   }
-  
+
   .scrollbar-thin::-webkit-scrollbar-thumb {
     background: hsl(var(--muted-foreground) / 0.3);
     border-radius: 3px;
   }
-  
+
   .scrollbar-thin::-webkit-scrollbar-thumb:hover {
     background: hsl(var(--muted-foreground) / 0.5);
+  }
+
+  /* Ocultar scrollbar pero mantener scroll — útil para filtros horizontales en mobile */
+  .scrollbar-none {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Safe area para dispositivos con notch/home indicator */
+  .safe-area-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
   }
 }

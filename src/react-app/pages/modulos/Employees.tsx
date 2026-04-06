@@ -124,12 +124,12 @@ export default function Employees() {
     <div className="space-y-6">
       <UsageBanner label="Empleados" usage={myUsage?.usage["employees"]} />
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-3xl font-serif font-semibold text-foreground">
+          <h1 className="text-2xl sm:text-3xl font-serif font-semibold text-foreground">
             Personal
           </h1>
-          <p className="text-muted-foreground mt-1">
+          <p className="text-muted-foreground mt-1 text-sm sm:text-base">
             Gestiona a los empleados de tu restaurante
           </p>
         </div>
@@ -142,7 +142,7 @@ export default function Employees() {
             <Briefcase className="w-4 h-4 mr-2" />
             Gestionar Puestos
           </Button>
-          <Button onClick={openNewModal} className="bg-primary hover:bg-primary/90">
+          <Button onClick={openNewModal} className="bg-primary hover:bg-primary/90 min-h-[44px]">
             <Plus className="w-4 h-4 mr-2" />
             Agregar Empleado
           </Button>
@@ -150,34 +150,34 @@ export default function Employees() {
       </div>
 
       {/* Search & Filters */}
-      <div className="flex flex-col sm:flex-row gap-4">
-        <div className="relative flex-1 max-w-md">
+      <div className="flex flex-col gap-3">
+        <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
             placeholder="Buscar por nombre o puesto..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10"
+            className="pl-10 h-11"
           />
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
           <Badge
             variant={filter === "all" ? "secondary" : "outline"}
-            className="px-4 py-2 cursor-pointer hover:bg-secondary/80"
+            className="px-4 py-2.5 cursor-pointer hover:bg-secondary/80 whitespace-nowrap min-h-[36px] flex items-center"
             onClick={() => setFilter("all")}
           >
             Todos ({employees.length})
           </Badge>
           <Badge
             variant={filter === "active" ? "secondary" : "outline"}
-            className="px-4 py-2 cursor-pointer hover:bg-muted"
+            className="px-4 py-2.5 cursor-pointer hover:bg-muted whitespace-nowrap min-h-[36px] flex items-center"
             onClick={() => setFilter("active")}
           >
             Activos ({activeCount})
           </Badge>
           <Badge
             variant={filter === "inactive" ? "secondary" : "outline"}
-            className="px-4 py-2 cursor-pointer hover:bg-muted"
+            className="px-4 py-2.5 cursor-pointer hover:bg-muted whitespace-nowrap min-h-[36px] flex items-center"
             onClick={() => setFilter("inactive")}
           >
             Inactivos ({inactiveCount})
@@ -217,7 +217,7 @@ export default function Employees() {
                   <div className="relative">
                     <button
                       onClick={() => setMenuOpenId(menuOpenId === employee.id ? null : employee.id)}
-                      className="p-1.5 rounded-md opacity-0 group-hover:opacity-100 hover:bg-muted transition-all"
+                      className="p-2.5 rounded-md opacity-100 sm:opacity-0 sm:group-hover:opacity-100 hover:bg-muted transition-all min-h-[44px] min-w-[44px] flex items-center justify-center"
                     >
                       <MoreVertical className="w-4 h-4 text-muted-foreground" />
                     </button>
@@ -226,14 +226,14 @@ export default function Employees() {
                       <div className="absolute right-0 top-8 bg-card rounded-lg shadow-lg border border-border py-1 min-w-32 z-10">
                         <button
                           onClick={() => handleEdit(employee)}
-                          className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-muted transition-colors"
+                          className="w-full flex items-center gap-2 px-3 py-3 text-sm hover:bg-muted transition-colors min-h-[44px]"
                         >
                           <Pencil className="w-4 h-4" />
                           Editar
                         </button>
                         <button
                           onClick={() => setDeleteConfirmId(employee.id)}
-                          className="w-full flex items-center gap-2 px-3 py-2 text-sm text-destructive hover:bg-destructive/10 transition-colors"
+                          className="w-full flex items-center gap-2 px-3 py-3 text-sm text-destructive hover:bg-destructive/10 transition-colors min-h-[44px]"
                         >
                           <Trash2 className="w-4 h-4" />
                           Eliminar

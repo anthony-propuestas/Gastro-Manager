@@ -184,7 +184,7 @@ export default function Dashboard() {
     <div className="space-y-8">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-serif font-semibold text-foreground">
+        <h1 className="text-2xl sm:text-3xl font-serif font-semibold text-foreground">
           Bienvenido de vuelta
         </h1>
         <p className="text-muted-foreground mt-1">
@@ -193,7 +193,7 @@ export default function Dashboard() {
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
         {stats.map((stat) => {
           const Icon = stat.icon;
           return (
@@ -202,19 +202,19 @@ export default function Dashboard() {
               className="border-0 shadow-sm bg-card cursor-pointer hover:shadow-md transition-shadow"
               onClick={stat.onClick}
             >
-              <CardContent className="p-6">
+              <CardContent className="p-4 sm:p-6">
                 <div className="flex items-start justify-between">
-                  <div className="space-y-2">
-                    <p className="text-sm font-medium text-muted-foreground">
+                  <div className="space-y-1 sm:space-y-2 min-w-0 flex-1 mr-2">
+                    <p className="text-xs sm:text-sm font-medium text-muted-foreground leading-tight">
                       {stat.title}
                     </p>
-                    <p className="text-3xl font-serif font-semibold">
+                    <p className="text-xl sm:text-3xl font-serif font-semibold truncate">
                       {stat.value}
                     </p>
-                    <p className="text-xs text-muted-foreground">{stat.change}</p>
+                    <p className="text-xs text-muted-foreground truncate">{stat.change}</p>
                   </div>
-                  <div className={`p-3 rounded-xl ${stat.bgColor}`}>
-                    <Icon className={`w-5 h-5 ${stat.color}`} />
+                  <div className={`p-2 sm:p-3 rounded-xl flex-shrink-0 ${stat.bgColor}`}>
+                    <Icon className={`w-4 h-4 sm:w-5 sm:h-5 ${stat.color}`} />
                   </div>
                 </div>
               </CardContent>
@@ -336,7 +336,7 @@ export default function Dashboard() {
       <Card className="border-0 shadow-sm">
         <CardContent className="p-6">
           <h2 className="text-lg font-serif font-semibold mb-4">Acciones Rápidas</h2>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <button
               onClick={() => navigate("/empleados")}
               className="p-4 rounded-lg bg-primary text-primary-foreground font-medium hover:bg-primary/90 transition-colors text-left"

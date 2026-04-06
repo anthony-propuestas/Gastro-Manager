@@ -76,14 +76,18 @@ export default function EmployeeAdvancesModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
       <div
         className="absolute inset-0 bg-black/50 backdrop-blur-sm"
         onClick={onClose}
       />
-      <div className="relative bg-card rounded-2xl shadow-xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
+      <div className="relative bg-card sm:rounded-2xl rounded-t-2xl shadow-xl w-full sm:max-w-2xl sm:mx-4 max-h-[92vh] overflow-y-auto">
+        {/* Drag handle — solo mobile */}
+        <div className="flex justify-center pt-3 sm:hidden">
+          <div className="w-10 h-1 rounded-full bg-muted-foreground/30" />
+        </div>
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-border">
+        <div className="flex items-center justify-between p-5 sm:p-6 border-b border-border">
           <div>
             <h2 className="text-xl font-serif font-semibold">
               Adelantos de {employee.name}
@@ -101,7 +105,7 @@ export default function EmployeeAdvancesModal({
         </div>
 
         {/* Content */}
-        <div className="p-6">
+        <div className="p-5 sm:p-6">
           {isLoading ? (
             <div className="text-center py-8 text-muted-foreground">
               Cargando...

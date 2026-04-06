@@ -33,18 +33,18 @@ export function ChatWidget() {
 
   return (
     <>
-      {/* Floating Button */}
+      {/* Floating Button — sube en mobile para no tapar bottom nav */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="fixed bottom-6 right-6 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg transition-all hover:scale-110 hover:shadow-xl"
+        className="fixed bottom-[72px] right-4 lg:bottom-6 lg:right-6 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg transition-all hover:scale-110 hover:shadow-xl"
         aria-label="Abrir chat"
       >
         {isOpen ? <X className="h-6 w-6" /> : <MessageCircle className="h-6 w-6" />}
       </button>
 
-      {/* Chat Panel */}
+      {/* Chat Panel — en mobile ocupa casi toda la pantalla desde arriba del bottom nav */}
       {isOpen && (
-        <div className="fixed bottom-24 right-6 z-50 flex h-[500px] w-[380px] flex-col rounded-lg border border-border bg-background shadow-2xl">
+        <div className="fixed bottom-[136px] right-4 left-4 lg:left-auto lg:bottom-24 lg:right-6 lg:w-[380px] z-50 flex h-[60vh] lg:h-[500px] flex-col rounded-lg border border-border bg-background shadow-2xl">
           {/* Header */}
           <div className="flex items-center justify-between border-b border-border bg-gradient-to-r from-emerald-500 to-emerald-600 px-4 py-3 text-white rounded-t-lg">
             <div>
