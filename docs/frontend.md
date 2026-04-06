@@ -935,20 +935,32 @@ Los modales usan `focus-trap` nativo de Radix UI: el foco queda atrapado dentro 
 
 ## Testing
 
-**Pendiente de implementar:**
+### Unit tests
+
+El proyecto usa **Vitest** con entorno **happy-dom** para pruebas unitarias y de componentes React.
 
 ```bash
-# Unit tests
 npm run test
-
-# E2E tests
-npm run test:e2e
+npm run test:watch
+npm run test:coverage
 ```
 
+**Configuración actual:**
+- **Vitest**: Runner principal
+- **happy-dom**: DOM simulado para componentes
+- **Testing Library**: Render y assertions de UI
+
+**Cobertura inicial recomendada:**
+- Utilidades puras (`lib/`, validaciones Zod)
+- Componentes sin acoplamiento fuerte a contexto global
+- Guards y helpers de navegación con mocks acotados
+
+### E2E tests
+
+Pendiente de implementar.
+
 Herramientas recomendadas:
-- **Vitest**: Unit tests
 - **Playwright**: E2E tests
-- **Testing Library**: React testing
 
 ## Performance Tips
 
