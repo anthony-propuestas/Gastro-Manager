@@ -22,6 +22,8 @@ src/react-app/
 │   ├── employees/       # Componentes de empleados
 │   └── salaries/        # Componentes de sueldos
 ├── pages/               # Páginas/vistas principales
+│   ├── modulos/         # Módulos operativos (personal, sueldos, calendario)
+│   └── ...
 ├── hooks/               # Custom hooks
 ├── lib/                 # Utilidades
 ├── index.css            # Estilos globales y tema
@@ -135,7 +137,7 @@ const { fetchOverview } = useSalaries();
 - El dashboard vuelve a cargar overview, eventos y tópicos cuando cambia `currentNegocio`.
 - Antes de recargar, limpia el estado derivado (`salaryOverview`, `eventsToday`, `openTopics`) para no mostrar datos del negocio anterior.
 
-### Employees (`pages/Employees.tsx`)
+### Employees (`pages/modulos/Employees.tsx`)
 
 Gestión completa de empleados.
 
@@ -152,7 +154,7 @@ Gestión completa de empleados.
 - `EmployeeDetailModal`: Vista detallada con tópicos/notas
 - `JobRolesModal`: Gestión de puestos
 
-### Salaries (`pages/Salaries.tsx`)
+### Salaries (`pages/modulos/Salaries.tsx`)
 
 Sistema de sueldos y adelantos.
 
@@ -168,7 +170,7 @@ Sistema de sueldos y adelantos.
 - `AdvanceModal`: Registrar adelanto
 - `EmployeeAdvancesModal`: Ver/gestionar adelantos de empleado
 
-### CalendarPage (`pages/CalendarPage.tsx`)
+### CalendarPage (`pages/modulos/CalendarPage.tsx`)
 
 Calendario mensual con eventos y tópicos.
 

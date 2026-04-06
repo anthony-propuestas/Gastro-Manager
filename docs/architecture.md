@@ -202,9 +202,10 @@ gastro-manager/
 │       └── pages/
 │           ├── Admin.tsx          # Panel de administración (6 secciones)
 │           ├── Dashboard.tsx
-│           ├── Employees.tsx
-│           ├── Salaries.tsx
-│           ├── CalendarPage.tsx
+│           ├── modulos/
+│           │   ├── Employees.tsx
+│           │   ├── Salaries.tsx
+│           │   └── CalendarPage.tsx
 │           ├── NegocioSetup.tsx   # Selección/creación de negocio
 │           ├── InvitePage.tsx     # Flujo de invitación
 │           └── ...
