@@ -741,10 +741,6 @@ app.post("/api/negocios/:id/request-owner", authMiddleware, async (c) => {
     const negocioId = Number(c.req.param("id"));
     const db = c.env.DB;
 
-    if (user.role !== 'usuario_inteligente') {
-      return c.json(apiError("FORBIDDEN", "Solo los usuarios inteligentes pueden solicitar ser owner"), 403);
-    }
-
     const membership = await db
       .prepare("SELECT negocio_role FROM negocio_members WHERE negocio_id = ? AND user_id = ?")
       .bind(negocioId, user.id)
@@ -767,25 +763,8 @@ app.post("/api/negocios/:id/request-owner", authMiddleware, async (c) => {
       return c.json(apiError("REQUEST_PENDING", "Ya tienes una solicitud pendiente"), 409);
     }
 
-    const ownerCount = await db
-      .prepare("SELECT COUNT(*) as count FROM negocio_members WHERE negocio_id = ? AND negocio_role = 'owner'")
-      .bind(negocioId)
-      .first<{ count: number }>();
-
     const now = new Date().toISOString();
 
-    if ((ownerCount?.count ?? 0) === 0) {
-      // First owner — auto-approve
-      await db.batch([
-        db.prepare("UPDATE negocio_members SET negocio_role = 'owner' WHERE negocio_id = ? AND user_id = ?")
-          .bind(negocioId, user.id),
-        db.prepare("INSERT INTO owner_requests (negocio_id, user_id, status, requested_at, resolved_at, resolved_by) VALUES (?, ?, 'approved', ?, ?, ?)")
-          .bind(negocioId, user.id, now, now, user.id),
-      ]);
-      return c.json(apiResponse({ status: 'approved' }), 200);
-    }
-
-    // Existing owners — create pending request
     // Delete any previous rejected request first to avoid UNIQUE(negocio_id, user_id, status) violation
     await db
       .prepare("DELETE FROM owner_requests WHERE negocio_id = ? AND user_id = ? AND status = 'rejected'")

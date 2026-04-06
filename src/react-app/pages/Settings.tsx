@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router";
 import { User, UsersRound, UserMinus, LogOut, Calendar, Users, Banknote, LayoutGrid, Crown, Loader2, Lock } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/react-app/components/ui/card";
 import { Button } from "@/react-app/components/ui/button";
@@ -20,6 +21,7 @@ const MODULE_ICONS = {
 type OwnerStatus = 'loading' | 'owner' | 'pending' | 'none';
 
 export default function Settings() {
+  const navigate = useNavigate();
   const { user, currentNegocio, setCurrentNegocio, refreshNegocios } = useAuth();
   const { getNegocioDetail, removeMember, leaveNegocio } = useNegocios();
   const { prefs, toggleModule, negocioRestrictions, isGerente } = useModulePrefsContext();
@@ -55,7 +57,7 @@ export default function Settings() {
   const negocioId = currentNegocio?.id;
 
   useEffect(() => {
-    if (negocioId == null || user?.role !== 'usuario_inteligente') {
+    if (negocioId == null) {
       setOwnerStatus('none');
       return;
     }
@@ -68,7 +70,7 @@ export default function Settings() {
         else setOwnerStatus('none');
       })
       .catch(() => setOwnerStatus('none'));
-  }, [negocioId, user?.role]);
+  }, [negocioId]);
 
   const handleRequestOwner = async () => {
     if (!currentNegocio) return;
@@ -225,8 +227,7 @@ export default function Settings() {
         </CardContent>
       </Card>
 
-      {/* Owner card — only for usuario_inteligente */}
-      {user?.role === 'usuario_inteligente' && currentNegocio && (
+      {currentNegocio && (
         <Card className="border-0 shadow-sm">
           <CardHeader>
             <div className="flex items-center gap-3">
@@ -249,9 +250,18 @@ export default function Settings() {
               </div>
             )}
             {ownerStatus === 'owner' && (
-              <div className="flex items-center gap-2 text-sm font-medium text-amber-600">
-                <Crown className="w-4 h-4" />
-                Eres Owner de este negocio
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 text-sm font-medium text-amber-600">
+                  <Crown className="w-4 h-4" />
+                  Eres Owner de este negocio
+                </div>
+                <Button
+                  variant="outline"
+                  onClick={() => navigate("/owner")}
+                  className="border-amber-200 text-amber-700 hover:bg-amber-50 hover:text-amber-800"
+                >
+                  Panel de control
+                </Button>
               </div>
             )}
             {ownerStatus === 'pending' && (
