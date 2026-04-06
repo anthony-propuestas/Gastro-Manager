@@ -1,6 +1,8 @@
 import { ReactNode } from "react";
 import { Navigate, useLocation } from "react-router";
 import { useAuth } from "@/react-app/context/AuthContext";
+import { useModulePrefsContext } from "@/react-app/context/ModulePrefsContext";
+import type { ModuleKey } from "@/react-app/hooks/useModulePrefs";
 import { Loader2, ChefHat } from "lucide-react";
 
 interface ProtectedRouteProps {
@@ -34,6 +36,21 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
 
   if (!currentNegocio && !isSetupRoute && !isInviteRoute) {
     return <Navigate to="/negocio/setup" replace />;
+  }
+
+  return <>{children}</>;
+}
+
+interface RestrictedModuleRouteProps {
+  moduleKey: ModuleKey;
+  children: ReactNode;
+}
+
+export function RestrictedModuleRoute({ moduleKey, children }: RestrictedModuleRouteProps) {
+  const { negocioRestrictions, isGerente } = useModulePrefsContext();
+
+  if (isGerente && negocioRestrictions[moduleKey]) {
+    return <Navigate to="/" replace />;
   }
 
   return <>{children}</>;

@@ -1,7 +1,7 @@
 import { BrowserRouter as Router, Routes, Route } from "react-router";
 import { AuthProvider } from "@/react-app/context/AuthContext";
 import MainLayout from "@/react-app/components/layout/MainLayout";
-import ProtectedRoute from "@/react-app/components/auth/ProtectedRoute";
+import ProtectedRoute, { RestrictedModuleRoute } from "@/react-app/components/auth/ProtectedRoute";
 import { ToastProvider } from "@/react-app/components/ui/toast";
 import { ErrorBoundary, PageErrorBoundary } from "@/react-app/components/ErrorBoundary";
 import { SidebarProvider } from "@/react-app/hooks/useSidebar";
@@ -63,7 +63,9 @@ export default function App() {
                   <ProtectedRoute>
                     <MainLayout>
                       <PageErrorBoundary>
-                        <Employees />
+                        <RestrictedModuleRoute moduleKey="personal">
+                          <Employees />
+                        </RestrictedModuleRoute>
                       </PageErrorBoundary>
                     </MainLayout>
                   </ProtectedRoute>
@@ -75,7 +77,9 @@ export default function App() {
                   <ProtectedRoute>
                     <MainLayout>
                       <PageErrorBoundary>
-                        <Salaries />
+                        <RestrictedModuleRoute moduleKey="sueldos">
+                          <Salaries />
+                        </RestrictedModuleRoute>
                       </PageErrorBoundary>
                     </MainLayout>
                   </ProtectedRoute>
@@ -87,7 +91,9 @@ export default function App() {
                   <ProtectedRoute>
                     <MainLayout>
                       <PageErrorBoundary>
-                        <CalendarPage />
+                        <RestrictedModuleRoute moduleKey="calendario">
+                          <CalendarPage />
+                        </RestrictedModuleRoute>
                       </PageErrorBoundary>
                     </MainLayout>
                   </ProtectedRoute>

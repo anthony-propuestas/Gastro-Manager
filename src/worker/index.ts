@@ -30,7 +30,7 @@ type Env = {
 };
 
 type UserPayload = { id: string; email: string; name: string; picture: string; role: string };
-type NegocioPayload = { id: number; name: string };
+type NegocioPayload = { id: number; name: string; member_role: string };
 
 type Variables = {
   user: UserPayload;
@@ -103,9 +103,9 @@ const negocioMiddleware: MiddlewareHandler<{ Bindings: Env; Variables: Variables
   const negocioId = Number(negocioIdHeader);
   const user = c.get("user");
   const member = await c.env.DB
-    .prepare("SELECT negocio_id FROM negocio_members WHERE negocio_id = ? AND user_id = ?")
+    .prepare("SELECT negocio_id, negocio_role FROM negocio_members WHERE negocio_id = ? AND user_id = ?")
     .bind(negocioId, user.id)
-    .first();
+    .first<{ negocio_id: number; negocio_role: string }>();
   if (!member) {
     return c.json({ success: false, error: { code: "NEGOCIO_ACCESS_DENIED", message: "No tienes acceso a este negocio" } }, 403);
   }
@@ -117,7 +117,7 @@ const negocioMiddleware: MiddlewareHandler<{ Bindings: Env; Variables: Variables
   if (!negocio) {
     return c.json({ success: false, error: { code: "NEGOCIO_NOT_FOUND", message: "Negocio no encontrado" } }, 404);
   }
-  c.set("negocio", { id: negocio.id, name: negocio.name });
+  c.set("negocio", { id: negocio.id, name: negocio.name, member_role: member.negocio_role });
   await next();
 };
 
@@ -172,6 +172,24 @@ function createUsageLimitMiddleware(tool: UsageTool): MiddlewareHandler<{ Bindin
       );
     }
 
+    await next();
+  };
+}
+
+// Blocks gerentes from accessing a module if the owner has restricted it.
+// Must be used after negocioMiddleware (requires negocio.member_role).
+function createModuleRestrictionMiddleware(moduleKey: 'calendario' | 'personal' | 'sueldos'): MiddlewareHandler<{ Bindings: Env; Variables: Variables }> {
+  return async (c, next) => {
+    const negocio = c.get("negocio");
+    if (negocio.member_role !== 'owner') {
+      const restriction = await c.env.DB
+        .prepare("SELECT is_restricted FROM negocio_module_restrictions WHERE negocio_id = ? AND module_key = ?")
+        .bind(negocio.id, moduleKey)
+        .first<{ is_restricted: number }>();
+      if (restriction?.is_restricted === 1) {
+        return c.json(apiError("MODULE_RESTRICTED", "Este módulo está restringido por el owner"), 403);
+      }
+    }
     await next();
   };
 }
@@ -768,6 +786,11 @@ app.post("/api/negocios/:id/request-owner", authMiddleware, async (c) => {
     }
 
     // Existing owners — create pending request
+    // Delete any previous rejected request first to avoid UNIQUE(negocio_id, user_id, status) violation
+    await db
+      .prepare("DELETE FROM owner_requests WHERE negocio_id = ? AND user_id = ? AND status = 'rejected'")
+      .bind(negocioId, user.id)
+      .run();
     await db
       .prepare("INSERT INTO owner_requests (negocio_id, user_id, requested_at) VALUES (?, ?, ?)")
       .bind(negocioId, user.id, now)
@@ -1054,7 +1077,7 @@ app.put("/api/modules/prefs", authMiddleware, async (c) => {
 // Employee Routes (Protected + Negocio)
 // ============================================
 
-app.get("/api/employees", authMiddleware, negocioMiddleware, async (c) => {
+app.get("/api/employees", authMiddleware, negocioMiddleware, createModuleRestrictionMiddleware('personal'), async (c) => {
   try {
     const user = c.get("user");
     const negocio = c.get("negocio");
@@ -1079,7 +1102,7 @@ app.get("/api/employees", authMiddleware, negocioMiddleware, async (c) => {
   }
 });
 
-app.get("/api/employees/:id", authMiddleware, negocioMiddleware, async (c) => {
+app.get("/api/employees/:id", authMiddleware, negocioMiddleware, createModuleRestrictionMiddleware('personal'), async (c) => {
   try {
     const negocio = c.get("negocio");
     const employeeId = c.req.param("id");
@@ -1106,7 +1129,7 @@ app.get("/api/employees/:id", authMiddleware, negocioMiddleware, async (c) => {
   }
 });
 
-app.post("/api/employees", authMiddleware, negocioMiddleware, createUsageLimitMiddleware(USAGE_TOOLS.EMPLOYEES), async (c) => {
+app.post("/api/employees", authMiddleware, negocioMiddleware, createModuleRestrictionMiddleware('personal'), createUsageLimitMiddleware(USAGE_TOOLS.EMPLOYEES), async (c) => {
   try {
     const user = c.get("user");
     const negocio = c.get("negocio");
@@ -1153,7 +1176,7 @@ app.post("/api/employees", authMiddleware, negocioMiddleware, createUsageLimitMi
   }
 });
 
-app.put("/api/employees/:id", authMiddleware, negocioMiddleware, async (c) => {
+app.put("/api/employees/:id", authMiddleware, negocioMiddleware, createModuleRestrictionMiddleware('personal'), async (c) => {
   try {
     const user = c.get("user");
     const negocio = c.get("negocio");
@@ -1217,7 +1240,7 @@ app.put("/api/employees/:id", authMiddleware, negocioMiddleware, async (c) => {
   }
 });
 
-app.delete("/api/employees/:id", authMiddleware, negocioMiddleware, async (c) => {
+app.delete("/api/employees/:id", authMiddleware, negocioMiddleware, createModuleRestrictionMiddleware('personal'), async (c) => {
   try {
     const user = c.get("user");
     const negocio = c.get("negocio");
@@ -1252,7 +1275,7 @@ app.delete("/api/employees/:id", authMiddleware, negocioMiddleware, async (c) =>
 // Job Roles Routes (Protected + Negocio)
 // ============================================
 
-app.get("/api/job-roles", authMiddleware, negocioMiddleware, async (c) => {
+app.get("/api/job-roles", authMiddleware, negocioMiddleware, createModuleRestrictionMiddleware('personal'), async (c) => {
   try {
     const negocio = c.get("negocio");
     const db = c.env.DB;
@@ -1269,7 +1292,7 @@ app.get("/api/job-roles", authMiddleware, negocioMiddleware, async (c) => {
   }
 });
 
-app.post("/api/job-roles", authMiddleware, negocioMiddleware, createUsageLimitMiddleware(USAGE_TOOLS.JOB_ROLES), async (c) => {
+app.post("/api/job-roles", authMiddleware, negocioMiddleware, createModuleRestrictionMiddleware('personal'), createUsageLimitMiddleware(USAGE_TOOLS.JOB_ROLES), async (c) => {
   try {
     const negocio = c.get("negocio");
     const body = await c.req.json();
@@ -1299,7 +1322,7 @@ app.post("/api/job-roles", authMiddleware, negocioMiddleware, createUsageLimitMi
   }
 });
 
-app.delete("/api/job-roles/:id", authMiddleware, negocioMiddleware, async (c) => {
+app.delete("/api/job-roles/:id", authMiddleware, negocioMiddleware, createModuleRestrictionMiddleware('personal'), async (c) => {
   try {
     const negocio = c.get("negocio");
     const roleId = c.req.param("id");
@@ -1327,7 +1350,7 @@ app.delete("/api/job-roles/:id", authMiddleware, negocioMiddleware, async (c) =>
 // Topic Routes (Protected + Negocio)
 // ============================================
 
-app.get("/api/employees/:employeeId/topics", authMiddleware, negocioMiddleware, async (c) => {
+app.get("/api/employees/:employeeId/topics", authMiddleware, negocioMiddleware, createModuleRestrictionMiddleware('personal'), async (c) => {
   try {
     const negocio = c.get("negocio");
     const employeeId = c.req.param("employeeId");
@@ -1361,7 +1384,7 @@ app.get("/api/employees/:employeeId/topics", authMiddleware, negocioMiddleware, 
   }
 });
 
-app.post("/api/employees/:employeeId/topics", authMiddleware, negocioMiddleware, createUsageLimitMiddleware(USAGE_TOOLS.TOPICS), async (c) => {
+app.post("/api/employees/:employeeId/topics", authMiddleware, negocioMiddleware, createModuleRestrictionMiddleware('personal'), createUsageLimitMiddleware(USAGE_TOOLS.TOPICS), async (c) => {
   try {
     const negocio = c.get("negocio");
     const employeeId = c.req.param("employeeId");
@@ -1404,7 +1427,7 @@ app.post("/api/employees/:employeeId/topics", authMiddleware, negocioMiddleware,
   }
 });
 
-app.put("/api/topics/:id", authMiddleware, negocioMiddleware, async (c) => {
+app.put("/api/topics/:id", authMiddleware, negocioMiddleware, createModuleRestrictionMiddleware('personal'), async (c) => {
   try {
     const negocio = c.get("negocio");
     const topicId = c.req.param("id");
@@ -1455,7 +1478,7 @@ app.put("/api/topics/:id", authMiddleware, negocioMiddleware, async (c) => {
   }
 });
 
-app.delete("/api/topics/:id", authMiddleware, negocioMiddleware, async (c) => {
+app.delete("/api/topics/:id", authMiddleware, negocioMiddleware, createModuleRestrictionMiddleware('personal'), async (c) => {
   try {
     const negocio = c.get("negocio");
     const topicId = c.req.param("id");
@@ -1488,7 +1511,7 @@ app.delete("/api/topics/:id", authMiddleware, negocioMiddleware, async (c) => {
 // Note Routes (Protected + Negocio)
 // ============================================
 
-app.get("/api/topics/:topicId/notes", authMiddleware, negocioMiddleware, async (c) => {
+app.get("/api/topics/:topicId/notes", authMiddleware, negocioMiddleware, createModuleRestrictionMiddleware('personal'), async (c) => {
   try {
     const negocio = c.get("negocio");
     const topicId = c.req.param("topicId");
@@ -1519,7 +1542,7 @@ app.get("/api/topics/:topicId/notes", authMiddleware, negocioMiddleware, async (
   }
 });
 
-app.post("/api/topics/:topicId/notes", authMiddleware, negocioMiddleware, createUsageLimitMiddleware(USAGE_TOOLS.NOTES), async (c) => {
+app.post("/api/topics/:topicId/notes", authMiddleware, negocioMiddleware, createModuleRestrictionMiddleware('personal'), createUsageLimitMiddleware(USAGE_TOOLS.NOTES), async (c) => {
   try {
     const negocio = c.get("negocio");
     const topicId = c.req.param("topicId");
@@ -1568,7 +1591,7 @@ app.post("/api/topics/:topicId/notes", authMiddleware, negocioMiddleware, create
   }
 });
 
-app.put("/api/notes/:id", authMiddleware, negocioMiddleware, async (c) => {
+app.put("/api/notes/:id", authMiddleware, negocioMiddleware, createModuleRestrictionMiddleware('personal'), async (c) => {
   try {
     const negocio = c.get("negocio");
     const noteId = c.req.param("id");
@@ -1610,7 +1633,7 @@ app.put("/api/notes/:id", authMiddleware, negocioMiddleware, async (c) => {
   }
 });
 
-app.delete("/api/notes/:id", authMiddleware, negocioMiddleware, async (c) => {
+app.delete("/api/notes/:id", authMiddleware, negocioMiddleware, createModuleRestrictionMiddleware('personal'), async (c) => {
   try {
     const negocio = c.get("negocio");
     const noteId = c.req.param("id");
@@ -1643,7 +1666,7 @@ app.delete("/api/notes/:id", authMiddleware, negocioMiddleware, async (c) => {
 // Topic Deadlines for Calendar (Protected + Negocio)
 // ============================================
 
-app.get("/api/topics/deadlines", authMiddleware, negocioMiddleware, async (c) => {
+app.get("/api/topics/deadlines", authMiddleware, negocioMiddleware, createModuleRestrictionMiddleware('personal'), async (c) => {
   try {
     const negocio = c.get("negocio");
     const db = c.env.DB;
@@ -1678,7 +1701,7 @@ app.get("/api/topics/deadlines", authMiddleware, negocioMiddleware, async (c) =>
 // Event Routes (Protected + Negocio)
 // ============================================
 
-app.get("/api/events", authMiddleware, negocioMiddleware, async (c) => {
+app.get("/api/events", authMiddleware, negocioMiddleware, createModuleRestrictionMiddleware('calendario'), async (c) => {
   try {
     const negocio = c.get("negocio");
     const db = c.env.DB;
@@ -1704,7 +1727,7 @@ app.get("/api/events", authMiddleware, negocioMiddleware, async (c) => {
   }
 });
 
-app.get("/api/events/:id", authMiddleware, negocioMiddleware, async (c) => {
+app.get("/api/events/:id", authMiddleware, negocioMiddleware, createModuleRestrictionMiddleware('calendario'), async (c) => {
   try {
     const negocio = c.get("negocio");
     const eventId = c.req.param("id");
@@ -1726,7 +1749,7 @@ app.get("/api/events/:id", authMiddleware, negocioMiddleware, async (c) => {
   }
 });
 
-app.post("/api/events", authMiddleware, negocioMiddleware, createUsageLimitMiddleware(USAGE_TOOLS.EVENTS), async (c) => {
+app.post("/api/events", authMiddleware, negocioMiddleware, createModuleRestrictionMiddleware('calendario'), createUsageLimitMiddleware(USAGE_TOOLS.EVENTS), async (c) => {
   try {
     const user = c.get("user");
     const negocio = c.get("negocio");
@@ -1773,7 +1796,7 @@ app.post("/api/events", authMiddleware, negocioMiddleware, createUsageLimitMiddl
   }
 });
 
-app.put("/api/events/:id", authMiddleware, negocioMiddleware, async (c) => {
+app.put("/api/events/:id", authMiddleware, negocioMiddleware, createModuleRestrictionMiddleware('calendario'), async (c) => {
   try {
     const user = c.get("user");
     const negocio = c.get("negocio");
@@ -1834,7 +1857,7 @@ app.put("/api/events/:id", authMiddleware, negocioMiddleware, async (c) => {
   }
 });
 
-app.delete("/api/events/:id", authMiddleware, negocioMiddleware, async (c) => {
+app.delete("/api/events/:id", authMiddleware, negocioMiddleware, createModuleRestrictionMiddleware('calendario'), async (c) => {
   try {
     const user = c.get("user");
     const negocio = c.get("negocio");
@@ -1864,7 +1887,7 @@ app.delete("/api/events/:id", authMiddleware, negocioMiddleware, async (c) => {
 // Salary & Advances Routes (Protected + Negocio)
 // ============================================
 
-app.get("/api/salaries/overview", authMiddleware, negocioMiddleware, async (c) => {
+app.get("/api/salaries/overview", authMiddleware, negocioMiddleware, createModuleRestrictionMiddleware('sueldos'), async (c) => {
   try {
     const negocio = c.get("negocio");
     const db = c.env.DB;
@@ -1912,7 +1935,7 @@ app.get("/api/salaries/overview", authMiddleware, negocioMiddleware, async (c) =
   }
 });
 
-app.get("/api/employees/:employeeId/advances", authMiddleware, negocioMiddleware, async (c) => {
+app.get("/api/employees/:employeeId/advances", authMiddleware, negocioMiddleware, createModuleRestrictionMiddleware('sueldos'), async (c) => {
   try {
     const negocio = c.get("negocio");
     const employeeId = c.req.param("employeeId");
@@ -1946,7 +1969,7 @@ app.get("/api/employees/:employeeId/advances", authMiddleware, negocioMiddleware
   }
 });
 
-app.post("/api/employees/:employeeId/advances", authMiddleware, negocioMiddleware, createUsageLimitMiddleware(USAGE_TOOLS.ADVANCES), async (c) => {
+app.post("/api/employees/:employeeId/advances", authMiddleware, negocioMiddleware, createModuleRestrictionMiddleware('sueldos'), createUsageLimitMiddleware(USAGE_TOOLS.ADVANCES), async (c) => {
   try {
     const user = c.get("user");
     const negocio = c.get("negocio");
@@ -2007,7 +2030,7 @@ app.post("/api/employees/:employeeId/advances", authMiddleware, negocioMiddlewar
   }
 });
 
-app.delete("/api/advances/:id", authMiddleware, negocioMiddleware, async (c) => {
+app.delete("/api/advances/:id", authMiddleware, negocioMiddleware, createModuleRestrictionMiddleware('sueldos'), async (c) => {
   try {
     const user = c.get("user");
     const negocio = c.get("negocio");
@@ -2033,7 +2056,7 @@ app.delete("/api/advances/:id", authMiddleware, negocioMiddleware, async (c) => 
   }
 });
 
-app.get("/api/salary-payments", authMiddleware, negocioMiddleware, async (c) => {
+app.get("/api/salary-payments", authMiddleware, negocioMiddleware, createModuleRestrictionMiddleware('sueldos'), async (c) => {
   try {
     const negocio = c.get("negocio");
     const db = c.env.DB;
@@ -2062,7 +2085,7 @@ app.get("/api/salary-payments", authMiddleware, negocioMiddleware, async (c) => 
   }
 });
 
-app.post("/api/salary-payments/mark-paid", authMiddleware, negocioMiddleware, createUsageLimitMiddleware(USAGE_TOOLS.SALARY_PAYMENTS), async (c) => {
+app.post("/api/salary-payments/mark-paid", authMiddleware, negocioMiddleware, createModuleRestrictionMiddleware('sueldos'), createUsageLimitMiddleware(USAGE_TOOLS.SALARY_PAYMENTS), async (c) => {
   try {
     const user = c.get("user");
     const negocio = c.get("negocio");
@@ -2143,7 +2166,7 @@ app.post("/api/salary-payments/mark-paid", authMiddleware, negocioMiddleware, cr
   }
 });
 
-app.post("/api/salary-payments/mark-all-paid", authMiddleware, negocioMiddleware, async (c) => {
+app.post("/api/salary-payments/mark-all-paid", authMiddleware, negocioMiddleware, createModuleRestrictionMiddleware('sueldos'), async (c) => {
   try {
     const user = c.get("user");
     const negocio = c.get("negocio");

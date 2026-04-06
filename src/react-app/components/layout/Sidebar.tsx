@@ -41,8 +41,13 @@ export default function Sidebar() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [showNegocioDropdown, setShowNegocioDropdown] = useState(false);
   const { isOpen, isCollapsed, setIsOpen, toggleCollapsed } = useSidebar();
-  const { prefs } = useModulePrefsContext();
-  const visibleNavItems = navItems.filter((item) => !item.moduleKey || prefs[item.moduleKey] !== false);
+  const { prefs, negocioRestrictions, isGerente } = useModulePrefsContext();
+  const visibleNavItems = navItems.filter((item) => {
+    if (!item.moduleKey) return true;
+    if (prefs[item.moduleKey] === false) return false;
+    if (isGerente && negocioRestrictions[item.moduleKey as keyof typeof negocioRestrictions]) return false;
+    return true;
+  });
 
   // Check admin status
   useEffect(() => {
