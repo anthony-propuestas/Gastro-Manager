@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/react-app/context/AuthContext";
+import { apiFetch } from "@/react-app/lib/api";
 import type { NegocioModuleRestrictions } from "@/shared/types";
 
 export const MODULES = [
@@ -83,7 +84,7 @@ export function useModulePrefs() {
       return;
     }
 
-    fetch(`/api/negocios/${negocioId}/module-restrictions`)
+    apiFetch(`/api/negocios/${negocioId}/module-restrictions`, {}, negocioId)
       .then((r) => r.json())
       .then((json) => {
         if (json.success && typeof json.data === 'object') {

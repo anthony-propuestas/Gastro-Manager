@@ -46,7 +46,11 @@ El Worker sirve tanto el frontend estático como la API REST. No hay servidores 
 
 Cada usuario puede crear o unirse a varios **negocios**. Todos los datos (empleados, sueldos, eventos) están aislados por `negocio_id`. El frontend envía el negocio activo en el header `X-Negocio-ID` en cada petición.
 
+El negocio activo se selecciona desde el dropdown del sidebar izquierdo. Cambiarlo actualiza el contexto global `currentNegocio`, persiste la selección localmente y obliga a recargar las vistas que dependen del negocio actual.
+
 Los usuarios se unen a negocios mediante enlaces de invitación con token de un solo uso.
+
+**Convención frontend:** para endpoints ligados al negocio activo se usa `apiFetch` en vez de `fetch` directo, para centralizar el header `X-Negocio-ID` y evitar datos cruzados entre negocios.
 
 ---
 
@@ -85,6 +89,7 @@ El middleware de cuotas usa un patrón **increment-then-revert atómico** para e
 ### Dashboard
 - Resumen de estadísticas: empleados activos, eventos del día, temas pendientes
 - Acciones rápidas a todos los módulos
+- Reacciona al cambio de negocio activo y vuelve a consultar overview, eventos, tópicos e invitaciones con el contexto correcto
 
 ### Empleados
 - CRUD completo con filtros por estado y búsqueda por nombre
@@ -199,4 +204,4 @@ npm run cf-typegen   # Generar tipos de Cloudflare
 
 ---
 
-**Versión**: 2.0.0 · **Plataforma**: Cloudflare Workers · **Última actualización**: 2026-04-05
+**Versión**: 2.0.0 · **Plataforma**: Cloudflare Workers · **Última actualización**: 2026-04-06

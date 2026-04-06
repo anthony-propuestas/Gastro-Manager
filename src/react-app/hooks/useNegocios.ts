@@ -1,4 +1,5 @@
 import { useState, useCallback } from "react";
+import { apiFetch } from "@/react-app/lib/api";
 import type { Negocio, NegocioMember, Invitation } from "@/shared/types";
 
 export function useNegocios() {
@@ -14,7 +15,7 @@ export function useNegocios() {
     startOp("create");
     setError(null);
     try {
-      const res = await fetch("/api/negocios", {
+      const res = await apiFetch("/api/negocios", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name }),
@@ -36,7 +37,7 @@ export function useNegocios() {
       startOp("detail");
       setError(null);
       try {
-        const res = await fetch(`/api/negocios/${negocioId}`);
+        const res = await apiFetch(`/api/negocios/${negocioId}`, {}, negocioId);
         const data = await res.json();
         if (data.success) return data.data;
         setError(data.error?.message || "Error al obtener el negocio");
@@ -56,10 +57,10 @@ export function useNegocios() {
       startOp("invite");
       setError(null);
       try {
-        const res = await fetch(`/api/negocios/${negocioId}/invitations`, {
+        const res = await apiFetch(`/api/negocios/${negocioId}/invitations`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-        });
+        }, negocioId);
         const data = await res.json();
         if (data.success) return data.data as Invitation;
         setError(data.error?.message || "Error al generar la invitación");
@@ -79,10 +80,10 @@ export function useNegocios() {
       startOp("remove");
       setError(null);
       try {
-        const res = await fetch(`/api/negocios/${negocioId}/members/${userId}`, {
+        const res = await apiFetch(`/api/negocios/${negocioId}/members/${userId}`, {
           method: "DELETE",
           headers: { "Content-Type": "application/json" },
-        });
+        }, negocioId);
         const data = await res.json();
         if (data.success) return true;
         setError(data.error?.message || "Error al remover miembro");
@@ -101,10 +102,10 @@ export function useNegocios() {
     startOp("leave");
     setError(null);
     try {
-      const res = await fetch(`/api/negocios/${negocioId}/leave`, {
+      const res = await apiFetch(`/api/negocios/${negocioId}/leave`, {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
-      });
+      }, negocioId);
       const data = await res.json();
       if (data.success) return true;
       setError(data.error?.message || "Error al salir del negocio");

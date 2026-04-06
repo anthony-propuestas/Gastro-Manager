@@ -1,5 +1,6 @@
 import { useState, useCallback } from "react";
 import type { OwnerRequest, NegocioModuleRestrictions } from "@/shared/types";
+import { apiFetch } from "@/react-app/lib/api";
 
 const DEFAULT_RESTRICTIONS: NegocioModuleRestrictions = {
   calendario: false,
@@ -19,7 +20,7 @@ export function useOwnerPanel(negocioId: number) {
     setLoadingRequests(true);
     setError(null);
     try {
-      const res = await fetch(`/api/negocios/${negocioId}/owner-requests`);
+      const res = await apiFetch(`/api/negocios/${negocioId}/owner-requests`, {}, negocioId);
       const json = await res.json();
       if (json.success) {
         setRequests(json.data);
@@ -36,7 +37,7 @@ export function useOwnerPanel(negocioId: number) {
   const fetchRestrictions = useCallback(async () => {
     setLoadingRestrictions(true);
     try {
-      const res = await fetch(`/api/negocios/${negocioId}/module-restrictions`);
+      const res = await apiFetch(`/api/negocios/${negocioId}/module-restrictions`, {}, negocioId);
       const json = await res.json();
       if (json.success && typeof json.data === 'object') {
         setRestrictions({ ...DEFAULT_RESTRICTIONS, ...json.data });
@@ -52,9 +53,9 @@ export function useOwnerPanel(negocioId: number) {
     setActionLoading(requestId);
     setError(null);
     try {
-      const res = await fetch(`/api/negocios/${negocioId}/owner-requests/${requestId}/approve`, {
+      const res = await apiFetch(`/api/negocios/${negocioId}/owner-requests/${requestId}/approve`, {
         method: "POST",
-      });
+      }, negocioId);
       const json = await res.json();
       if (json.success) {
         setRequests((prev) => prev.filter((r) => r.id !== requestId));
@@ -75,9 +76,9 @@ export function useOwnerPanel(negocioId: number) {
     setActionLoading(requestId);
     setError(null);
     try {
-      const res = await fetch(`/api/negocios/${negocioId}/owner-requests/${requestId}/reject`, {
+      const res = await apiFetch(`/api/negocios/${negocioId}/owner-requests/${requestId}/reject`, {
         method: "POST",
-      });
+      }, negocioId);
       const json = await res.json();
       if (json.success) {
         setRequests((prev) => prev.filter((r) => r.id !== requestId));
@@ -99,11 +100,11 @@ export function useOwnerPanel(negocioId: number) {
     // Optimistic update
     setRestrictions((prev) => ({ ...prev, [moduleKey]: newValue }));
     try {
-      const res = await fetch(`/api/negocios/${negocioId}/module-restrictions`, {
+      const res = await apiFetch(`/api/negocios/${negocioId}/module-restrictions`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ module_key: moduleKey, is_restricted: newValue }),
-      });
+      }, negocioId);
       const json = await res.json();
       if (!json.success) throw new Error("API error");
     } catch {

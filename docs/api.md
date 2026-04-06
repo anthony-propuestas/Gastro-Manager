@@ -33,6 +33,8 @@ X-Negocio-ID: <id_del_negocio_activo>
 
 Si el header está ausente o el usuario no es miembro del negocio, la respuesta es `403 FORBIDDEN`.
 
+**Convención de frontend:** las pantallas y hooks React deben enviar este header usando `apiFetch(url, options, negocioId)` desde `src/react-app/lib/api.ts`, en lugar de construir el header manualmente o usar `fetch` directo.
+
 ---
 
 ## Formato de Respuestas
@@ -105,6 +107,8 @@ Lista los negocios en los que el usuario es miembro.
 }]
 ```
 
+**Uso en frontend:** esta colección alimenta el selector de negocio del sidebar. Cambiar el negocio activo no cambia la membresía del usuario; solo cambia el contexto operativo para requests posteriores.
+
 #### `GET /api/negocios/:id`
 Detalle de un negocio (solo si el usuario es miembro).
 
@@ -153,6 +157,8 @@ Activa o desactiva un módulo para el usuario. Upsert via `ON CONFLICT`.
 // Request
 { "module_key": "sueldos", "is_active": false }
 ```
+
+Las restricciones por negocio del owner viven aparte en `GET/PUT /api/negocios/:id/module-restrictions` y sí dependen de `X-Negocio-ID` cuando se consultan desde el frontend operativo.
 
 ---
 

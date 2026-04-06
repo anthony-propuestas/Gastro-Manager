@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@/react-app/context/AuthContext";
+import { apiFetch } from "@/react-app/lib/api";
 
 export interface ToolUsage {
   count: number;
@@ -14,20 +15,23 @@ interface MyUsageData {
 
 export function useMyUsage() {
   const { currentNegocio } = useAuth();
+  const negocioId = currentNegocio?.id;
   const [data, setData] = useState<MyUsageData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    if (!currentNegocio) return;
+    if (!negocioId) {
+      setData(null);
+      return;
+    }
+
     setIsLoading(true);
-    fetch("/api/usage/me", {
-      headers: { "X-Negocio-ID": String(currentNegocio.id) },
-    })
+    apiFetch("/api/usage/me", {}, negocioId)
       .then(r => r.json())
       .then(d => { if (d.success) setData(d.data); })
       .catch(() => {})
       .finally(() => setIsLoading(false));
-  }, [currentNegocio?.id]);
+  }, [negocioId]);
 
   return { data, isLoading };
 }

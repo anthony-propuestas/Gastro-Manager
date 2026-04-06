@@ -125,7 +125,7 @@ export default function Sidebar() {
 
       {/* Negocio dropdown overlay */}
       {showNegocioDropdown && (
-        <div className="fixed inset-0 z-[55]" onClick={() => setShowNegocioDropdown(false)} />
+        <div className="fixed inset-0 z-[45]" onClick={() => setShowNegocioDropdown(false)} />
       )}
 
       {/* Sidebar */}
@@ -171,24 +171,24 @@ export default function Sidebar() {
 
             {/* Dropdown */}
             {showNegocioDropdown && (
-              <div className="absolute left-3 right-3 top-full mt-1 bg-popover border rounded-lg shadow-lg overflow-hidden z-[70]">
+              <div className="absolute left-3 right-3 top-full mt-1 bg-popover text-popover-foreground border border-border rounded-lg shadow-lg overflow-hidden z-[70]">
                 {negocios.map((n) => (
                   <button
                     key={n.id}
                     onClick={() => handleNegocioSelect(n)}
                     className={cn(
-                      "w-full flex items-center gap-2 px-3 py-2.5 text-sm text-left hover:bg-accent transition-colors",
-                      n.id === currentNegocio.id && "bg-accent text-primary font-medium"
+                      "w-full flex items-center gap-2 px-3 py-2.5 text-sm text-left text-popover-foreground hover:bg-accent hover:text-accent-foreground transition-colors",
+                      n.id === currentNegocio.id && "bg-accent text-accent-foreground font-medium"
                     )}
                   >
                     <Building2 className="w-3.5 h-3.5 flex-shrink-0" />
                     <span className="truncate">{n.name}</span>
                   </button>
                 ))}
-                <div className="border-t">
+                <div className="border-t border-border">
                   <button
                     onClick={handleCreateNegocio}
-                    className="w-full flex items-center gap-2 px-3 py-2.5 text-sm text-left hover:bg-accent transition-colors text-muted-foreground"
+                    className="w-full flex items-center gap-2 px-3 py-2.5 text-sm text-left text-popover-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
                   >
                     <Plus className="w-3.5 h-3.5 flex-shrink-0" />
                     Crear nuevo negocio

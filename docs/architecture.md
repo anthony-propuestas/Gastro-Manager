@@ -96,6 +96,10 @@ Usuario A ──┬── Miembro de: Negocio 1 (Restaurante Norte)
 
 El frontend mantiene un `currentNegocio` en el `AuthContext` y lo envía en cada petición como `X-Negocio-ID`.
 
+El cambio de negocio se dispara desde el dropdown del sidebar. Al seleccionar otro negocio, el frontend actualiza `currentNegocio`, lo persiste en `localStorage` y vuelve a solicitar la data dependiente del negocio activo en hooks y pantallas que usan `apiFetch`.
+
+**Convención del frontend:** los requests ligados a negocio deben usar `apiFetch(url, options, negocioId)` para centralizar la inyección de `X-Negocio-ID` y evitar inconsistencias al cambiar de negocio.
+
 **Invitaciones:** Se genera un token único; el destinatario abre el enlace, autenticarse si no lo está, y canjea el token con `POST /api/invitations/:token/redeem`. El token queda invalidado tras el primer uso.
 
 ---
@@ -237,6 +241,8 @@ Cada módulo tiene un hook (`useEmployees`, `useSalaries`, etc.) que encapsula e
 
 ### Context API para estado global
 `AuthContext` expone `user`, `role`, `currentNegocio`, y la lista de negocios. `ToastContext` para notificaciones. `SidebarContext` para estado del menú. `ModulePrefsContext` distribuye las preferencias de visibilidad de módulos al Sidebar y Settings.
+
+`currentNegocio` es la fuente única de verdad para el negocio activo. Cualquier vista con datos operativos debe reaccionar a cambios en `currentNegocio?.id` para refrescar su información.
 
 ### Formato de respuesta uniforme
 Todos los endpoints devuelven `{ success: true, data }` o `{ success: false, error: { code, message } }`.

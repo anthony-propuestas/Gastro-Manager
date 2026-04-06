@@ -10,6 +10,7 @@ import { useAuth } from "@/react-app/context/AuthContext";
 import { useNegocios } from "@/react-app/hooks/useNegocios";
 import { useModulePrefsContext } from "@/react-app/context/ModulePrefsContext";
 import { MODULES } from "@/react-app/hooks/useModulePrefs";
+import { apiFetch } from "@/react-app/lib/api";
 import type { NegocioMember } from "@/shared/types";
 
 const MODULE_ICONS = {
@@ -63,7 +64,7 @@ export default function Settings() {
     }
 
     setOwnerStatus('loading');
-    fetch(`/api/negocios/${negocioId}/my-owner-request`)
+    apiFetch(`/api/negocios/${negocioId}/my-owner-request`, {}, negocioId)
       .then((r) => r.json())
       .then((json) => {
         if (json.success) setOwnerStatus(json.data.status as OwnerStatus);
@@ -73,10 +74,10 @@ export default function Settings() {
   }, [negocioId]);
 
   const handleRequestOwner = async () => {
-    if (!currentNegocio) return;
+    if (negocioId == null) return;
     setRequestingOwner(true);
     try {
-      const res = await fetch(`/api/negocios/${currentNegocio.id}/request-owner`, { method: "POST" });
+      const res = await apiFetch(`/api/negocios/${negocioId}/request-owner`, { method: "POST" }, negocioId);
       const json = await res.json();
       if (json.success) {
         setOwnerStatus(json.data.status as OwnerStatus);

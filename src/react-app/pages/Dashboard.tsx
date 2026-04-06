@@ -7,6 +7,7 @@ import { Input } from "@/react-app/components/ui/input";
 import { useAuth } from "@/react-app/context/AuthContext";
 import { useEmployees } from "@/react-app/hooks/useEmployees";
 import { useSalaries } from "@/react-app/hooks/useSalaries";
+import { apiFetch } from "@/react-app/lib/api";
 
 type InvitationResponse = {
   success: boolean;
@@ -33,6 +34,7 @@ type CalendarEvent = {
 export default function Dashboard() {
   const navigate = useNavigate();
   const { currentNegocio } = useAuth();
+  const negocioId = currentNegocio?.id;
   const { employees, isLoading: loadingEmployees } = useEmployees();
   const { fetchOverview } = useSalaries();
   const [invite, setInvite] = useState({ url: "", error: "", loading: false });
@@ -44,6 +46,9 @@ export default function Dashboard() {
   useEffect(() => {
     const loadDashboardData = async () => {
       setLoadingData(true);
+      setSalaryOverview(null);
+      setEventsToday([]);
+      setOpenTopics(0);
       
       // Load salary overview
       const now = new Date();
@@ -55,7 +60,7 @@ export default function Dashboard() {
         const today = new Date();
         const month = (today.getMonth() + 1).toString();
         const year = today.getFullYear().toString();
-        const response = await fetch(`/api/events?month=${month}&year=${year}`);
+        const response = await apiFetch(`/api/events?month=${month}&year=${year}`, {}, negocioId);
         const data = await response.json();
         
         if (data.success) {
@@ -69,7 +74,7 @@ export default function Dashboard() {
 
       // Count open topics across all employees
       try {
-        const response = await fetch("/api/topics/deadlines");
+        const response = await apiFetch("/api/topics/deadlines", {}, negocioId);
         const data = await response.json();
         if (data.success) {
           const open = (data.data || []).filter((t: { is_open: number }) => t.is_open === 1).length;
@@ -82,17 +87,25 @@ export default function Dashboard() {
       setLoadingData(false);
     };
 
+    if (!negocioId) {
+      setSalaryOverview(null);
+      setEventsToday([]);
+      setOpenTopics(0);
+      setLoadingData(false);
+      return;
+    }
+
     if (!loadingEmployees) {
       loadDashboardData();
     }
-  }, [loadingEmployees, fetchOverview]);
+  }, [negocioId, loadingEmployees, fetchOverview]);
 
   const activeEmployees = employees.filter((e) => e.is_active === 1).length;
   const totalSalaries = salaryOverview?.totals?.total_salaries || 0;
   const totalAdvances = salaryOverview?.totals?.total_advances || 0;
 
   const handleGenerateInvite = async () => {
-    if (!currentNegocio) {
+    if (!negocioId) {
       setInvite(prev => ({ ...prev, error: "No hay un negocio seleccionado." }));
       return;
     }
@@ -100,10 +113,10 @@ export default function Dashboard() {
     setInvite({ url: "", error: "", loading: true });
 
     try {
-      const response = await fetch(`/api/negocios/${currentNegocio.id}/invitations`, {
+      const response = await apiFetch(`/api/negocios/${negocioId}/invitations`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-      });
+      }, negocioId);
 
       const data = (await response.json()) as InvitationResponse;
 

@@ -103,6 +103,12 @@ const navItems = [
 
 **Selector de negocio:** El sidebar incluye un dropdown para cambiar entre negocios del usuario (icono `Building2` + `ChevronDown`), con opción de crear un nuevo negocio directamente desde el menú.
 
+**Comportamiento actual del selector:**
+- El click fuera del menú cierra el dropdown sin bloquear los botones internos.
+- Seleccionar otro negocio actualiza `currentNegocio` en `AuthContext`, persiste el valor en `localStorage` y cierra el menú.
+- La opción "Crear nuevo negocio" navega a `NegocioSetup`.
+- Los items del dropdown usan colores explícitos para `popover`, `hover` y `selected`, evitando contraste insuficiente en light/dark mode.
+
 **Filtrado por módulos:** Los items con `moduleKey` se ocultan si el usuario ha desactivado ese módulo en la página de Configuración (via `useModulePrefsContext`).
 
 ## Páginas
@@ -122,8 +128,12 @@ Vista principal con resumen del negocio activo.
 ```tsx
 const { employees } = useEmployees();
 const { fetchOverview } = useSalaries();
-// Eventos y tópicos se obtienen via fetch directo a /api/events y /api/topics/deadlines
+// Eventos, tópicos e invitaciones usan apiFetch(..., {}, currentNegocio?.id)
 ```
+
+**Actualización por cambio de negocio:**
+- El dashboard vuelve a cargar overview, eventos y tópicos cuando cambia `currentNegocio`.
+- Antes de recargar, limpia el estado derivado (`salaryOverview`, `eventsToday`, `openTopics`) para no mostrar datos del negocio anterior.
 
 ### Employees (`pages/Employees.tsx`)
 
@@ -258,6 +268,19 @@ export function useEmployees() {
 
   const fetchEmployees = async () => { ... };
   const createEmployee = async (data) => { ... };
+
+### Convención de llamadas a API
+
+Para cualquier endpoint ligado al negocio activo debe usarse `apiFetch` desde `lib/api.ts` en lugar de `fetch` directo.
+
+```tsx
+const response = await apiFetch("/api/employees", {}, currentNegocio?.id);
+```
+
+**Objetivo:**
+- Inyectar `X-Negocio-ID` de forma consistente.
+- Evitar vistas desincronizadas al cambiar de negocio desde el sidebar.
+- Reducir headers manuales repetidos en hooks y páginas.
   const updateEmployee = async (id, data) => { ... };
   const deleteEmployee = async (id) => { ... };
 
