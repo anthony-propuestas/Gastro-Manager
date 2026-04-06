@@ -158,6 +158,25 @@ export const createNegocioSchema = z.object({
 });
 
 
+// Compras validation schemas
+const COMPRAS_CATEGORIAS = [
+  "carnes", "verduras", "bebidas", "limpieza", "descartables",
+  "servicios", "mantenimiento", "alquiler", "otros",
+] as const;
+
+export const createCompraSchema = z.object({
+  fecha: z.string().refine((date) => isReasonableDate(date), "Fecha de compra inválida"),
+  monto: z.number().min(0.01, "El monto debe ser mayor a cero").max(10000000, "Monto muy alto"),
+  item: z.string().min(1, "Item es requerido").max(200, "Item muy largo"),
+  tipo: z.enum(["producto", "servicio"]),
+  categoria: z.enum(COMPRAS_CATEGORIAS),
+  comprador_id: z.number().int().positive().optional().nullable(),
+  descripcion: z.string().max(500, "Descripción muy larga").optional().nullable(),
+  comprobante_key: z.string().max(300).optional().nullable(),
+});
+
+export const updateCompraSchema = createCompraSchema.partial();
+
 // Helper to validate and parse with Zod
 export function validateData<T>(schema: z.ZodSchema<T>, data: unknown): {
   success: boolean;

@@ -35,6 +35,7 @@ export type NegocioModuleRestrictions = {
   calendario: boolean;
   personal: boolean;
   sueldos: boolean;
+  compras: boolean;
 };
 
 export type Invitation = {

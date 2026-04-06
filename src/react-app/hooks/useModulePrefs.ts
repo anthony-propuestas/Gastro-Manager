@@ -7,6 +7,7 @@ export const MODULES = [
   { key: "calendario", label: "Calendario", order: 1, path: "/calendario", description: "Gestión de eventos y agenda" },
   { key: "personal",   label: "Personal",   order: 2, path: "/empleados",  description: "Administración de empleados" },
   { key: "sueldos",    label: "Sueldos",    order: 3, path: "/sueldos",    description: "Pagos y anticipos salariales" },
+  { key: "compras",    label: "Compras",    order: 4, path: "/compras",    description: "Registro de compras y gastos" },
 ] as const;
 
 export type ModuleKey = (typeof MODULES)[number]["key"];
@@ -15,6 +16,7 @@ const DEFAULT_PREFS: Record<ModuleKey, boolean> = {
   calendario: true,
   personal: true,
   sueldos: true,
+  compras: true,
 };
 
 type ModulePrefsResponse = {
@@ -51,6 +53,7 @@ const DEFAULT_RESTRICTIONS: NegocioModuleRestrictions = {
   calendario: false,
   personal: false,
   sueldos: false,
+  compras: false,
 };
 
 export function useModulePrefs() {

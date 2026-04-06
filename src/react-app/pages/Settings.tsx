@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
-import { User, UsersRound, UserMinus, LogOut, Calendar, Users, Banknote, LayoutGrid, Crown, Loader2, Lock } from "lucide-react";
+import { User, UsersRound, UserMinus, LogOut, Calendar, Users, Banknote, ShoppingCart, LayoutGrid, Crown, Loader2, Lock } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/react-app/components/ui/card";
 import { Button } from "@/react-app/components/ui/button";
 import { Separator } from "@/react-app/components/ui/separator";
@@ -17,6 +17,7 @@ const MODULE_ICONS = {
   calendario: Calendar,
   personal: Users,
   sueldos: Banknote,
+  compras: ShoppingCart,
 } as const;
 
 type OwnerStatus = 'loading' | 'owner' | 'pending' | 'none';

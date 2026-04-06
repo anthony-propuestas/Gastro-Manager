@@ -16,6 +16,8 @@ import {
   createAdvanceSchema,
   markSalaryPaidSchema,
   createNegocioSchema,
+  createCompraSchema,
+  updateCompraSchema,
 } from "./validation";
 import { USAGE_TOOLS, type UsageTool } from "./usageTools";
 
@@ -178,7 +180,7 @@ function createUsageLimitMiddleware(tool: UsageTool): MiddlewareHandler<{ Bindin
 
 // Blocks gerentes from accessing a module if the owner has restricted it.
 // Must be used after negocioMiddleware (requires negocio.member_role).
-function createModuleRestrictionMiddleware(moduleKey: 'calendario' | 'personal' | 'sueldos'): MiddlewareHandler<{ Bindings: Env; Variables: Variables }> {
+function createModuleRestrictionMiddleware(moduleKey: 'calendario' | 'personal' | 'sueldos' | 'compras'): MiddlewareHandler<{ Bindings: Env; Variables: Variables }> {
   return async (c, next) => {
     const negocio = c.get("negocio");
     if (negocio.member_role !== 'owner') {
@@ -930,6 +932,7 @@ app.get("/api/negocios/:id/module-restrictions", authMiddleware, async (c) => {
       calendario: false,
       personal: false,
       sueldos: false,
+      compras: false,
     };
 
     for (const row of rows.results) {
@@ -960,7 +963,7 @@ app.put("/api/negocios/:id/module-restrictions", authMiddleware, async (c) => {
     }
 
     const body = await c.req.json() as { module_key?: string; is_restricted?: boolean };
-    const VALID_KEYS = ['calendario', 'personal', 'sueldos'];
+    const VALID_KEYS = ['calendario', 'personal', 'sueldos', 'compras'];
 
     if (!body.module_key || !VALID_KEYS.includes(body.module_key) || typeof body.is_restricted !== 'boolean') {
       return c.json(apiError("VALIDATION_ERROR", "module_key y is_restricted son requeridos"), 400);
@@ -989,7 +992,7 @@ app.put("/api/negocios/:id/module-restrictions", authMiddleware, async (c) => {
 // Módulos de usuario (Protected, no negocio)
 // ============================================
 
-const VALID_MODULE_KEYS = ["calendario", "personal", "sueldos"] as const;
+const VALID_MODULE_KEYS = ["calendario", "personal", "sueldos", "compras"] as const;
 type ModuleKey = (typeof VALID_MODULE_KEYS)[number];
 
 app.get("/api/modules/prefs", authMiddleware, async (c) => {
@@ -1006,6 +1009,7 @@ app.get("/api/modules/prefs", authMiddleware, async (c) => {
       calendario: true,
       personal: true,
       sueldos: true,
+      compras: true,
     };
 
     for (const row of rows.results) {
@@ -2512,7 +2516,7 @@ app.put("/api/admin/usage-limits", authMiddleware, async (c) => {
     return c.json(apiError("UNAUTHORIZED", "No tienes permisos de administrador"), 403);
   }
   const body = await c.req.json<Record<string, number>>();
-  const validTools = ["employees","job_roles","topics","notes","advances","salary_payments","events","chat"];
+  const validTools = ["employees","job_roles","topics","notes","advances","salary_payments","events","chat","compras"];
   const entries = Object.entries(body).filter(([tool, val]) =>
     validTools.includes(tool) && typeof val === "number" && val >= 0
   );
@@ -2749,5 +2753,247 @@ Responde de manera concisa en español sobre los datos de este negocio.
     return c.json(apiError("CHAT_ERROR", "Error inesperado en el asistente. Intenta de nuevo."), 500);
   }
 });
+
+// ============================================
+// Compras (Purchases/Expenses) Routes
+// ============================================
+
+// GET /api/compras — list purchases for a month
+app.get("/api/compras",
+  authMiddleware,
+  negocioMiddleware,
+  createModuleRestrictionMiddleware('compras'),
+  async (c) => {
+    const negocio = c.get("negocio");
+    const user = c.get("user");
+    const db = c.env.DB;
+    const month = c.req.query("month") || String(new Date().getMonth() + 1);
+    const year = c.req.query("year") || String(new Date().getFullYear());
+    const period = `${year}-${month.padStart(2, '0')}`;
+    try {
+      const rows = await db
+        .prepare(`SELECT c.*, e.name as comprador_name
+                  FROM compras c
+                  LEFT JOIN employees e ON c.comprador_id = e.id
+                  WHERE c.negocio_id = ? AND strftime('%Y-%m', c.fecha) = ?
+                  ORDER BY c.fecha DESC, c.created_at DESC`)
+        .bind(negocio.id, period)
+        .all();
+      await logUsage(db, user.id, negocio.id, "view", "compras");
+      return c.json(apiResponse(rows.results));
+    } catch (error) {
+      console.error("Error fetching compras:", error);
+      return c.json(apiError("FETCH_ERROR", "Error al obtener compras"), 500);
+    }
+  }
+);
+
+// GET /api/compras/summary — daily totals for calendar grid
+app.get("/api/compras/summary",
+  authMiddleware,
+  negocioMiddleware,
+  createModuleRestrictionMiddleware('compras'),
+  async (c) => {
+    const negocio = c.get("negocio");
+    const user = c.get("user");
+    const db = c.env.DB;
+    const month = c.req.query("month") || String(new Date().getMonth() + 1);
+    const year = c.req.query("year") || String(new Date().getFullYear());
+    const period = `${year}-${month.padStart(2, '0')}`;
+    try {
+      const rows = await db
+        .prepare(`SELECT fecha, SUM(monto) as total_dia,
+                    SUM(CASE WHEN tipo = 'producto' THEN monto ELSE 0 END) as total_productos,
+                    SUM(CASE WHEN tipo = 'servicio' THEN monto ELSE 0 END) as total_servicios,
+                    COUNT(*) as cantidad
+                  FROM compras
+                  WHERE negocio_id = ? AND strftime('%Y-%m', fecha) = ?
+                  GROUP BY fecha
+                  ORDER BY fecha`)
+        .bind(negocio.id, period)
+        .all();
+      await logUsage(db, user.id, negocio.id, "view", "compras_summary");
+      return c.json(apiResponse(rows.results));
+    } catch (error) {
+      console.error("Error fetching compras summary:", error);
+      return c.json(apiError("FETCH_ERROR", "Error al obtener resumen"), 500);
+    }
+  }
+);
+
+// POST /api/compras — create a purchase
+app.post("/api/compras",
+  authMiddleware,
+  negocioMiddleware,
+  createModuleRestrictionMiddleware('compras'),
+  createUsageLimitMiddleware(USAGE_TOOLS.COMPRAS),
+  async (c) => {
+    const user = c.get("user");
+    const negocio = c.get("negocio");
+    const db = c.env.DB;
+    try {
+      const body = await c.req.json();
+      const validation = validateData(createCompraSchema, body);
+      if (!validation.success) {
+        return c.json(apiError("VALIDATION_ERROR", validation.error || "Datos inválidos"), 400);
+      }
+      const d = validation.data!;
+      const now = new Date().toISOString();
+      const result = await db
+        .prepare(`INSERT INTO compras (negocio_id, user_id, fecha, monto, item, tipo, categoria, comprador_id, descripcion, comprobante_key, created_at, updated_at)
+                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING *`)
+        .bind(negocio.id, user.id, d.fecha, d.monto, d.item, d.tipo, d.categoria, d.comprador_id ?? null, d.descripcion ?? null, d.comprobante_key ?? null, now, now)
+        .first();
+      await logUsage(db, user.id, negocio.id, "create", "compras");
+      return c.json(apiResponse(result), 201);
+    } catch (error) {
+      console.error("Error creating compra:", error);
+      return c.json(apiError("CREATE_ERROR", "Error al crear compra"), 500);
+    }
+  }
+);
+
+// PUT /api/compras/:id — update a purchase
+app.put("/api/compras/:id",
+  authMiddleware,
+  negocioMiddleware,
+  createModuleRestrictionMiddleware('compras'),
+  createUsageLimitMiddleware(USAGE_TOOLS.COMPRAS),
+  async (c) => {
+    const user = c.get("user");
+    const negocio = c.get("negocio");
+    const db = c.env.DB;
+    const id = parseInt(c.req.param("id"));
+    if (isNaN(id)) return c.json(apiError("VALIDATION_ERROR", "ID inválido"), 400);
+    try {
+      const existing = await db
+        .prepare("SELECT * FROM compras WHERE id = ? AND negocio_id = ?")
+        .bind(id, negocio.id)
+        .first();
+      if (!existing) return c.json(apiError("NOT_FOUND", "Compra no encontrada"), 404);
+
+      const body = await c.req.json();
+      const validation = validateData(updateCompraSchema, body);
+      if (!validation.success) {
+        return c.json(apiError("VALIDATION_ERROR", validation.error || "Datos inválidos"), 400);
+      }
+      const d = validation.data!;
+      const now = new Date().toISOString();
+      const result = await db
+        .prepare(`UPDATE compras SET
+                    fecha = COALESCE(?, fecha),
+                    monto = COALESCE(?, monto),
+                    item = COALESCE(?, item),
+                    tipo = COALESCE(?, tipo),
+                    categoria = COALESCE(?, categoria),
+                    comprador_id = COALESCE(?, comprador_id),
+                    descripcion = COALESCE(?, descripcion),
+                    comprobante_key = COALESCE(?, comprobante_key),
+                    updated_at = ?
+                  WHERE id = ? AND negocio_id = ? RETURNING *`)
+        .bind(d.fecha ?? null, d.monto ?? null, d.item ?? null, d.tipo ?? null, d.categoria ?? null, d.comprador_id ?? null, d.descripcion ?? null, d.comprobante_key ?? null, now, id, negocio.id)
+        .first();
+      await logUsage(db, user.id, negocio.id, "update", "compras");
+      return c.json(apiResponse(result));
+    } catch (error) {
+      console.error("Error updating compra:", error);
+      return c.json(apiError("UPDATE_ERROR", "Error al actualizar compra"), 500);
+    }
+  }
+);
+
+// DELETE /api/compras/:id — delete a purchase
+app.delete("/api/compras/:id",
+  authMiddleware,
+  negocioMiddleware,
+  createModuleRestrictionMiddleware('compras'),
+  async (c) => {
+    const user = c.get("user");
+    const negocio = c.get("negocio");
+    const db = c.env.DB;
+    const id = parseInt(c.req.param("id"));
+    if (isNaN(id)) return c.json(apiError("VALIDATION_ERROR", "ID inválido"), 400);
+    try {
+      const existing = await db
+        .prepare("SELECT * FROM compras WHERE id = ? AND negocio_id = ?")
+        .bind(id, negocio.id)
+        .first<{ comprobante_key: string | null }>();
+      if (!existing) return c.json(apiError("NOT_FOUND", "Compra no encontrada"), 404);
+
+      // Delete R2 file if exists
+      if (existing.comprobante_key) {
+        try { await c.env.R2_BUCKET.delete(existing.comprobante_key); } catch { /* ignore */ }
+      }
+
+      await db.prepare("DELETE FROM compras WHERE id = ? AND negocio_id = ?").bind(id, negocio.id).run();
+      await logUsage(db, user.id, negocio.id, "delete", "compras");
+      return c.json(apiResponse({ deleted: true }));
+    } catch (error) {
+      console.error("Error deleting compra:", error);
+      return c.json(apiError("DELETE_ERROR", "Error al eliminar compra"), 500);
+    }
+  }
+);
+
+// POST /api/compras/upload — upload receipt image to R2
+app.post("/api/compras/upload",
+  authMiddleware,
+  negocioMiddleware,
+  createModuleRestrictionMiddleware('compras'),
+  async (c) => {
+    const negocio = c.get("negocio");
+    try {
+      const formData = await c.req.formData();
+      const file = formData.get("file") as File | null;
+      if (!file) return c.json(apiError("VALIDATION_ERROR", "No se envió archivo"), 400);
+
+      const allowedTypes = ["image/jpeg", "image/png", "image/webp", "image/heic"];
+      if (!allowedTypes.includes(file.type)) {
+        return c.json(apiError("VALIDATION_ERROR", "Tipo de archivo no permitido. Solo imágenes (JPEG, PNG, WebP, HEIC)"), 400);
+      }
+      if (file.size > 5 * 1024 * 1024) {
+        return c.json(apiError("VALIDATION_ERROR", "Archivo muy grande (máximo 5MB)"), 400);
+      }
+
+      const ext = file.name.split(".").pop() || "jpg";
+      const key = `compras/${negocio.id}/${crypto.randomUUID()}.${ext}`;
+      await c.env.R2_BUCKET.put(key, file.stream(), {
+        httpMetadata: { contentType: file.type },
+      });
+
+      return c.json(apiResponse({ key }), 201);
+    } catch (error) {
+      console.error("Error uploading comprobante:", error);
+      return c.json(apiError("UPLOAD_ERROR", "Error al subir archivo"), 500);
+    }
+  }
+);
+
+// GET /api/compras/files/* — serve receipt image from R2
+app.get("/api/compras/files/*",
+  authMiddleware,
+  negocioMiddleware,
+  async (c) => {
+    const negocio = c.get("negocio");
+    const key = c.req.path.replace("/api/compras/files/", "");
+
+    if (!key.startsWith(`compras/${negocio.id}/`)) {
+      return c.json(apiError("FORBIDDEN", "No autorizado"), 403);
+    }
+
+    try {
+      const object = await c.env.R2_BUCKET.get(key);
+      if (!object) return c.json(apiError("NOT_FOUND", "Archivo no encontrado"), 404);
+
+      const headers = new Headers();
+      headers.set("Content-Type", object.httpMetadata?.contentType || "application/octet-stream");
+      headers.set("Cache-Control", "public, max-age=31536000, immutable");
+      return new Response(object.body, { headers });
+    } catch (error) {
+      console.error("Error serving comprobante:", error);
+      return c.json(apiError("FETCH_ERROR", "Error al obtener archivo"), 500);
+    }
+  }
+);
 
 export default app;
