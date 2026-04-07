@@ -4,10 +4,11 @@ import { apiFetch } from "@/react-app/lib/api";
 import type { NegocioModuleRestrictions } from "@/shared/types";
 
 export const MODULES = [
-  { key: "calendario", label: "Calendario", order: 1, path: "/calendario", description: "Gestión de eventos y agenda" },
-  { key: "personal",   label: "Personal",   order: 2, path: "/empleados",  description: "Administración de empleados" },
-  { key: "sueldos",    label: "Sueldos",    order: 3, path: "/sueldos",    description: "Pagos y anticipos salariales" },
-  { key: "compras",    label: "Compras",    order: 4, path: "/compras",    description: "Registro de compras y gastos" },
+  { key: "calendario",  label: "Calendario",  order: 1, path: "/calendario",  description: "Gestión de eventos y agenda" },
+  { key: "personal",    label: "Personal",    order: 2, path: "/empleados",   description: "Administración de empleados" },
+  { key: "sueldos",     label: "Sueldos",     order: 3, path: "/sueldos",     description: "Pagos y anticipos salariales" },
+  { key: "compras",     label: "Compras",     order: 4, path: "/compras",     description: "Registro de compras y gastos" },
+  { key: "facturacion", label: "Facturación", order: 5, path: "/facturacion", description: "Registro de ventas del negocio" },
 ] as const;
 
 export type ModuleKey = (typeof MODULES)[number]["key"];
@@ -17,6 +18,7 @@ const DEFAULT_PREFS: Record<ModuleKey, boolean> = {
   personal: true,
   sueldos: true,
   compras: true,
+  facturacion: true,
 };
 
 type ModulePrefsResponse = {
@@ -54,6 +56,7 @@ const DEFAULT_RESTRICTIONS: NegocioModuleRestrictions = {
   personal: false,
   sueldos: false,
   compras: false,
+  facturacion: false,
 };
 
 export function useModulePrefs() {

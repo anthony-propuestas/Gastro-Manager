@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
-import { User, UsersRound, UserMinus, LogOut, Calendar, Users, Banknote, ShoppingCart, LayoutGrid, Crown, Loader2, Lock } from "lucide-react";
+import { User, UsersRound, UserMinus, LogOut, Calendar, Users, Banknote, ShoppingCart, Receipt, LayoutGrid, Crown, Loader2, Lock } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/react-app/components/ui/card";
 import { Button } from "@/react-app/components/ui/button";
 import { Separator } from "@/react-app/components/ui/separator";
@@ -14,10 +14,11 @@ import { apiFetch } from "@/react-app/lib/api";
 import type { NegocioMember } from "@/shared/types";
 
 const MODULE_ICONS = {
-  calendario: Calendar,
-  personal: Users,
-  sueldos: Banknote,
-  compras: ShoppingCart,
+  calendario:  Calendar,
+  personal:    Users,
+  sueldos:     Banknote,
+  compras:     ShoppingCart,
+  facturacion: Receipt,
 } as const;
 
 type OwnerStatus = 'loading' | 'owner' | 'pending' | 'none';

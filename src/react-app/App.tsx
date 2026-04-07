@@ -12,6 +12,7 @@ import Employees from "@/react-app/pages/modulos/Employees";
 import Salaries from "@/react-app/pages/modulos/Salaries";
 import CalendarPage from "@/react-app/pages/modulos/CalendarPage";
 import Compras from "@/react-app/pages/modulos/Compras";
+import Facturacion from "@/react-app/pages/modulos/Facturacion";
 import Settings from "@/react-app/pages/Settings";
 import Admin from "@/react-app/pages/Admin";
 import OwnerPanel from "@/react-app/pages/OwnerPanel";
@@ -108,6 +109,20 @@ export default function App() {
                       <PageErrorBoundary>
                         <RestrictedModuleRoute moduleKey="compras">
                           <Compras />
+                        </RestrictedModuleRoute>
+                      </PageErrorBoundary>
+                    </MainLayout>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/facturacion"
+                element={
+                  <ProtectedRoute>
+                    <MainLayout>
+                      <PageErrorBoundary>
+                        <RestrictedModuleRoute moduleKey="facturacion">
+                          <Facturacion />
                         </RestrictedModuleRoute>
                       </PageErrorBoundary>
                     </MainLayout>

@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { Navigate } from "react-router";
-import { Crown, Lock, Calendar, Users, Banknote, ShoppingCart, CheckCircle, XCircle, Loader2 } from "lucide-react";
+import { Crown, Lock, Calendar, Users, Banknote, ShoppingCart, Receipt, CheckCircle, XCircle, Loader2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/react-app/components/ui/card";
 import { Button } from "@/react-app/components/ui/button";
 import { Switch } from "@/react-app/components/ui/switch";
@@ -11,10 +11,11 @@ import { useOwnerPanel } from "@/react-app/hooks/useOwnerPanel";
 import type { NegocioModuleRestrictions } from "@/shared/types";
 
 const MODULE_LABELS: { key: keyof NegocioModuleRestrictions; label: string; icon: typeof Calendar }[] = [
-  { key: "calendario", label: "Calendario",  icon: Calendar },
-  { key: "personal",   label: "Personal",    icon: Users },
-  { key: "sueldos",    label: "Sueldos",     icon: Banknote },
-  { key: "compras",    label: "Compras",     icon: ShoppingCart },
+  { key: "calendario",  label: "Calendario",  icon: Calendar },
+  { key: "personal",    label: "Personal",    icon: Users },
+  { key: "sueldos",     label: "Sueldos",     icon: Banknote },
+  { key: "compras",     label: "Compras",     icon: ShoppingCart },
+  { key: "facturacion", label: "Facturación", icon: Receipt },
 ];
 
 export default function OwnerPanel() {

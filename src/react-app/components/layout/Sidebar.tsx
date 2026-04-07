@@ -13,6 +13,7 @@ import {
   PanelLeft,
   Banknote,
   ShoppingCart,
+  Receipt,
   Shield,
   Crown,
   Building2,
@@ -26,11 +27,12 @@ import { useModulePrefsContext } from "@/react-app/context/ModulePrefsContext";
 import type { Negocio } from "@/shared/types";
 
 const navItems = [
-  { path: "/",             label: "Dashboard",    icon: LayoutDashboard },
-  { path: "/calendario",   label: "Calendario",   icon: Calendar,  moduleKey: "calendario" as const },
-  { path: "/empleados",    label: "Personal",     icon: Users,     moduleKey: "personal"   as const },
-  { path: "/sueldos",      label: "Sueldos",      icon: Banknote,      moduleKey: "sueldos"    as const },
-  { path: "/compras",      label: "Compras",      icon: ShoppingCart,  moduleKey: "compras"    as const },
+  { path: "/",              label: "Dashboard",    icon: LayoutDashboard },
+  { path: "/calendario",    label: "Calendario",   icon: Calendar,      moduleKey: "calendario"  as const },
+  { path: "/empleados",     label: "Personal",     icon: Users,         moduleKey: "personal"    as const },
+  { path: "/sueldos",       label: "Sueldos",      icon: Banknote,      moduleKey: "sueldos"     as const },
+  { path: "/compras",       label: "Compras",      icon: ShoppingCart,  moduleKey: "compras"     as const },
+  { path: "/facturacion",   label: "Facturación",  icon: Receipt,       moduleKey: "facturacion" as const },
   { path: "/configuracion", label: "Configuración", icon: Settings },
 ];
 

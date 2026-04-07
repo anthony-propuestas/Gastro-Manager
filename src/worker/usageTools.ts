@@ -17,6 +17,7 @@ export const USAGE_TOOLS = {
   EVENTS:          "events",           // POST /api/events
   CHAT:            "chat",             // POST /api/chat
   COMPRAS:         "compras",          // POST /api/compras
+  FACTURACION:     "facturacion",      // POST /api/facturacion
 } as const;
 
 export type UsageTool = typeof USAGE_TOOLS[keyof typeof USAGE_TOOLS];

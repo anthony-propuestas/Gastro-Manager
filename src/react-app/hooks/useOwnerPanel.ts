@@ -7,6 +7,7 @@ const DEFAULT_RESTRICTIONS: NegocioModuleRestrictions = {
   personal: false,
   sueldos: false,
   compras: false,
+  facturacion: false,
 };
 
 export function useOwnerPanel(negocioId: number) {

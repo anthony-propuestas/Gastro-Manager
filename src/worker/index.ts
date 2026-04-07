@@ -18,6 +18,8 @@ import {
   createNegocioSchema,
   createCompraSchema,
   updateCompraSchema,
+  createFacturaSchema,
+  updateFacturaSchema,
 } from "./validation";
 import { USAGE_TOOLS, type UsageTool } from "./usageTools";
 
@@ -193,7 +195,7 @@ function createUsageLimitMiddleware(tool: UsageTool): MiddlewareHandler<{ Bindin
 
 // Blocks gerentes from accessing a module if the owner has restricted it.
 // Must be used after negocioMiddleware (requires negocio.member_role).
-function createModuleRestrictionMiddleware(moduleKey: 'calendario' | 'personal' | 'sueldos' | 'compras'): MiddlewareHandler<{ Bindings: Env; Variables: Variables }> {
+function createModuleRestrictionMiddleware(moduleKey: 'calendario' | 'personal' | 'sueldos' | 'compras' | 'facturacion'): MiddlewareHandler<{ Bindings: Env; Variables: Variables }> {
   return async (c, next) => {
     const negocio = c.get("negocio");
     if (negocio.member_role !== 'owner') {
@@ -946,6 +948,7 @@ app.get("/api/negocios/:id/module-restrictions", authMiddleware, async (c) => {
       personal: false,
       sueldos: false,
       compras: false,
+      facturacion: false,
     };
 
     for (const row of rows.results) {
@@ -976,7 +979,7 @@ app.put("/api/negocios/:id/module-restrictions", authMiddleware, async (c) => {
     }
 
     const body = await c.req.json() as { module_key?: string; is_restricted?: boolean };
-    const VALID_KEYS = ['calendario', 'personal', 'sueldos', 'compras'];
+    const VALID_KEYS = ['calendario', 'personal', 'sueldos', 'compras', 'facturacion'];
 
     if (!body.module_key || !VALID_KEYS.includes(body.module_key) || typeof body.is_restricted !== 'boolean') {
       return c.json(apiError("VALIDATION_ERROR", "module_key y is_restricted son requeridos"), 400);
@@ -1005,7 +1008,7 @@ app.put("/api/negocios/:id/module-restrictions", authMiddleware, async (c) => {
 // Módulos de usuario (Protected, no negocio)
 // ============================================
 
-const VALID_MODULE_KEYS = ["calendario", "personal", "sueldos", "compras"] as const;
+const VALID_MODULE_KEYS = ["calendario", "personal", "sueldos", "compras", "facturacion"] as const;
 type ModuleKey = (typeof VALID_MODULE_KEYS)[number];
 
 app.get("/api/modules/prefs", authMiddleware, async (c) => {
@@ -2555,7 +2558,7 @@ app.put("/api/admin/usage-limits", authMiddleware, async (c) => {
     return c.json(apiError("UNAUTHORIZED", "No tienes permisos de administrador"), 403);
   }
   const body = await c.req.json<Record<string, number>>();
-  const validTools = ["employees","job_roles","topics","notes","advances","salary_payments","events","chat","compras"];
+  const validTools = ["employees","job_roles","topics","notes","advances","salary_payments","events","chat","compras","facturacion"];
   const entries = Object.entries(body).filter(([tool, val]) =>
     validTools.includes(tool) && typeof val === "number" && val >= 0
   );
@@ -3033,6 +3036,194 @@ app.get("/api/compras/files/*",
     } catch (error) {
       console.error("Error serving comprobante:", error);
       return c.json(apiError("FETCH_ERROR", "Error al obtener archivo"), 500);
+    }
+  }
+);
+
+// ============================================
+// Facturación Routes
+// ============================================
+
+// GET /api/facturacion — list sales for a month
+app.get("/api/facturacion",
+  authMiddleware,
+  negocioMiddleware,
+  createModuleRestrictionMiddleware('facturacion'),
+  async (c) => {
+    const user = c.get("user");
+    const negocio = c.get("negocio");
+    const db = c.env.DB;
+    const month = Number(c.req.query("month") || new Date().getMonth() + 1);
+    const year = Number(c.req.query("year") || new Date().getFullYear());
+    try {
+      const monthStr = String(month).padStart(2, "0");
+      const rows = await db
+        .prepare(
+          `SELECT * FROM facturas
+           WHERE negocio_id = ?
+             AND strftime('%m', fecha) = ?
+             AND strftime('%Y', fecha) = ?
+           ORDER BY fecha DESC, created_at DESC`
+        )
+        .bind(negocio.id, monthStr, String(year))
+        .all();
+      await logUsage(db, user.id, negocio.id, "view", "factura");
+      return c.json(apiResponse(rows.results));
+    } catch (error) {
+      console.error("Error fetching facturas:", error);
+      return c.json(apiError("FETCH_ERROR", "Error al obtener facturas"), 500);
+    }
+  }
+);
+
+// GET /api/facturacion/summary — daily totals for calendar grid
+app.get("/api/facturacion/summary",
+  authMiddleware,
+  negocioMiddleware,
+  createModuleRestrictionMiddleware('facturacion'),
+  async (c) => {
+    const negocio = c.get("negocio");
+    const db = c.env.DB;
+    const month = Number(c.req.query("month") || new Date().getMonth() + 1);
+    const year = Number(c.req.query("year") || new Date().getFullYear());
+    try {
+      const monthStr = String(month).padStart(2, "0");
+      const rows = await db
+        .prepare(
+          `SELECT
+             fecha,
+             SUM(monto_total) AS total_dia,
+             COUNT(*) AS cantidad
+           FROM facturas
+           WHERE negocio_id = ?
+             AND strftime('%m', fecha) = ?
+             AND strftime('%Y', fecha) = ?
+           GROUP BY fecha
+           ORDER BY fecha ASC`
+        )
+        .bind(negocio.id, monthStr, String(year))
+        .all();
+      return c.json(apiResponse(rows.results));
+    } catch (error) {
+      console.error("Error fetching facturacion summary:", error);
+      return c.json(apiError("FETCH_ERROR", "Error al obtener resumen"), 500);
+    }
+  }
+);
+
+// POST /api/facturacion — create a sale
+app.post("/api/facturacion",
+  authMiddleware,
+  negocioMiddleware,
+  createModuleRestrictionMiddleware('facturacion'),
+  createUsageLimitMiddleware(USAGE_TOOLS.FACTURACION),
+  async (c) => {
+    const user = c.get("user");
+    const negocio = c.get("negocio");
+    const db = c.env.DB;
+    try {
+      const body = await c.req.json();
+      const validation = validateData(createFacturaSchema, body);
+      if (!validation.success) {
+        return c.json(apiError("VALIDATION_ERROR", validation.error || "Datos inválidos"), 400);
+      }
+      const d = validation.data!;
+      const now = new Date().toISOString();
+      const result = await db
+        .prepare(
+          `INSERT INTO facturas (negocio_id, user_id, fecha, monto_total, metodo_pago, concepto, numero_comprobante, notas, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING *`
+        )
+        .bind(negocio.id, user.id, d.fecha, d.monto_total, d.metodo_pago, d.concepto ?? null, d.numero_comprobante ?? null, d.notas ?? null, now, now)
+        .first();
+      await logUsage(db, user.id, negocio.id, "create", "factura");
+      return c.json(apiResponse(result), 201);
+    } catch (error) {
+      console.error("Error creating factura:", error);
+      return c.json(apiError("CREATE_ERROR", "Error al crear factura"), 500);
+    }
+  }
+);
+
+// PUT /api/facturacion/:id — update a sale
+app.put("/api/facturacion/:id",
+  authMiddleware,
+  negocioMiddleware,
+  createModuleRestrictionMiddleware('facturacion'),
+  createUsageLimitMiddleware(USAGE_TOOLS.FACTURACION),
+  async (c) => {
+    const user = c.get("user");
+    const negocio = c.get("negocio");
+    const db = c.env.DB;
+    const id = Number(c.req.param("id"));
+    try {
+      const existing = await db
+        .prepare("SELECT id FROM facturas WHERE id = ? AND negocio_id = ?")
+        .bind(id, negocio.id)
+        .first();
+      if (!existing) {
+        return c.json(apiError("NOT_FOUND", "Factura no encontrada"), 404);
+      }
+      const body = await c.req.json();
+      const validation = validateData(updateFacturaSchema, body);
+      if (!validation.success) {
+        return c.json(apiError("VALIDATION_ERROR", validation.error || "Datos inválidos"), 400);
+      }
+      const d = validation.data!;
+      const now = new Date().toISOString();
+      const fields: string[] = [];
+      const values: unknown[] = [];
+      if (d.fecha !== undefined)              { fields.push("fecha = ?");              values.push(d.fecha); }
+      if (d.monto_total !== undefined)        { fields.push("monto_total = ?");        values.push(d.monto_total); }
+      if (d.metodo_pago !== undefined)        { fields.push("metodo_pago = ?");        values.push(d.metodo_pago); }
+      if (d.concepto !== undefined)           { fields.push("concepto = ?");           values.push(d.concepto ?? null); }
+      if (d.numero_comprobante !== undefined) { fields.push("numero_comprobante = ?"); values.push(d.numero_comprobante ?? null); }
+      if (d.notas !== undefined)              { fields.push("notas = ?");              values.push(d.notas ?? null); }
+      fields.push("updated_at = ?");
+      values.push(now);
+      values.push(id);
+      values.push(negocio.id);
+      const result = await db
+        .prepare(`UPDATE facturas SET ${fields.join(", ")} WHERE id = ? AND negocio_id = ? RETURNING *`)
+        .bind(...values)
+        .first();
+      await logUsage(db, user.id, negocio.id, "update", "factura");
+      return c.json(apiResponse(result));
+    } catch (error) {
+      console.error("Error updating factura:", error);
+      return c.json(apiError("UPDATE_ERROR", "Error al actualizar factura"), 500);
+    }
+  }
+);
+
+// DELETE /api/facturacion/:id — delete a sale
+app.delete("/api/facturacion/:id",
+  authMiddleware,
+  negocioMiddleware,
+  createModuleRestrictionMiddleware('facturacion'),
+  createUsageLimitMiddleware(USAGE_TOOLS.FACTURACION),
+  async (c) => {
+    const user = c.get("user");
+    const negocio = c.get("negocio");
+    const db = c.env.DB;
+    const id = Number(c.req.param("id"));
+    try {
+      const existing = await db
+        .prepare("SELECT id FROM facturas WHERE id = ? AND negocio_id = ?")
+        .bind(id, negocio.id)
+        .first();
+      if (!existing) {
+        return c.json(apiError("NOT_FOUND", "Factura no encontrada"), 404);
+      }
+      await db
+        .prepare("DELETE FROM facturas WHERE id = ? AND negocio_id = ?")
+        .bind(id, negocio.id)
+        .run();
+      await logUsage(db, user.id, negocio.id, "delete", "factura");
+      return c.json(apiResponse({ deleted: true }));
+    } catch (error) {
+      console.error("Error deleting factura:", error);
+      return c.json(apiError("DELETE_ERROR", "Error al eliminar factura"), 500);
     }
   }
 );

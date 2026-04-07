@@ -177,6 +177,18 @@ export const createCompraSchema = z.object({
 
 export const updateCompraSchema = createCompraSchema.partial();
 
+// Facturación validation schemas
+export const createFacturaSchema = z.object({
+  fecha: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Fecha inválida"),
+  monto_total: z.number().positive("El monto debe ser positivo").max(10000000, "Monto muy alto"),
+  metodo_pago: z.enum(["efectivo", "tarjeta_credito", "tarjeta_debito", "transferencia", "mercado_pago", "otros"]),
+  concepto: z.string().max(200, "Concepto muy largo").optional().nullable(),
+  numero_comprobante: z.string().max(50, "Número de comprobante muy largo").optional().nullable(),
+  notas: z.string().max(500, "Notas muy largas").optional().nullable(),
+});
+
+export const updateFacturaSchema = createFacturaSchema.partial();
+
 // Helper to validate and parse with Zod
 export function validateData<T>(schema: z.ZodSchema<T>, data: unknown): {
   success: boolean;

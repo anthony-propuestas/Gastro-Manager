@@ -52,8 +52,8 @@ describe("useModulePrefs", () => {
 
     const { result } = renderHook(() => useModulePrefs());
 
-    expect(result.current.prefs).toEqual({ calendario: true, compras: true, personal: true, sueldos: true });
-    expect(result.current.negocioRestrictions).toEqual({ calendario: false, compras: false, personal: false, sueldos: false });
+    expect(result.current.prefs).toEqual({ calendario: true, compras: true, facturacion: true, personal: true, sueldos: true });
+    expect(result.current.negocioRestrictions).toEqual({ calendario: false, compras: false, facturacion: false, personal: false, sueldos: false });
     expect(result.current.isGerente).toBe(false);
     expect(fetchMock).not.toHaveBeenCalled();
     expect(mockApiFetch).not.toHaveBeenCalled();
@@ -69,7 +69,7 @@ describe("useModulePrefs", () => {
       if (url === "/api/modules/prefs") {
         return jsonResponse({
           success: true,
-          data: { calendario: true, compras: true, personal: false, sueldos: true },
+          data: { calendario: true, compras: true, facturacion: true, personal: false, sueldos: true },
         });
       }
 
@@ -116,7 +116,7 @@ describe("useModulePrefs", () => {
       expect(consoleError).toHaveBeenCalled();
     });
 
-    expect(result.current.prefs).toEqual({ calendario: true, compras: true, personal: true, sueldos: true });
+    expect(result.current.prefs).toEqual({ calendario: true, compras: true, facturacion: true, personal: true, sueldos: true });
   });
 
   it("applies optimistic updates and keeps them on successful toggle", async () => {
