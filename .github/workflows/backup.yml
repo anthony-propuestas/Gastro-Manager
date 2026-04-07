@@ -1,0 +1,60 @@
+name: Backup Gastro Manager
+
+on:
+  schedule:
+    - cron: '0 3 * * *' # diario a las 3:00 UTC
+  workflow_dispatch: # permite ejecutar manualmente desde GitHub
+
+jobs:
+  backup-d1:
+    name: Backup D1 Database
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install wrangler
+        run: npm install -g wrangler
+
+      - name: Export D1 to SQL
+        run: |
+          DATE=$(date +%Y-%m-%d)
+          wrangler d1 export gastro-manager-db \
+            --remote \
+            --output "backup-${DATE}.sql"
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
+
+      - name: Upload backup to R2
+        run: |
+          DATE=$(date +%Y-%m-%d)
+          wrangler r2 object put \
+            "gastro-manager-files/backups/d1/${DATE}/gastro-manager-db.sql" \
+            --file "backup-${DATE}.sql"
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
+
+  backup-r2:
+    name: Backup R2 Images
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install rclone
+        run: curl https://rclone.org/install.sh | sudo bash
+
+      - name: Sync R2 images to backup bucket
+        run: |
+          rclone sync \
+            :s3:gastro-manager-files/compras \
+            :s3:gastro-manager-files-backup/compras \
+            --s3-provider Cloudflare \
+            --s3-access-key-id ${{ secrets.CF_R2_ACCESS_KEY }} \
+            --s3-secret-access-key ${{ secrets.CF_R2_SECRET_KEY }} \
+            --s3-endpoint https://${{ secrets.CF_ACCOUNT_ID }}.r2.cloudflarestorage.com \
+            --s3-no-check-bucket \
+            --verbose
