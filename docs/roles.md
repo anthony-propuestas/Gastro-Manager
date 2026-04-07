@@ -109,6 +109,7 @@ Las cuotas se aplican por **combinación (usuario, negocio, herramienta, mes)**:
 | `salary_payments` | 10 |
 | `events` | 15 |
 | `chat` | 20 |
+| `compras` | *(sin límite por defecto — configurable desde el admin)* |
 
 ```sql
 -- Migration 10
@@ -178,6 +179,7 @@ El owner puede ocultar módulos específicos a los gerentes de su negocio:
 | Calendario | `calendario` | `/calendario` |
 | Personal | `personal` | `/empleados` |
 | Sueldos | `sueldos` | `/sueldos` |
+| Compras | `compras` | `/compras` |
 
 ```sql
 -- Migration 12
@@ -348,6 +350,7 @@ Dashboard        → Siempre visible
 Calendario       → Oculto si: prefs.calendario = false O (isGerente Y restricción activa)
 Personal         → Oculto si: prefs.personal = false O (isGerente Y restricción activa)
 Sueldos          → Oculto si: prefs.sueldos = false O (isGerente Y restricción activa)
+Compras          → Oculto si: prefs.compras = false O (isGerente Y restricción activa)
 Configuración    → Siempre visible
 Admin            → Solo si isAdmin
 Panel Owner      → Solo si negocio_role = 'owner'

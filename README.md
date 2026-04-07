@@ -1,6 +1,6 @@
 # Gastro Manager
 
-Sistema de gestión de restaurantes multi-usuario desplegado en Cloudflare Workers. Permite administrar personal, sueldos, calendario y seguimiento de empleados, con soporte para negocios compartidos, control de cuotas por plan de usuario y un asistente virtual potenciado por IA.
+Sistema de gestión de restaurantes multi-usuario desplegado en Cloudflare Workers. Permite administrar personal, sueldos, calendario, compras y seguimiento de empleados, con soporte para negocios compartidos, control de cuotas por plan de usuario y un asistente virtual potenciado por IA.
 
 ---
 
@@ -11,6 +11,7 @@ Sistema de gestión de restaurantes multi-usuario desplegado en Cloudflare Worke
 | Empleados | CRUD completo con búsqueda, filtros, roles personalizados y tópicos de seguimiento |
 | Sueldos | Registro de salarios, adelantos, pagos individuales y por lote |
 | Calendario | Eventos propios + tópicos con fecha límite integrados visualmente |
+| Compras | Registro de compras y gastos del negocio por categoría |
 | Seguimiento | Tópicos y notas por empleado con deadlines y alertas de vencimiento |
 | Negocios compartidos | Múltiples usuarios pueden colaborar en el mismo negocio |
 | Asistente Virtual IA | Chatbot contextual sobre los datos del negocio (Google Gemini) |
@@ -79,6 +80,9 @@ Las cuotas son **por usuario por negocio** y se reinician mensualmente. Los lím
 | Pagos de sueldo | 10 / mes |
 | Eventos | 15 / mes |
 | Chat IA | 20 / mes |
+| Compras | sin límite por defecto* |
+
+*El límite de compras es `null` hasta que el admin lo configure desde el panel.
 
 El middleware de cuotas usa un patrón **increment-then-revert atómico** para evitar condiciones de carrera (TOCTOU).
 
@@ -109,6 +113,13 @@ El middleware de cuotas usa un patrón **increment-then-revert atómico** para e
 - Eventos propios + tópicos con deadline integrados
 - Indicadores: rojo = vencido, ámbar = pendiente
 - CRUD completo de eventos
+
+### Compras
+- Registro de compras y gastos del negocio
+- Filtro por mes/año con totales del período
+- Campos: ítem, monto, fecha, tipo (`producto` / `servicio`), categoría, comprador (empleado opcional)
+- Sujeto a cuota mensual configurable (`compras`)
+- Restringible por el owner desde `/owner`
 
 ### Asistente Virtual (Chatbot IA)
 - Widget flotante accesible desde cualquier página
@@ -181,6 +192,9 @@ npm run cf-typegen   # Generar tipos de Cloudflare
 | [Frontend](docs/frontend.md) | Componentes, páginas y hooks |
 | [Autenticación](docs/authentication.md) | Sistema de login y autorización |
 | [Validación](docs/validation.md) | Reglas y esquemas Zod |
+| [Roles y Permisos](docs/roles.md) | Sistema de roles, cuotas y permisos |
+| [Tests](docs/test.md) | Guía de ejecución y cobertura de tests |
+| [Agregar un módulo](docs/agregar-nuevo-modulo.md) | Checklist paso a paso para nuevos módulos |
 | [Despliegue](docs/deployment.md) | Configuración y variables de entorno |
 
 ---

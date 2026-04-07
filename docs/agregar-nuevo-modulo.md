@@ -21,6 +21,7 @@ FRONTEND
 ────────────────────────────────────────────────────────────────────
 src/shared/types.ts                           ←  1. Agregar clave al tipo NegocioModuleRestrictions
 src/react-app/hooks/useModulePrefs.ts         ←  2. Registrar en MODULES, DEFAULT_PREFS, DEFAULT_RESTRICTIONS
+src/react-app/hooks/useModulePrefs.test.ts    ←  2b. Actualizar tests: objetos esperados y mocks de fetch
 src/react-app/components/layout/Sidebar.tsx   ←  3. Agregar ítem de navegación (desktop)
 src/react-app/components/layout/BottomNav.tsx ←  4. Agregar ítem de navegación (mobile)
 src/react-app/pages/Settings.tsx              ←  5. Agregar ícono al dict MODULE_ICONS
@@ -75,7 +76,8 @@ export const MODULES = [
   { key: "calendario", label: "Calendario", order: 1, path: "/calendario",  description: "Gestión de eventos y agenda" },
   { key: "personal",   label: "Personal",   order: 2, path: "/empleados",   description: "Administración de empleados" },
   { key: "sueldos",    label: "Sueldos",    order: 3, path: "/sueldos",     description: "Pagos y anticipos salariales" },
-  { key: "mi_modulo",  label: "Mi Módulo",  order: 4, path: "/mi-modulo",   description: "Descripción corta" }, // ← nuevo
+  { key: "compras",    label: "Compras",    order: 4, path: "/compras",     description: "Registro de compras y gastos" },
+  { key: "mi_modulo",  label: "Mi Módulo",  order: 5, path: "/mi-modulo",   description: "Descripción corta" }, // ← nuevo
 ] as const;
 
 // Agregar a DEFAULT_PREFS
@@ -83,6 +85,7 @@ const DEFAULT_PREFS: Record<ModuleKey, boolean> = {
   calendario: true,
   personal: true,
   sueldos: true,
+  compras: true,
   mi_modulo: true, // ← nuevo
 };
 
@@ -91,9 +94,50 @@ const DEFAULT_RESTRICTIONS: NegocioModuleRestrictions = {
   calendario: false,
   personal: false,
   sueldos: false,
+  compras: false,
   mi_modulo: false, // ← nuevo
 };
 ```
+
+---
+
+### 2b. Actualizar los tests de `useModulePrefs`
+
+[src/react-app/hooks/useModulePrefs.test.ts](../src/react-app/hooks/useModulePrefs.test.ts)
+
+Cada vez que se agrega un módulo, este archivo requiere tres cambios:
+
+**a) Objetos de prefs por defecto esperados** — en los tests que no tienen usuario autenticado o que simulan respuesta inválida, el valor esperado debe incluir la nueva clave:
+
+```ts
+// ANTES:
+expect(result.current.prefs).toEqual({ calendario: true, personal: true, sueldos: true });
+expect(result.current.negocioRestrictions).toEqual({ calendario: false, personal: false, sueldos: false });
+
+// DESPUÉS (agregar mi_modulo):
+expect(result.current.prefs).toEqual({ calendario: true, mi_modulo: true, personal: true, sueldos: true });
+expect(result.current.negocioRestrictions).toEqual({ calendario: false, mi_modulo: false, personal: false, sueldos: false });
+```
+
+**b) Mock de respuesta del endpoint `/api/modules/prefs`** — el hook llama a `isModulePrefsResponse()` que valida que **todos los módulos de `MODULES` estén presentes** en el campo `data`. Si falta uno, la validación falla, el hook ignora la respuesta y los prefs quedan en DEFAULT. El mock debe incluir la nueva clave:
+
+```ts
+// ANTES:
+return jsonResponse({
+  success: true,
+  data: { calendario: true, personal: false, sueldos: true },
+});
+
+// DESPUÉS:
+return jsonResponse({
+  success: true,
+  data: { calendario: true, mi_modulo: true, personal: false, sueldos: true },
+});
+```
+
+> Este es el error más silencioso al agregar un módulo: los tests compilan y corren, pero el test que verifica que los prefs se actualizan falla porque el mock devuelve una respuesta que el hook descarta como inválida.
+
+**c) Verificar con `npm test`** — los tests deben pasar los 22 casos (o más si agregaste tests propios del módulo).
 
 ---
 
@@ -102,15 +146,16 @@ const DEFAULT_RESTRICTIONS: NegocioModuleRestrictions = {
 [src/react-app/components/layout/Sidebar.tsx](../src/react-app/components/layout/Sidebar.tsx) — array `navItems`
 
 ```ts
-import { LayoutDashboard, Calendar, Users, Banknote, Settings, BookOpen } from "lucide-react";
+import { LayoutDashboard, Calendar, Users, Banknote, ShoppingCart, Settings, BookOpen } from "lucide-react";
 //  elegir ícono en https://lucide.dev/icons/ ↑
 
 const navItems = [
   { path: "/",             label: "Dashboard",     icon: LayoutDashboard },
-  { path: "/calendario",   label: "Calendario",    icon: Calendar,  moduleKey: "calendario" as const },
-  { path: "/empleados",    label: "Personal",      icon: Users,     moduleKey: "personal"   as const },
-  { path: "/sueldos",      label: "Sueldos",       icon: Banknote,  moduleKey: "sueldos"    as const },
-  { path: "/mi-modulo",    label: "Mi Módulo",     icon: BookOpen,  moduleKey: "mi_modulo"  as const }, // ← nuevo
+  { path: "/calendario",   label: "Calendario",    icon: Calendar,       moduleKey: "calendario" as const },
+  { path: "/empleados",    label: "Personal",      icon: Users,          moduleKey: "personal"   as const },
+  { path: "/sueldos",      label: "Sueldos",       icon: Banknote,       moduleKey: "sueldos"    as const },
+  { path: "/compras",      label: "Compras",       icon: ShoppingCart,   moduleKey: "compras"    as const },
+  { path: "/mi-modulo",    label: "Mi Módulo",     icon: BookOpen,       moduleKey: "mi_modulo"  as const }, // ← nuevo
   { path: "/configuracion", label: "Configuración", icon: Settings },
 ];
 ```
@@ -124,14 +169,15 @@ El filtrado que oculta el ítem cuando el usuario lo desactivó o el owner lo re
 [src/react-app/components/layout/BottomNav.tsx](../src/react-app/components/layout/BottomNav.tsx)
 
 ```ts
-import { LayoutDashboard, Calendar, Users, Banknote, Settings, BookOpen } from "lucide-react";
+import { LayoutDashboard, Calendar, Users, Banknote, ShoppingCart, Settings, BookOpen } from "lucide-react";
 
 const navItems = [
   { path: "/",             label: "Inicio",      icon: LayoutDashboard },
-  { path: "/calendario",   label: "Calendario",  icon: Calendar,  moduleKey: "calendario" as const },
-  { path: "/empleados",    label: "Personal",    icon: Users,     moduleKey: "personal"   as const },
-  { path: "/sueldos",      label: "Sueldos",     icon: Banknote,  moduleKey: "sueldos"    as const },
-  { path: "/mi-modulo",    label: "Mi Módulo",   icon: BookOpen,  moduleKey: "mi_modulo"  as const }, // ← nuevo
+  { path: "/calendario",   label: "Calendario",  icon: Calendar,      moduleKey: "calendario" as const },
+  { path: "/empleados",    label: "Personal",    icon: Users,         moduleKey: "personal"   as const },
+  { path: "/sueldos",      label: "Sueldos",     icon: Banknote,      moduleKey: "sueldos"    as const },
+  { path: "/compras",      label: "Compras",     icon: ShoppingCart,  moduleKey: "compras"    as const },
+  { path: "/mi-modulo",    label: "Mi Módulo",   icon: BookOpen,      moduleKey: "mi_modulo"  as const }, // ← nuevo
   { path: "/configuracion", label: "Config",     icon: Settings },
 ];
 ```
@@ -145,12 +191,13 @@ const navItems = [
 [src/react-app/pages/Settings.tsx](../src/react-app/pages/Settings.tsx) — `MODULE_ICONS`
 
 ```ts
-import { Calendar, Users, Banknote, BookOpen } from "lucide-react"; // ← agregar BookOpen
+import { Calendar, Users, Banknote, ShoppingCart, BookOpen } from "lucide-react"; // ← agregar BookOpen
 
 const MODULE_ICONS = {
   calendario: Calendar,
   personal:   Users,
   sueldos:    Banknote,
+  compras:    ShoppingCart,
   mi_modulo:  BookOpen, // ← nuevo — mismo ícono que usaste en Sidebar
 } as const;
 ```
@@ -164,13 +211,14 @@ Settings ya itera sobre `MODULES` para renderizar los toggles. Solo necesita el 
 [src/react-app/pages/OwnerPanel.tsx](../src/react-app/pages/OwnerPanel.tsx) — `MODULE_LABELS`
 
 ```ts
-import { Crown, Lock, Calendar, Users, Banknote, BookOpen /* ← agregar */ } from "lucide-react";
+import { Crown, Lock, Calendar, Users, Banknote, ShoppingCart, BookOpen /* ← agregar */ } from "lucide-react";
 import type { NegocioModuleRestrictions } from "@/shared/types";
 
 const MODULE_LABELS: { key: keyof NegocioModuleRestrictions; label: string; icon: typeof Calendar }[] = [
   { key: "calendario", label: "Calendario",  icon: Calendar },
   { key: "personal",   label: "Personal",    icon: Users },
   { key: "sueldos",    label: "Sueldos",     icon: Banknote },
+  { key: "compras",    label: "Compras",     icon: ShoppingCart },
   { key: "mi_modulo",  label: "Mi Módulo",   icon: BookOpen }, // ← nuevo
 ];
 ```
@@ -361,6 +409,7 @@ export const USAGE_TOOLS = {
   SALARY_PAYMENTS:  "salary_payments",
   EVENTS:           "events",
   CHAT:             "chat",
+  COMPRAS:          "compras",
   MI_MODULO_ACTION: "mi_modulo_action", // ← nuevo
 } as const;
 ```
@@ -377,16 +426,16 @@ export const USAGE_TOOLS = {
 
 ```ts
 // ANTES:
-function createModuleRestrictionMiddleware(moduleKey: 'calendario' | 'personal' | 'sueldos')
+function createModuleRestrictionMiddleware(moduleKey: 'calendario' | 'personal' | 'sueldos' | 'compras')
 
 // DESPUÉS:
-function createModuleRestrictionMiddleware(moduleKey: 'calendario' | 'personal' | 'sueldos' | 'mi_modulo')
+function createModuleRestrictionMiddleware(moduleKey: 'calendario' | 'personal' | 'sueldos' | 'compras' | 'mi_modulo')
 ```
 
 #### 12. `VALID_MODULE_KEYS` (línea ~992)
 
 ```ts
-const VALID_MODULE_KEYS = ["calendario", "personal", "sueldos", "mi_modulo"] as const;
+const VALID_MODULE_KEYS = ["calendario", "personal", "sueldos", "compras", "mi_modulo"] as const;
 ```
 
 #### 13. GET `/api/negocios/:id/module-restrictions` — objeto de valores por defecto
@@ -396,6 +445,7 @@ const data: Record<string, boolean> = {
   calendario: false,
   personal:   false,
   sueldos:    false,
+  compras:    false,
   mi_modulo:  false, // ← nuevo
 };
 ```
@@ -403,7 +453,7 @@ const data: Record<string, boolean> = {
 #### 14. PUT `/api/negocios/:id/module-restrictions` — validación de `module_key` (línea ~963)
 
 ```ts
-const VALID_KEYS = ['calendario', 'personal', 'sueldos', 'mi_modulo'];
+const VALID_KEYS = ['calendario', 'personal', 'sueldos', 'compras', 'mi_modulo'];
 ```
 
 #### 15. PUT `/api/admin/usage-limits` — lista de tools válidos (línea ~2515)
@@ -412,6 +462,7 @@ const VALID_KEYS = ['calendario', 'personal', 'sueldos', 'mi_modulo'];
 const validTools = [
   "employees", "job_roles", "topics", "notes",
   "advances", "salary_payments", "events", "chat",
+  "compras",
   "mi_modulo_action", // ← nuevo
 ];
 ```
@@ -533,7 +584,7 @@ El límite es `NULL` hasta que el admin lo configure en `/admin`. Con `NULL`, el
 
 ### 18. Crear la migración de base de datos
 
-Crear `migrations/N.sql` (N = siguiente número en la secuencia, actualmente la última es `12.sql`):
+Crear `migrations/N.sql` (N = siguiente número en la secuencia, actualmente la última es `13.sql`):
 
 ```sql
 -- Migration N: Tabla para el módulo Mi Módulo

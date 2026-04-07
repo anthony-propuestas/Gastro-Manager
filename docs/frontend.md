@@ -22,7 +22,7 @@ src/react-app/
 │   ├── employees/       # Componentes de empleados
 │   └── salaries/        # Componentes de sueldos
 ├── pages/               # Páginas/vistas principales
-│   ├── modulos/         # Módulos operativos (personal, sueldos, calendario)
+│   ├── modulos/         # Módulos operativos (personal, sueldos, calendario, compras)
 │   └── ...
 ├── hooks/               # Custom hooks
 ├── lib/                 # Utilidades
@@ -93,10 +93,11 @@ Navegación lateral adaptativa.
 // Navegación — items con moduleKey se filtran según preferencias de módulo
 const navItems = [
   { label: "Dashboard", icon: LayoutDashboard, path: "/" },
-  { label: "Calendario", icon: Calendar, path: "/calendario", moduleKey: "calendario" },
-  { label: "Personal", icon: Users, path: "/empleados", moduleKey: "personal" },
-  { label: "Sueldos", icon: Banknote, path: "/sueldos", moduleKey: "sueldos" },
-  { label: "Configuración", icon: Settings, path: "/configuracion" },
+  { label: "Calendario", icon: Calendar,      path: "/calendario", moduleKey: "calendario" },
+  { label: "Personal",   icon: Users,          path: "/empleados",  moduleKey: "personal" },
+  { label: "Sueldos",    icon: Banknote,        path: "/sueldos",    moduleKey: "sueldos" },
+  { label: "Compras",    icon: ShoppingCart,    path: "/compras",    moduleKey: "compras" },
+  { label: "Configuración", icon: Settings,    path: "/configuracion" },
 ];
 
 // El enlace Admin se renderiza condicionalmente fuera de navItems
@@ -188,7 +189,7 @@ Calendario mensual con eventos y tópicos.
   <div className="calendar-grid">
     {/* 7x6 grid de días */}
   </div>
-  
+
   {/* Panel lateral */}
   <div className="side-panel">
     {/* Eventos del día seleccionado */}
@@ -196,6 +197,18 @@ Calendario mensual con eventos y tópicos.
   </div>
 </div>
 ```
+
+### Compras (`pages/modulos/Compras.tsx`)
+
+Registro y gestión de compras y gastos del negocio.
+
+**Características:**
+- Selector de período (mes/año) con totales del mes
+- Tabla de compras con ítem, monto, tipo, categoría, comprador y fecha
+- Modal para crear/editar compras
+- Filtros y ordenamiento por fecha
+- Banner de cuota cuando se acerca o alcanza el límite mensual (tool `compras`)
+- Módulo restringible por el owner desde `/owner`
 
 ### NegocioSetup (`pages/NegocioSetup.tsx`)
 
@@ -224,7 +237,7 @@ Configuración de la cuenta y del negocio.
 
 **Características:**
 - **Perfil:** Card con header (contenido pendiente de implementar)
-- **Módulos de Gestión:** Switches para activar/desactivar los 3 módulos visibles en el sidebar (calendario, personal, sueldos) via `useModulePrefsContext`
+- **Módulos de Gestión:** Switches para activar/desactivar los 4 módulos visibles en el sidebar (calendario, personal, sueldos, compras) via `useModulePrefsContext`
 - **Administradores del negocio:** Lista de miembros del negocio actual, botón para remover miembros (solo el creador), y botón para abandonar el negocio
 
 ### Admin (`pages/Admin.tsx`)
@@ -234,7 +247,7 @@ Panel de administración (solo admins). Si el usuario no es admin, muestra una t
 **6 secciones:**
 1. **Stats cards:** Total de usuarios, emails registrados, promedio de empleados y eventos por negocio
 2. **Estadísticas de uso:** Gráficos de barras por módulo (empleados, sueldos, calendario)
-3. **Cuotas mensuales usadas:** Grid de 8 herramientas (employees, job_roles, topics, notes, advances, salary_payments, events, chat) con tabla de uso por usuario/negocio
+3. **Cuotas mensuales usadas:** Grid de 9 herramientas (employees, job_roles, topics, notes, advances, salary_payments, events, chat, compras) con tabla de uso por usuario/negocio
 4. **Configuración de límites mensuales:** Inputs editables por herramienta para usuarios "Básico", con botón guardar (`updateLimits`)
 5. **Gestión de roles de usuario:** Buscar usuarios por email, promover a "Usuario Inteligente" (sin límites) o degradar a "Básico", tabla de usuarios inteligentes actuales
 6. **Gestión de emails administradores:** Agregar/eliminar emails admin
@@ -338,6 +351,33 @@ export function useEvents() {
     createEvent,
     updateEvent,
     deleteEvent,
+  };
+}
+```
+
+### useCompras
+
+Gestión de compras y gastos del negocio.
+
+```tsx
+export function useCompras() {
+  const [compras, setCompras]     = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError]         = useState<string | null>(null);
+
+  const fetchCompras = async (month, year) => { ... };  // GET /api/compras?month&year
+  const createCompra = async (data) => { ... };          // POST /api/compras
+  const updateCompra = async (id, data) => { ... };      // PUT /api/compras/:id
+  const deleteCompra = async (id) => { ... };            // DELETE /api/compras/:id
+
+  return {
+    compras,
+    isLoading,
+    error,
+    fetchCompras,
+    createCompra,
+    updateCompra,
+    deleteCompra,
   };
 }
 ```
@@ -475,7 +515,7 @@ Preferencias de visibilidad de módulos en el sidebar. Optimistic updates con re
 ```tsx
 export function useModulePrefs() {
   const [prefs, setPrefs] = useState<Record<ModuleKey, boolean>>(
-    { calendario: true, personal: true, sueldos: true }
+    { calendario: true, compras: true, personal: true, sueldos: true }
   );
 
   const toggleModule = async (key: ModuleKey) => { ... };  // PUT /api/modules/prefs
@@ -766,6 +806,7 @@ Por página individual.
   <Route path="/empleados" element={<ProtectedRoute><MainLayout><Employees /></MainLayout></ProtectedRoute>} />
   <Route path="/sueldos" element={<ProtectedRoute><MainLayout><Salaries /></MainLayout></ProtectedRoute>} />
   <Route path="/calendario" element={<ProtectedRoute><MainLayout><CalendarPage /></MainLayout></ProtectedRoute>} />
+  <Route path="/compras" element={<ProtectedRoute><MainLayout><RestrictedModuleRoute moduleKey="compras"><Compras /></RestrictedModuleRoute></MainLayout></ProtectedRoute>} />
   <Route path="/configuracion" element={<ProtectedRoute><MainLayout><Settings /></MainLayout></ProtectedRoute>} />
   <Route path="/admin" element={<ProtectedRoute><MainLayout><Admin /></MainLayout></ProtectedRoute>} />
 </Routes>

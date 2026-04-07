@@ -147,7 +147,7 @@ Obtiene las preferencias de visibilidad de módulos del usuario. Módulos sin fi
 
 ```json
 // Response data
-{ "calendario": true, "personal": true, "sueldos": false }
+{ "calendario": true, "compras": true, "personal": true, "sueldos": false }
 ```
 
 #### `PUT /api/modules/prefs`
@@ -380,6 +380,75 @@ Marca todos los pagos pendientes de un período. Cuenta N usos de la cuota `sala
 
 ---
 
+### Compras
+*Requieren `X-Negocio-ID`*
+
+#### `GET /api/compras` ⚠️ *Restringible por owner*
+Lista las compras del negocio. Filtrable por `month` y `year`.
+
+```
+GET /api/compras?month=4&year=2026
+```
+
+```json
+// Response data (array)
+[{
+  "id": 1,
+  "negocio_id": 1,
+  "user_id": "google_sub_123",
+  "fecha": "2026-04-10",
+  "monto": 3500.00,
+  "item": "Carne vacuna",
+  "tipo": "producto",
+  "categoria": "carnes",
+  "comprador_id": 2,
+  "descripcion": "Compra semanal",
+  "comprobante_key": null,
+  "created_at": "2026-04-10T14:00:00Z",
+  "updated_at": "2026-04-10T14:00:00Z"
+}]
+```
+
+#### `GET /api/compras/summary` ⚠️ *Restringible por owner*
+Totales diarios de compras para el mes (usado por la grilla del calendario de compras).
+
+```
+GET /api/compras/summary?month=4&year=2026
+```
+
+```json
+// Response data (array de totales por día)
+[{ "fecha": "2026-04-10", "total": 3500.00 }]
+```
+
+#### `POST /api/compras` ⚠️ *Sujeto a cuota `compras` · Restringible por owner*
+Registra una nueva compra.
+
+```json
+// Request
+{
+  "fecha": "2026-04-10",
+  "monto": 3500.00,
+  "item": "Carne vacuna",
+  "tipo": "producto",
+  "categoria": "carnes",
+  "comprador_id": 2,
+  "descripcion": "Compra semanal"
+}
+```
+
+**Valores válidos de `tipo`:** `"producto"` | `"servicio"`
+
+**Valores válidos de `categoria`:** `"carnes"` | `"verduras"` | `"bebidas"` | `"limpieza"` | `"descartables"` | `"servicios"` | `"mantenimiento"` | `"alquiler"` | `"otros"`
+
+#### `PUT /api/compras/:id` ⚠️ *Sujeto a cuota `compras` · Restringible por owner*
+Actualiza una compra (todos los campos opcionales, mismos valores válidos que POST).
+
+#### `DELETE /api/compras/:id` ⚠️ *Restringible por owner*
+Elimina una compra.
+
+---
+
 ### Cuotas del Usuario
 
 #### `GET /api/usage/me`
@@ -400,7 +469,8 @@ Devuelve el uso actual y los límites del usuario para el negocio activo en el p
     "advances":         { "count": 2, "limit": 10 },
     "salary_payments":  { "count": 5, "limit": 10 },
     "events":           { "count": 4, "limit": 15 },
-    "chat":             { "count": 8, "limit": 20 }
+    "chat":             { "count": 8, "limit": 20 },
+    "compras":          { "count": 1, "limit": null }
   }
 }
 ```
@@ -471,7 +541,7 @@ Devuelve los límites mensuales actuales para todas las herramientas.
 
 ```json
 // Response data
-{ "employees": 5, "job_roles": 3, "topics": 10, "notes": 20, "advances": 10, "salary_payments": 10, "events": 15, "chat": 20 }
+{ "employees": 5, "job_roles": 3, "topics": 10, "notes": 20, "advances": 10, "salary_payments": 10, "events": 15, "chat": 20, "compras": null }
 ```
 
 #### `PUT /api/admin/usage-limits`

@@ -8,14 +8,14 @@
 
 ## Esquema General
 
-La base de datos tiene **13 tablas** en 4 grupos funcionales:
+La base de datos tiene **14 tablas** en 4 grupos funcionales:
 
 | Grupo | Tablas |
 |---|---|
 | Identidad y acceso | `users`, `admin_emails` |
 | Negocios compartidos | `negocios`, `negocio_members`, `invitations` |
 | Cuotas | `usage_counters`, `usage_limits` |
-| Datos operativos | `employees`, `job_roles`, `topics`, `notes`, `advances`, `salary_payments`, `events` |
+| Datos operativos | `employees`, `job_roles`, `topics`, `notes`, `advances`, `salary_payments`, `events`, `compras` |
 
 ---
 
@@ -167,6 +167,9 @@ CREATE TABLE usage_limits (
 | `salary_payments` | 10 | Marcar pagos de sueldo |
 | `events` | 15 | Crear eventos |
 | `chat` | 20 | Mensajes al chatbot IA |
+| `compras` | *(sin límite por defecto)* | Registrar compras y gastos |
+
+`compras` no tiene límite seedeado en la migración — es `NULL` hasta que el admin lo configure desde el panel.
 
 Los usuarios con `role = 'usuario_inteligente'` ignoran estos límites.
 
@@ -293,6 +296,30 @@ CREATE TABLE events (
 );
 ```
 
+### `compras`
+
+Compras y gastos del negocio. Sujeto a cuota mensual (tool `compras`).
+
+```sql
+CREATE TABLE compras (
+  id              INTEGER PRIMARY KEY AUTOINCREMENT,
+  negocio_id      INTEGER NOT NULL REFERENCES negocios(id) ON DELETE CASCADE,
+  user_id         TEXT    NOT NULL,
+  fecha           TEXT    NOT NULL,
+  monto           REAL    NOT NULL,              -- 0.01-10,000,000
+  item            TEXT    NOT NULL,              -- 1-200 chars
+  tipo            TEXT    NOT NULL DEFAULT 'producto', -- 'producto' | 'servicio'
+  categoria       TEXT    NOT NULL DEFAULT 'otros',
+  comprador_id    INTEGER REFERENCES employees(id) ON DELETE SET NULL,
+  descripcion     TEXT,
+  comprobante_key TEXT,
+  created_at      TEXT    NOT NULL DEFAULT (datetime('now')),
+  updated_at      TEXT    NOT NULL DEFAULT (datetime('now'))
+);
+```
+
+**Valores válidos de `categoria`:** `carnes`, `verduras`, `bebidas`, `limpieza`, `descartables`, `servicios`, `mantenimiento`, `alquiler`, `otros`
+
 ---
 
 ## Diagrama de Relaciones
@@ -310,6 +337,7 @@ users (Google ID)
   │                                  │
   │                                  ├─── job_roles (1:N)
   │                                  ├─── events (1:N)
+  │                                  ├─── compras (1:N)
   │                                  └─── invitations (1:N)
   │
   └─── usage_counters (scope: user_id + negocio_id)
@@ -328,7 +356,7 @@ admin_emails  (standalone — consultado por isAdmin())
 | Aislamiento de datos | Todas las queries de datos filtran por `negocio_id` |
 | Timestamps | `created_at` + `updated_at` en todas las tablas; `updated_at` se actualiza manualmente |
 | Booleanos | `INTEGER` 0/1 con prefijo `is_` o `has_` |
-| Migraciones | Numeradas `1.sql`–`10.sql`, inmutables en producción |
+| Migraciones | Numeradas `1.sql`–`13.sql`, inmutables en producción |
 
 ---
 

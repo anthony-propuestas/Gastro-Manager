@@ -67,7 +67,7 @@ Ejecuta en todos los endpoints de datos operativos.
 
 ### `createUsageLimitMiddleware(tool)`
 
-Ejecuta antes de los 8 endpoints de escritura con cuota.
+Ejecuta antes de los 9 endpoints de escritura con cuota.
 
 **Patrón atómico (increment-then-revert) para evitar TOCTOU:**
 
@@ -119,7 +119,7 @@ El rol se almacena en `users.role` y es gestionado por el admin vía `/api/admin
 
 Las cuotas son **por usuario por negocio por mes** (`UNIQUE(user_id, negocio_id, tool, period)`).
 
-- **8 herramientas** sujetas a cuota: `employees`, `job_roles`, `topics`, `notes`, `advances`, `salary_payments`, `events`, `chat`.
+- **9 herramientas** sujetas a cuota: `employees`, `job_roles`, `topics`, `notes`, `advances`, `salary_payments`, `events`, `chat`, `compras`.
 - Los límites son globales (una fila por tool en `usage_limits`) y editables desde el panel de admin.
 - El endpoint `mark-all-paid` consume **N usos** (uno por empleado marcado), con el mismo patrón atómico.
 
@@ -177,7 +177,7 @@ POST /api/chat { message }
 
 ```
 gastro-manager/
-├── migrations/           # 11 migraciones SQL (inmutables)
+├── migrations/           # 13 migraciones SQL (inmutables)
 ├── docs/                 # Documentación
 ├── src/
 │   ├── worker/
@@ -205,7 +205,8 @@ gastro-manager/
 │           ├── modulos/
 │           │   ├── Employees.tsx
 │           │   ├── Salaries.tsx
-│           │   └── CalendarPage.tsx
+│           │   ├── CalendarPage.tsx
+│           │   └── Compras.tsx
 │           ├── NegocioSetup.tsx   # Selección/creación de negocio
 │           ├── InvitePage.tsx     # Flujo de invitación
 │           └── ...
