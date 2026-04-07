@@ -261,15 +261,28 @@ Cloudflare Dashboard muestra:
 
 ---
 
-## Backup de Base de Datos
+## Backup
+
+> El sistema de copias de seguridad está automatizado vía GitHub Actions. Ver [Sistema de Backup](./backup.md) para la estrategia completa, procedimiento de restauración y consideraciones de seguridad.
+
+Para exportar manualmente la base de datos en desarrollo:
 
 ```bash
-# Exportar base de datos de producción a SQL
-wrangler d1 export gastro-manager-db --output backup.sql
-
-# Exportar DB local de desarrollo
-wrangler d1 export gastro-manager-db --local --output backup-dev.sql
+wrangler d1 export [nombre-db] --local --output backup-dev.sql
 ```
+
+---
+
+## Secrets de CI/CD (GitHub Actions)
+
+El workflow de backup automático requiere 4 secrets configurados en el repositorio (Settings → Secrets and variables → Actions):
+
+| Secret | Propósito |
+|---|---|
+| `CF_API_TOKEN` | Autenticar wrangler (exportar D1 + subir a R2) |
+| `CF_ACCOUNT_ID` | Identificar la cuenta Cloudflare |
+| `CF_R2_ACCESS_KEY` | Access Key ID para rclone (API S3-compatible de R2) |
+| `CF_R2_SECRET_KEY` | Secret Access Key para rclone |
 
 ---
 

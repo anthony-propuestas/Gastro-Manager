@@ -17,10 +17,14 @@ Cloudflare Worker (Hono)
          ├── moduleRestrictionMiddleware → bloquea gerentes de módulos restringidos
          ├── usageLimitMiddleware     → cuotas atómicas
          └── Route handlers → D1 (SQLite)
-                              ├── R2 (almacenamiento de comprobantes)
+                              ├── R2 producción (comprobantes)
                               └── Google Gemini API (chatbot)
 
 Google OAuth (accounts.google.com) ← intercambio de código en POST /api/sessions
+
+GitHub Actions (cron diario 03:00 UTC)
+   ├── Job Backup D1 → wrangler d1 export → R2 producción /backups/d1/YYYY-MM-DD/
+   └── Job Backup R2 → rclone sync       → R2 backup (comprobantes)
 ```
 
 ---

@@ -207,6 +207,7 @@ npm run cf-typegen   # Generar tipos de Cloudflare
 | [Tests](docs/test.md) | Guía de ejecución y cobertura de tests |
 | [Agregar un módulo](docs/agregar-nuevo-modulo.md) | Checklist paso a paso para nuevos módulos |
 | [Despliegue](docs/deployment.md) | Configuración y variables de entorno |
+| [Sistema de Backup](docs/backup.md) | Copias de seguridad automáticas de base de datos y archivos |
 
 ---
 
