@@ -573,7 +573,7 @@ Devuelve el uso actual y los límites del usuario para el negocio activo en el p
 }
 ```
 
-Para `usuario_inteligente`, todos los `limit` son `null`.
+Para `usuario_inteligente`, todos los `limit` son `null`. Los `count` sí se registran (el middleware también contabiliza sus acciones desde la actualización de cuotas), por lo que el uso real se refleja aunque no haya límites que respetar.
 
 ---
 
@@ -595,10 +595,18 @@ Estadísticas globales del sistema.
 // Response data
 {
   "totalUsers": 32,
-  "registeredEmails": 32,
-  "avgEmployees": 7.4,
-  "avgEvents": 11.2,
-  "usage": { "employees": 48, "salaries": 30, "calendar": 22 }
+  "totalNegocios": 8,
+  "avgEmployees": 7,
+  "avgEvents": 11,
+  "usage": {
+    "employees": 48,
+    "salaries": 30,
+    "calendar": 22,
+    "job_roles": 15,
+    "topics": 34,
+    "notes": 67,
+    "chat": 12
+  }
 }
 ```
 
