@@ -1278,6 +1278,7 @@ app.get("/api/job-roles", authMiddleware, negocioMiddleware, createModuleRestric
 app.post("/api/job-roles", authMiddleware, negocioMiddleware, createModuleRestrictionMiddleware('personal'), createUsageLimitMiddleware(USAGE_TOOLS.JOB_ROLES), async (c) => {
   try {
     const negocio = c.get("negocio");
+    const user = c.get("user");
     const body = await c.req.json();
     const db = c.env.DB;
 
@@ -1298,6 +1299,7 @@ app.post("/api/job-roles", authMiddleware, negocioMiddleware, createModuleRestri
       .bind(result.meta.last_row_id)
       .first();
 
+    await logUsage(db, user.id, negocio.id, "create", "job_role");
     return c.json(apiResponse(newRole), 201);
   } catch (error) {
     console.error("Error creating job role:", error);
@@ -1370,6 +1372,7 @@ app.get("/api/employees/:employeeId/topics", authMiddleware, negocioMiddleware, 
 app.post("/api/employees/:employeeId/topics", authMiddleware, negocioMiddleware, createModuleRestrictionMiddleware('personal'), createUsageLimitMiddleware(USAGE_TOOLS.TOPICS), async (c) => {
   try {
     const negocio = c.get("negocio");
+    const user = c.get("user");
     const employeeId = c.req.param("employeeId");
     const body = await c.req.json();
     const db = c.env.DB;
@@ -1403,6 +1406,7 @@ app.post("/api/employees/:employeeId/topics", authMiddleware, negocioMiddleware,
       .bind(result.meta.last_row_id)
       .first();
 
+    await logUsage(db, user.id, negocio.id, "create", "topic");
     return c.json(apiResponse(newTopic), 201);
   } catch (error) {
     console.error("Error creating topic:", error);
@@ -1528,6 +1532,7 @@ app.get("/api/topics/:topicId/notes", authMiddleware, negocioMiddleware, createM
 app.post("/api/topics/:topicId/notes", authMiddleware, negocioMiddleware, createModuleRestrictionMiddleware('personal'), createUsageLimitMiddleware(USAGE_TOOLS.NOTES), async (c) => {
   try {
     const negocio = c.get("negocio");
+    const user = c.get("user");
     const topicId = c.req.param("topicId");
     const body = await c.req.json();
     const db = c.env.DB;
@@ -1567,6 +1572,7 @@ app.post("/api/topics/:topicId/notes", authMiddleware, negocioMiddleware, create
       .bind(result.meta.last_row_id)
       .first();
 
+    await logUsage(db, user.id, negocio.id, "create", "note");
     return c.json(apiResponse(newNote), 201);
   } catch (error) {
     console.error("Error creating note:", error);
@@ -2345,10 +2351,30 @@ app.get("/api/admin/stats", authMiddleware, async (c) => {
       .prepare("SELECT COUNT(*) as count FROM usage_logs WHERE entity_type = 'event'")
       .first() as any;
 
+    const jobRoleActions = await db
+      .prepare("SELECT COUNT(*) as count FROM usage_logs WHERE entity_type = 'job_role'")
+      .first() as any;
+
+    const topicActions = await db
+      .prepare("SELECT COUNT(*) as count FROM usage_logs WHERE entity_type = 'topic'")
+      .first() as any;
+
+    const noteActions = await db
+      .prepare("SELECT COUNT(*) as count FROM usage_logs WHERE entity_type = 'note'")
+      .first() as any;
+
+    const chatActions = await db
+      .prepare("SELECT COUNT(*) as count FROM usage_logs WHERE entity_type = 'chat'")
+      .first() as any;
+
     const usage = {
       employees: employeeActions?.count || 0,
       salaries: salaryActions?.count || 0,
       calendar: calendarActions?.count || 0,
+      job_roles: jobRoleActions?.count || 0,
+      topics: topicActions?.count || 0,
+      notes: noteActions?.count || 0,
+      chat: chatActions?.count || 0,
     };
 
     return c.json(apiResponse({ totalUsers, totalNegocios, avgEmployees, avgEvents, usage }), 200);
@@ -2621,6 +2647,7 @@ app.get("/api/usage/me", authMiddleware, negocioMiddleware, async (c) => {
 app.post("/api/chat", authMiddleware, negocioMiddleware, createUsageLimitMiddleware(USAGE_TOOLS.CHAT), async (c) => {
   try {
     const negocio = c.get("negocio");
+    const user = c.get("user");
     const db = c.env.DB;
     const body = await c.req.json();
     const { message } = body;
@@ -2747,6 +2774,7 @@ Responde de manera concisa en español sobre los datos de este negocio.
 
     const reply = geminiData?.candidates?.[0]?.content?.parts?.[0]?.text || "Lo siento, no pude generar una respuesta.";
 
+    await logUsage(db, user.id, negocio.id, "create", "chat");
     return c.json(apiResponse({ reply }), 200);
   } catch (error: any) {
     console.error("Unexpected error in chat endpoint:", error.message);
