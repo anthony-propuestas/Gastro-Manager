@@ -367,7 +367,7 @@ export default function Admin() {
                 {filteredRows.length} de {usageData.rows.length} filas
                 {" · "}
                 <span className="inline-flex items-center gap-1">
-                  <span className="inline-block w-3 h-3 rounded-sm bg-purple-100 border border-purple-300" />
+                  <span className="inline-block w-3 h-3 rounded-sm bg-primary/20 border border-primary/40" />
                   Inteligente
                 </span>
                 {" · "}
@@ -400,14 +400,14 @@ export default function Admin() {
                       return (
                         <TableRow
                           key={u.user_id + "-" + u.negocio_id}
-                          className={isInteligente ? "bg-purple-50 hover:bg-purple-100" : ""}
+                          className={isInteligente ? "bg-primary/10 hover:bg-primary/15" : ""}
                         >
                           <TableCell>
                             <div className="flex items-center gap-2">
                               <div>
                                 <div className="font-medium">{u.email}</div>
                                 {isInteligente ? (
-                                  <Badge className="mt-0.5 text-xs bg-purple-100 text-purple-700 border border-purple-300 hover:bg-purple-100">
+                                  <Badge className="mt-0.5 text-xs bg-primary/15 text-primary border border-primary/30 hover:bg-primary/15">
                                     <Crown className="h-3 w-3 mr-1" />
                                     Inteligente
                                   </Badge>
@@ -420,7 +420,7 @@ export default function Admin() {
                           <TableCell className="text-muted-foreground text-sm">{u.negocio_name}</TableCell>
                           {TOOL_LABELS.map(t => (
                             <TableCell key={t.key} className="text-center">
-                              <span className={isInteligente ? "text-purple-700 font-medium" : ""}>
+                              <span className={isInteligente ? "text-primary font-medium" : ""}>
                                 {u.usage[t.key] ?? 0}
                               </span>
                             </TableCell>
