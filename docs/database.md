@@ -453,6 +453,65 @@ admin_emails  (standalone — consultado por isAdmin())
 
 ---
 
+## Índices
+
+Las migraciones crean **26 índices explícitos** para optimizar las queries más frecuentes. Estos índices no se muestran en las sentencias `CREATE TABLE` arriba, pero son creados por sentencias `CREATE INDEX` separadas en las migraciones.
+
+### Índices por tabla
+
+| Tabla | Índice | Columna(s) | Tipo | Migración |
+|---|---|---|---|---|
+| `employees` | `idx_employees_user_id` | `user_id` | Normal | 1 |
+| `employees` | `idx_employees_negocio_id` | `negocio_id` | Normal | 8 |
+| `topics` | `idx_topics_employee_id` | `employee_id` | Normal | 1 |
+| `notes` | `idx_notes_topic_id` | `topic_id` | Normal | 1 |
+| `events` | `idx_events_user_id` | `user_id` | Normal | 2 |
+| `events` | `idx_events_date` | `event_date` | Normal | 2 |
+| `events` | `idx_events_negocio_id` | `negocio_id` | Normal | 8 |
+| `advances` | `idx_advances_employee` | `employee_id` | Normal | 5 |
+| `advances` | `idx_advances_period` | `period_year, period_month` | Normal | 5 |
+| `advances` | `idx_advances_negocio_id` | `negocio_id` | Normal | 8 |
+| `salary_payments` | `idx_salary_payments_employee` | `employee_id` | Normal | 5 |
+| `salary_payments` | `idx_salary_payments_period` | `period_year, period_month` | Normal | 5 |
+| `salary_payments` | `idx_salary_payments_unique` | `employee_id, period_year, period_month` | **UNIQUE** | 5 |
+| `salary_payments` | `idx_salary_payments_negocio_id` | `negocio_id` | Normal | 8 |
+| `job_roles` | `idx_job_roles_user_id` | `user_id` | Normal | 6 |
+| `job_roles` | `idx_job_roles_negocio_id` | `negocio_id` | Normal | 8 |
+| `negocio_members` | `idx_negocio_members_negocio` | `negocio_id` | Normal | 8 |
+| `negocio_members` | `idx_negocio_members_user` | `user_id` | Normal | 8 |
+| `invitations` | `idx_invitations_negocio` | `negocio_id` | Normal | 8 |
+| `invitations` | `idx_invitations_token_hash` | `token_hash` | Normal | 8 |
+| `usage_logs` | `idx_usage_logs_negocio_id` | `negocio_id` | Normal | 8 |
+| `owner_requests` | `idx_owner_requests_negocio` | `negocio_id` | Normal | 12 |
+| `owner_requests` | `idx_owner_requests_user` | `user_id` | Normal | 12 |
+| `compras` | `idx_compras_negocio` | `negocio_id` | Normal | 13 |
+| `compras` | `idx_compras_fecha` | `negocio_id, fecha` | Normal | 13 |
+| `compras` | `idx_compras_comprador` | `comprador_id` | Normal | 13 |
+
+### Índices implícitos (por constraints)
+
+Además de los índices explícitos, SQLite crea índices automáticos para:
+- `PRIMARY KEY` de cada tabla
+- `UNIQUE` constraints: `users.email`, `admin_emails.email`, `negocio_members(negocio_id, user_id)`, `invitations.token_hash`, `usage_counters(user_id, negocio_id, tool, period)`, `usage_limits.tool`, `owner_requests(negocio_id, user_id, status)`
+
+---
+
+## Notas de Discrepancia entre Migraciones y Código
+
+### `compras` como `module_key`
+
+Las migraciones 11 y 12 (que crean `user_module_prefs` y `negocio_module_restrictions`) documentan en sus comentarios SQL los valores válidos de `module_key` como `'calendario' | 'personal' | 'sueldos'` — **sin incluir `compras`**.
+
+Sin embargo, el código del Worker (`VALID_MODULE_KEYS` en `index.ts`) sí reconoce `'compras'` como cuarto módulo válido. Esto funciona porque `module_key` es una columna `TEXT` sin constraint de enum, pero la discrepancia entre los comentarios de migración y el código real puede causar confusión.
+
+La migración 13 (que agrega la tabla `compras`) no actualiza los comentarios de las migraciones anteriores ni agrega un `INSERT` de `compras` en `usage_limits`.
+
+### `compras` sin límite default en `usage_limits`
+
+La migración 10 inserta valores iniciales en `usage_limits` para 8 tools, pero **no incluye `compras`**. Esto significa que `compras` tiene límite `NULL` (sin límite) hasta que el admin lo configure manualmente desde el panel de administración.
+
+---
+
 ## Limitaciones de D1
 
 - No soporta foreign key constraints enforcement (la integridad referencial se valida en el backend).

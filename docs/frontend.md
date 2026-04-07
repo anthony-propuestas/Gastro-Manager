@@ -1074,13 +1074,15 @@ console.log("Employee data:", employee);
 
 ErrorBoundary captura errores y los muestra.
 
-## Próximas Mejoras
+## Próximas Mejoras (NO implementadas)
 
-1. **Dark mode toggle**: Botón para cambiar tema
-2. **Internacionalización**: Soporte multi-idioma (i18next)
-3. **Offline support**: Service workers (PWA)
-4. **Real-time updates**: WebSockets para colaboración
-5. **Advanced filtering**: Filtros combinados y guardados
-6. **Export data**: Exportar a Excel/PDF
-7. **Drag & drop**: Reordenar items
-8. **Charts**: Visualización de datos (recharts)
+⚠️ **Las siguientes son ideas aspiracionales. Ninguna está implementada en el código actual.** No existen componentes, configuraciones ni dependencias para estas features en el proyecto.
+
+1. **Dark mode toggle**: Botón para cambiar tema — Las variables CSS para `.dark` existen pero no hay toggle en la UI
+2. **Internacionalización**: Soporte multi-idioma (i18next) — No hay dependencia `i18next` ni archivos de traducción
+3. **Offline support**: Service workers (PWA) — No hay `service-worker.js` ni `manifest.json`
+4. **Real-time updates**: WebSockets para colaboración — No hay implementación de WebSocket
+5. **Advanced filtering**: Filtros combinados y guardados — No hay persistencia de filtros
+6. **Export data**: Exportar a Excel/PDF — No hay dependencias de exportación
+7. **Drag & drop**: Reordenar items — No hay librería dnd
+8. **Charts**: Visualización de datos (recharts) — No hay dependencia `recharts` ni componentes de gráficos

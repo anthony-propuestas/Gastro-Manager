@@ -91,6 +91,13 @@ Ejecuta en endpoints de módulos restringibles (`calendario`, `personal`, `sueld
 - Si el usuario es `owner` del negocio → acceso permitido siempre.
 - Si el usuario es `gerente` y el módulo está marcado como restringido en `negocio_module_restrictions` → devuelve 403 FORBIDDEN.
 
+**⚠️ Excepciones importantes — rutas SIN restricción de módulo:**
+
+| Ruta | Razón |
+|---|---|
+| `POST /api/chat` | El chatbot no pertenece a ningún módulo. No es restringible por el owner. Además, el contexto enviado a Gemini incluye datos de **todos** los módulos (empleados, eventos, tópicos, anticipos, pagos) independientemente de restricciones. Un gerente con módulos restringidos puede acceder a esa información indirectamente via el chatbot. |
+| `GET /api/compras/files/*` | Solo requiere `auth + negocio`. Un gerente con `compras` restringido podría acceder a imágenes de comprobantes si conoce la URL directa (el key de R2). Se valida que el key pertenezca al negocio activo, pero no se verifica la restricción del módulo. |
+
 ---
 
 ## Sistema Multi-Negocio
@@ -131,7 +138,9 @@ Las cuotas son **por usuario por negocio por mes** (`UNIQUE(user_id, negocio_id,
 
 - **9 herramientas** sujetas a cuota: `employees`, `job_roles`, `topics`, `notes`, `advances`, `salary_payments`, `events`, `chat`, `compras`.
 - Los límites son globales (una fila por tool en `usage_limits`) y editables desde el panel de admin.
-- El endpoint `mark-all-paid` consume **N usos** (uno por empleado marcado), con el mismo patrón atómico.
+- El endpoint `mark-all-paid` consume **N usos** (uno por empleado marcado), con lógica inline (no usa el middleware estándar).
+- El endpoint `PUT /api/compras/:id` **también consume cuota**, a diferencia de PUT en otros módulos donde solo POST consume.
+- `compras` no tiene límite seedeado en la migración — es `NULL` hasta que el admin lo configure.
 
 ---
 
@@ -171,6 +180,7 @@ POST /api/employees
 POST /api/chat { message }
   │
   ├── authMiddleware + negocioMiddleware + usageLimitMiddleware("chat")
+  │   ⚠️ NO tiene createModuleRestrictionMiddleware
   └── handler:
         ├── SELECT empleados activos del negocio
         ├── SELECT eventos del mes
@@ -180,6 +190,8 @@ POST /api/chat { message }
         └── POST → Gemini 2.5 Flash API
               └── Respuesta → { response: "..." }
 ```
+
+⚠️ **Implicación de seguridad:** El chatbot accede a datos de todos los módulos sin respetar restricciones del owner. Un gerente con módulos restringidos puede obtener información de esos módulos a través del chat.
 
 ---
 

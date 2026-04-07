@@ -422,7 +422,11 @@ Elimina un anticipo.
 *Requieren `X-Negocio-ID`* ⚠️ *Restringible por owner (módulo `sueldos`)*
 
 #### `GET /api/salary-payments`
-Lista los registros de pago del negocio.
+Lista los registros de pago del negocio. Filtrable por `month` y `year`.
+
+```
+GET /api/salary-payments?month=4&year=2026
+```
 
 #### `POST /api/salary-payments/mark-paid` ⚠️ *Sujeto a cuota `salary_payments`*
 Marca un pago individual como realizado.
@@ -432,7 +436,9 @@ Marca un pago individual como realizado.
 ```
 
 #### `POST /api/salary-payments/mark-all-paid`
-Marca todos los pagos pendientes de un período. Cuenta N usos de la cuota `salary_payments` (uno por empleado marcado). El incremento es atómico.
+Marca todos los pagos pendientes de un período.
+
+⚠️ **Consumo especial de cuota:** Este endpoint **no usa** el middleware estándar `createUsageLimitMiddleware`. En su lugar, implementa lógica inline que consume **N usos** de la cuota `salary_payments` (uno por cada empleado marcado). El incremento es atómico. Si la cuota se agota a mitad de la operación, los empleados ya marcados permanecen pagados pero los restantes no se procesan.
 
 ```json
 { "period_month": 4, "period_year": 2026, "paid_date": "2026-04-30" }
@@ -510,6 +516,8 @@ Registra una nueva compra.
 #### `PUT /api/compras/:id` ⚠️ *Sujeto a cuota `compras` · Restringible por owner*
 Actualiza una compra (todos los campos opcionales, mismos valores válidos que POST).
 
+⚠️ **Nota:** A diferencia de otros módulos (employees, events, topics, notes) donde solo `POST` consume cuota, en compras **tanto `POST` como `PUT` consumen cuota**. Cada actualización cuenta como un uso adicional del tool `compras`.
+
 #### `DELETE /api/compras/:id` ⚠️ *Restringible por owner*
 Elimina una compra. Si tiene `comprobante_key`, también elimina el archivo de R2.
 
@@ -534,6 +542,8 @@ La key devuelta se usa como `comprobante_key` al crear o actualizar la compra.
 
 #### `GET /api/compras/files/*` ⚠️ *Requiere `X-Negocio-ID`*
 Sirve una imagen de comprobante desde R2. La ruta debe estar scoped al negocio actual.
+
+⚠️ **Nota de seguridad:** Esta ruta **no tiene** `createModuleRestrictionMiddleware('compras')`. Un gerente con el módulo `compras` restringido podría acceder a imágenes de comprobantes si conoce la URL directa. Solo se valida que el key de R2 coincida con el `negocio_id` activo para prevenir acceso cross-negocio.
 
 ---
 
@@ -667,6 +677,8 @@ Regresa a `usuario_basico`. No puede aplicarse al propio admin (devuelve `403`).
 ### Chatbot IA
 *Requiere `X-Negocio-ID`* ⚠️ *Sujeto a cuota `chat`*
 
+⚠️ **Nota:** El chatbot **no tiene** `createModuleRestrictionMiddleware`. No es restringible por el owner. Además, el contexto que se envía a Gemini incluye datos de **todos** los módulos (empleados, eventos, tópicos, anticipos, pagos) independientemente de si el owner ha restringido algún módulo para gerentes.
+
 #### `POST /api/chat`
 Envía un mensaje al asistente virtual (Google Gemini 2.5 Flash).
 
@@ -701,6 +713,34 @@ El contexto enviado a Gemini incluye: empleados activos, sueldos del mes, antici
 
 ## Notas Generales
 
+- **Total de endpoints**: 70 rutas registradas en el Worker (GET, POST, PUT, DELETE).
 - **Sin paginación**: todos los listados retornan el conjunto completo. Filtrado se realiza en cliente.
 - **Sin rate limiting propio**: Cloudflare Workers aplica 100,000 req/día en Free tier.
 - **CORS**: no configurado explícitamente; funciona por same-origin (SPA y API servidos por el mismo Worker via `not_found_handling: single-page-application`).
+
+### Notas sobre cuotas por endpoint
+
+| Endpoint | Middleware de cuota | Notas |
+|---|---|---|
+| `POST /api/employees` | `usageLimitMiddleware('employees')` | Estándar |
+| `POST /api/job-roles` | `usageLimitMiddleware('job_roles')` | Estándar |
+| `POST /api/employees/:id/topics` | `usageLimitMiddleware('topics')` | Estándar |
+| `POST /api/topics/:id/notes` | `usageLimitMiddleware('notes')` | Estándar |
+| `POST /api/employees/:id/advances` | `usageLimitMiddleware('advances')` | Estándar |
+| `POST /api/salary-payments/mark-paid` | `usageLimitMiddleware('salary_payments')` | Estándar |
+| `POST /api/salary-payments/mark-all-paid` | **Lógica inline** | N usos (1 por empleado). No usa middleware |
+| `POST /api/events` | `usageLimitMiddleware('events')` | Estándar |
+| `POST /api/chat` | `usageLimitMiddleware('chat')` | Estándar |
+| `POST /api/compras` | `usageLimitMiddleware('compras')` | Estándar |
+| `PUT /api/compras/:id` | `usageLimitMiddleware('compras')` | **Excepcional:** PUT también consume cuota |
+
+### Notas sobre restricciones de módulo
+
+| Ruta | Módulo | Restricción | Notas |
+|---|---|---|---|
+| `/api/employees*`, `/api/job-roles*`, `/api/topics*`, `/api/notes*` | `personal` | Sí | Todos los endpoints |
+| `/api/events*` | `calendario` | Sí | Todos los endpoints |
+| `/api/salaries*`, `/api/advances*`, `/api/salary-payments*` | `sueldos` | Sí | Todos los endpoints |
+| `/api/compras` (CRUD + upload + summary) | `compras` | Sí | Todos excepto files |
+| `GET /api/compras/files/*` | `compras` | **No** | Solo valida auth + negocio |
+| `POST /api/chat` | — | **No** | No restringible por owner |
