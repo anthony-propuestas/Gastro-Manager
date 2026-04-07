@@ -1026,6 +1026,7 @@ app.get("/api/modules/prefs", authMiddleware, async (c) => {
       personal: true,
       sueldos: true,
       compras: true,
+      facturacion: true,
     };
 
     for (const row of rows.results) {
