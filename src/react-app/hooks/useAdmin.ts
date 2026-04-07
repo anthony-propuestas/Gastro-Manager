@@ -34,6 +34,10 @@ interface AdminStats {
     employees: number;
     salaries: number;
     calendar: number;
+    job_roles: number;
+    topics: number;
+    notes: number;
+    chat: number;
   };
 }
 

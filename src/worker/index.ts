@@ -129,15 +129,28 @@ const negocioMiddleware: MiddlewareHandler<{ Bindings: Env; Variables: Variables
 function createUsageLimitMiddleware(tool: UsageTool): MiddlewareHandler<{ Bindings: Env; Variables: Variables }> {
   return async (c, next) => {
     const user = c.get("user");
+    const negocio = c.get("negocio");
     if (user.role === "usuario_inteligente") {
+      const period = new Date().toISOString().slice(0, 7);
+      const db = c.env.DB;
+      try {
+        await db
+          .prepare(
+            `INSERT INTO usage_counters (user_id, negocio_id, tool, period, count, updated_at)
+             VALUES (?, ?, ?, ?, 1, datetime('now'))
+             ON CONFLICT(user_id, negocio_id, tool, period)
+             DO UPDATE SET count = count + 1, updated_at = datetime('now')`
+          )
+          .bind(user.id, negocio.id, tool, period)
+          .run();
+      } catch { /* silent — no bloquea la request */ }
       await next();
       return;
     }
-    const negocio = c.get("negocio");
     const period = new Date().toISOString().slice(0, 7); // 'YYYY-MM'
     const db = c.env.DB;
 
-    // Atomic increment: insert or increment, return new count
+    // Atomic increment con verificación de límite (solo usuario_basico)
     const result = await db
       .prepare(
         `INSERT INTO usage_counters (user_id, negocio_id, tool, period, count, updated_at)

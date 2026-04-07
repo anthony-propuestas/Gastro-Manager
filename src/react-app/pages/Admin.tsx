@@ -6,7 +6,7 @@ import { Input } from "@/react-app/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/react-app/components/ui/table";
 import { Badge } from "@/react-app/components/ui/badge";
 import { useToast } from "@/react-app/components/ui/toast";
-import { Shield, Users, Mail, TrendingUp, Calendar, Banknote, UserPlus, Trash2, AlertCircle, BarChart3, Settings2, Crown, UserMinus } from "lucide-react";
+import { Shield, Users, Mail, TrendingUp, Calendar, Banknote, UserPlus, Trash2, AlertCircle, BarChart3, Settings2, Crown, UserMinus, Search, X } from "lucide-react";
 
 const TOOL_LABELS = [
   { key: "employees",       label: "Empleados",  color: "bg-green-500" },
@@ -29,6 +29,10 @@ export default function Admin() {
   const [limitEdits, setLimitEdits] = useState<Record<string, number>>({});
   const [isSavingLimits, setIsSavingLimits] = useState(false);
   const [userSearch, setUserSearch] = useState("");
+  const [usageSearchEmail, setUsageSearchEmail] = useState("");
+  const [filterRole, setFilterRole] = useState<"all" | "usuario_basico" | "usuario_inteligente">("all");
+  const [filterNegocio, setFilterNegocio] = useState("all");
+  const [filterTool, setFilterTool] = useState("all");
 
   useEffect(() => {
     if (isAdmin) {
@@ -99,7 +103,9 @@ export default function Admin() {
   }
 
   const totalActions = stats
-    ? stats.usage.employees + stats.usage.salaries + stats.usage.calendar
+    ? stats.usage.employees + stats.usage.salaries + stats.usage.calendar +
+      (stats.usage.job_roles ?? 0) + (stats.usage.topics ?? 0) +
+      (stats.usage.notes ?? 0) + (stats.usage.chat ?? 0)
     : 0;
 
   return (
@@ -291,48 +297,144 @@ export default function Admin() {
       )}
 
       {/* 4.1 — Tabla de uso por usuario */}
-      {usageData && usageData.rows.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Users className="h-5 w-5" />
-              Uso por Usuario — {usageData.period}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Usuario</TableHead>
-                  <TableHead>Rol</TableHead>
-                  <TableHead>Negocio</TableHead>
-                  {TOOL_LABELS.map(t => (
-                    <TableHead key={t.key} className="text-center">{t.label}</TableHead>
-                  ))}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {usageData.rows.map(u => (
-                  <TableRow key={u.user_id + "-" + u.negocio_id}>
-                    <TableCell className="font-medium">{u.email}</TableCell>
-                    <TableCell>
-                      <Badge variant={u.role === "usuario_inteligente" ? "default" : "secondary"}>
-                        {u.role === "usuario_inteligente" ? "Inteligente" : "Básico"}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground text-sm">{u.negocio_name}</TableCell>
-                    {TOOL_LABELS.map(t => (
-                      <TableCell key={t.key} className="text-center">
-                        {u.usage[t.key] ?? 0}
-                      </TableCell>
-                    ))}
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-      )}
+      {usageData && usageData.rows.length > 0 && (() => {
+        const uniqueNegocios = [...new Set(usageData.rows.map(r => r.negocio_name))].sort();
+        const filteredRows = usageData.rows.filter(r => {
+          if (filterRole !== "all" && r.role !== filterRole) return false;
+          if (filterNegocio !== "all" && r.negocio_name !== filterNegocio) return false;
+          if (filterTool !== "all" && (r.usage[filterTool] ?? 0) === 0) return false;
+          if (usageSearchEmail && !r.email.toLowerCase().includes(usageSearchEmail.toLowerCase())) return false;
+          return true;
+        });
+        const hasFilters = filterRole !== "all" || filterNegocio !== "all" || filterTool !== "all" || usageSearchEmail !== "";
+        return (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Users className="h-5 w-5" />
+                Uso por Usuario — {usageData.period}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {/* Filtros */}
+              <div className="flex flex-wrap gap-2">
+                <div className="relative flex-1 min-w-[160px]">
+                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground pointer-events-none" />
+                  <input
+                    type="text"
+                    placeholder="Buscar email..."
+                    value={usageSearchEmail}
+                    onChange={e => setUsageSearchEmail(e.target.value)}
+                    className="w-full pl-8 pr-3 py-2 text-sm border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+                  />
+                </div>
+                <select
+                  value={filterRole}
+                  onChange={e => setFilterRole(e.target.value as typeof filterRole)}
+                  className="px-3 py-2 text-sm border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+                >
+                  <option value="all">Todos los roles</option>
+                  <option value="usuario_basico">Solo Básicos</option>
+                  <option value="usuario_inteligente">Solo Inteligentes</option>
+                </select>
+                <select
+                  value={filterNegocio}
+                  onChange={e => setFilterNegocio(e.target.value)}
+                  className="px-3 py-2 text-sm border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+                >
+                  <option value="all">Todos los negocios</option>
+                  {uniqueNegocios.map(n => <option key={n} value={n}>{n}</option>)}
+                </select>
+                <select
+                  value={filterTool}
+                  onChange={e => setFilterTool(e.target.value)}
+                  className="px-3 py-2 text-sm border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+                >
+                  <option value="all">Todas las herramientas</option>
+                  {TOOL_LABELS.map(t => <option key={t.key} value={t.key}>{t.label}</option>)}
+                </select>
+                {hasFilters && (
+                  <button
+                    onClick={() => { setUsageSearchEmail(""); setFilterRole("all"); setFilterNegocio("all"); setFilterTool("all"); }}
+                    className="flex items-center gap-1 px-3 py-2 text-sm text-muted-foreground hover:text-foreground border rounded-md hover:bg-accent transition-colors"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                    Limpiar
+                  </button>
+                )}
+              </div>
+              <div className="text-xs text-muted-foreground">
+                {filteredRows.length} de {usageData.rows.length} filas
+                {" · "}
+                <span className="inline-flex items-center gap-1">
+                  <span className="inline-block w-3 h-3 rounded-sm bg-purple-100 border border-purple-300" />
+                  Inteligente
+                </span>
+                {" · "}
+                <span className="inline-flex items-center gap-1">
+                  <span className="inline-block w-3 h-3 rounded-sm bg-background border" />
+                  Básico
+                </span>
+              </div>
+              {/* Tabla */}
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Usuario</TableHead>
+                      <TableHead>Negocio</TableHead>
+                      {TOOL_LABELS.map(t => (
+                        <TableHead key={t.key} className="text-center">{t.label}</TableHead>
+                      ))}
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredRows.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={3 + TOOL_LABELS.length} className="text-center text-muted-foreground py-8">
+                          Sin resultados con los filtros actuales
+                        </TableCell>
+                      </TableRow>
+                    ) : filteredRows.map(u => {
+                      const isInteligente = u.role === "usuario_inteligente";
+                      return (
+                        <TableRow
+                          key={u.user_id + "-" + u.negocio_id}
+                          className={isInteligente ? "bg-purple-50 hover:bg-purple-100" : ""}
+                        >
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <div>
+                                <div className="font-medium">{u.email}</div>
+                                {isInteligente ? (
+                                  <Badge className="mt-0.5 text-xs bg-purple-100 text-purple-700 border border-purple-300 hover:bg-purple-100">
+                                    <Crown className="h-3 w-3 mr-1" />
+                                    Inteligente
+                                  </Badge>
+                                ) : (
+                                  <Badge variant="secondary" className="mt-0.5 text-xs">Básico</Badge>
+                                )}
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-muted-foreground text-sm">{u.negocio_name}</TableCell>
+                          {TOOL_LABELS.map(t => (
+                            <TableCell key={t.key} className="text-center">
+                              <span className={isInteligente ? "text-purple-700 font-medium" : ""}>
+                                {u.usage[t.key] ?? 0}
+                              </span>
+                            </TableCell>
+                          ))}
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+        );
+      })()}
 
       {/* 4.2 — Configurar límites mensuales */}
       <Card>
