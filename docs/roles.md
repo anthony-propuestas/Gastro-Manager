@@ -82,7 +82,15 @@ Almacenados en la columna `users.role` (Migration 9). Controlan las **cuotas de 
 
 ```sql
 -- Migration 9
-ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'usuario_basico';
+CREATE TABLE users (
+  id         TEXT PRIMARY KEY,               -- Google ID
+  email      TEXT NOT NULL UNIQUE,
+  name       TEXT NOT NULL,
+  picture    TEXT NOT NULL DEFAULT '',
+  role       TEXT NOT NULL DEFAULT 'usuario_basico',
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
 ```
 
 ### Comparación
@@ -184,10 +192,10 @@ El owner puede ocultar módulos específicos a los gerentes de su negocio:
 ```sql
 -- Migration 12
 CREATE TABLE negocio_module_restrictions (
-  negocio_id   INTEGER NOT NULL,
-  module_key   TEXT NOT NULL,
+  negocio_id    INTEGER NOT NULL REFERENCES negocios(id) ON DELETE CASCADE,
+  module_key    TEXT    NOT NULL, -- 'calendario' | 'personal' | 'sueldos' | 'compras'
   is_restricted INTEGER NOT NULL DEFAULT 0,
-  updated_at   TEXT,
+  updated_at    TEXT    NOT NULL DEFAULT (datetime('now')),
   PRIMARY KEY (negocio_id, module_key)
 );
 ```
@@ -222,7 +230,7 @@ Cualquier miembro de un negocio puede solicitar ser `owner`. El creador del nego
                  │
                  ▼
            4. Owner existente aprueba/rechaza
-              (PUT /api/negocios/:id/owner-requests/:requestId)
+              (POST /api/negocios/:id/owner-requests/:requestId/approve|reject)
                  │
                  ├──► Aprobado → negocio_members.negocio_role = 'owner'
                  └──► Rechazado → status = 'rejected'
@@ -231,14 +239,14 @@ Cualquier miembro de un negocio puede solicitar ser `owner`. El creador del nego
 ```sql
 -- Migration 12
 CREATE TABLE owner_requests (
-  id         INTEGER PRIMARY KEY AUTOINCREMENT,
-  negocio_id INTEGER NOT NULL,
-  user_id    TEXT NOT NULL,
-  status     TEXT NOT NULL DEFAULT 'pending',  -- 'pending' | 'approved' | 'rejected'
-  reviewed_by TEXT,
-  created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-  updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
-  UNIQUE(negocio_id, user_id)
+  id           INTEGER PRIMARY KEY AUTOINCREMENT,
+  negocio_id   INTEGER NOT NULL REFERENCES negocios(id) ON DELETE CASCADE,
+  user_id      TEXT    NOT NULL,
+  status       TEXT    NOT NULL DEFAULT 'pending',  -- 'pending' | 'approved' | 'rejected'
+  requested_at TEXT    NOT NULL DEFAULT (datetime('now')),
+  resolved_at  TEXT,
+  resolved_by  TEXT,
+  UNIQUE(negocio_id, user_id, status)
 );
 ```
 
@@ -419,7 +427,7 @@ Un módulo es visible si: `user_module_prefs.is_active = 1` **Y** (es `owner` **
      │ email (UNIQUE) │ │ user_id (FK)  │ │ user_id (FK)     │
      │ added_by       │ │ negocio_id(FK)│ │ negocio_id (FK)  │
      └────────────────┘ │ negocio_role  │ │ status           │
-                        │ invited_by    │ │ reviewed_by      │
+                        │ invited_by    │ │ resolved_by      │
                         └───────┬───────┘ └──────────────────┘
                                 │
                                 ▼

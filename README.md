@@ -11,11 +11,12 @@ Sistema de gestión de restaurantes multi-usuario desplegado en Cloudflare Worke
 | Empleados | CRUD completo con búsqueda, filtros, roles personalizados y tópicos de seguimiento |
 | Sueldos | Registro de salarios, adelantos, pagos individuales y por lote |
 | Calendario | Eventos propios + tópicos con fecha límite integrados visualmente |
-| Compras | Registro de compras y gastos del negocio por categoría |
+| Compras | Registro de compras y gastos del negocio por categoría, con upload de comprobantes |
 | Seguimiento | Tópicos y notas por empleado con deadlines y alertas de vencimiento |
 | Negocios compartidos | Múltiples usuarios pueden colaborar en el mismo negocio |
 | Asistente Virtual IA | Chatbot contextual sobre los datos del negocio (Google Gemini) |
 | Panel de Admin | Estadísticas globales, gestión de cuotas, roles de usuario |
+| Panel Owner | Restricciones de módulos para gerentes, gestión de solicitudes de owner |
 
 ---
 
@@ -26,6 +27,7 @@ Sistema de gestión de restaurantes multi-usuario desplegado en Cloudflare Worke
 | Frontend | React 19 + React Router 7 + Tailwind CSS + shadcn/ui |
 | Backend | Hono (Cloudflare Workers) |
 | Base de datos | Cloudflare D1 (SQLite serverless) |
+| Almacenamiento | Cloudflare R2 (comprobantes de compras) |
 | Autenticación | Google OAuth nativo + JWT (jose) |
 | Validación | Zod |
 | IA | Google Gemini 2.5 Flash |
@@ -65,6 +67,15 @@ Los usuarios se unen a negocios mediante enlaces de invitación con token de un 
 | `usuario_inteligente` | Sin cuotas, acceso ilimitado |
 
 El rol se almacena en la tabla `users` y se lee de la base de datos en cada request (no del JWT) para garantizar que los cambios sean inmediatos.
+
+### Roles de negocio
+
+Dentro de cada negocio, los miembros tienen un rol adicional:
+
+| Rol | Descripción |
+|---|---|
+| `owner` | Control total del negocio, puede restringir módulos a gerentes |
+| `gerente` | Rol por defecto al ser invitado, sujeto a restricciones del owner |
 
 ### Cuotas mensuales (usuario_basico)
 

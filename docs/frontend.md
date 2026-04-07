@@ -17,10 +17,11 @@ Aplicación React moderna con arquitectura basada en componentes.
 src/react-app/
 ├── components/           # Componentes reutilizables
 │   ├── ui/              # Componentes base (shadcn)
-│   ├── layout/          # Layouts de la app
+│   ├── layout/          # Layouts de la app (MainLayout, Sidebar, BottomNav)
 │   ├── auth/            # Componentes de autenticación
 │   ├── employees/       # Componentes de empleados
-│   └── salaries/        # Componentes de sueldos
+│   ├── salaries/        # Componentes de sueldos
+│   └── compras/         # Componentes de compras
 ├── pages/               # Páginas/vistas principales
 │   ├── modulos/         # Módulos operativos (personal, sueldos, calendario, compras)
 │   └── ...
@@ -44,6 +45,7 @@ Todos en `components/ui/`, basados en Radix UI (shadcn/ui):
 - **Separator** (`separator.tsx`): Líneas divisoras
 - **Table** (`table.tsx`): Tablas de datos
 - **Toast** (`toast.tsx`): Notificaciones temporales (success, error, info, warning)
+- **Switch** (`switch.tsx`): Toggle switches para activar/desactivar opciones
 
 **Uso:**
 ```tsx
@@ -114,6 +116,17 @@ const navItems = [
 
 **Filtrado por módulos:** Los items con `moduleKey` se ocultan si el usuario ha desactivado ese módulo en la página de Configuración (via `useModulePrefsContext`).
 
+### BottomNav
+
+Navegación inferior para dispositivos móviles (`components/layout/BottomNav.tsx`).
+
+**Comportamiento:**
+- Visible solo en pantallas pequeñas (`md:hidden`)
+- Muestra los mismos items de navegación que el Sidebar (Dashboard, Calendario, Personal, Sueldos, Compras)
+- Respeta las mismas reglas de filtrado por `moduleKey` y restricciones del owner
+- Íconos compactos con label debajo
+- Indicador visual del item activo
+
 ## Páginas
 
 ### Dashboard (`pages/Dashboard.tsx`)
@@ -182,6 +195,9 @@ Calendario mensual con eventos y tópicos.
 - Modal para crear/editar eventos
 - Indicadores visuales (rojo: vencido, ámbar: pendiente)
 
+**Componentes usados:**
+- `EventModal` (`components/EventModal.tsx`): Formulario de evento (crear/editar)
+
 **Estructura:**
 ```tsx
 <div className="grid lg:grid-cols-[1fr_300px]">
@@ -209,6 +225,11 @@ Registro y gestión de compras y gastos del negocio.
 - Filtros y ordenamiento por fecha
 - Banner de cuota cuando se acerca o alcanza el límite mensual (tool `compras`)
 - Módulo restringible por el owner desde `/owner`
+
+**Componentes usados:**
+- `CompraModal`: Formulario de compra (crear/editar)
+- `ComprasHistoryModal`: Historial de compras con filtros
+- `DayDetailModal`: Detalle de compras de un día específico
 
 ### NegocioSetup (`pages/NegocioSetup.tsx`)
 
@@ -251,6 +272,15 @@ Panel de administración (solo admins). Si el usuario no es admin, muestra una t
 4. **Configuración de límites mensuales:** Inputs editables por herramienta para usuarios "Básico", con botón guardar (`updateLimits`)
 5. **Gestión de roles de usuario:** Buscar usuarios por email, promover a "Usuario Inteligente" (sin límites) o degradar a "Básico", tabla de usuarios inteligentes actuales
 6. **Gestión de emails administradores:** Agregar/eliminar emails admin
+
+### OwnerPanel (`pages/OwnerPanel.tsx`)
+
+Panel de gestión de negocio para owners. Accesible desde `/owner`. Si el usuario no es `owner` del negocio actual, redirige a `/`.
+
+**Características:**
+- **Restricciones de módulos:** Toggles para activar/desactivar la visibilidad de cada módulo (calendario, personal, sueldos, compras) para los gerentes del negocio
+- **Solicitudes de owner:** Lista de solicitudes pendientes con botones para aprobar o rechazar
+- Usa `useOwnerPanel` para las llamadas API
 
 ### Login (`pages/Login.tsx`)
 
@@ -545,6 +575,24 @@ export function useMyUsage() {
 
 Usado por `ChatWidget` para mostrar `UsageBanner` del tool "chat".
 
+### useOwnerPanel
+
+Gestión del panel de owner (restricciones de módulos y solicitudes de owner).
+
+```tsx
+export function useOwnerPanel() {
+  const fetchMyOwnerRequest = async (negocioId) => { ... };     // GET /api/negocios/:id/my-owner-request
+  const requestOwner = async (negocioId) => { ... };            // POST /api/negocios/:id/request-owner
+  const fetchOwnerRequests = async (negocioId) => { ... };      // GET /api/negocios/:id/owner-requests
+  const approveOwnerRequest = async (negocioId, reqId) => { ... }; // POST .../approve
+  const rejectOwnerRequest = async (negocioId, reqId) => { ... };  // POST .../reject
+  const fetchModuleRestrictions = async (negocioId) => { ... }; // GET /api/negocios/:id/module-restrictions
+  const updateModuleRestriction = async (negocioId, data) => { ... }; // PUT /api/negocios/:id/module-restrictions
+
+  return { ... };
+}
+```
+
 ### useChat
 
 Comunicación con el asistente virtual IA.
@@ -627,14 +675,9 @@ import { AuthProvider } from "@/react-app/context/AuthContext";
 
 ### ToastProvider
 
-Sistema de notificaciones.
+Sistema de notificaciones temporales basado en el componente `toast.tsx` de shadcn/ui.
 
 ```tsx
-<ToastProvider>
-  {children}
-  {/* Renderiza toasts en esquina superior derecha */}
-</ToastProvider>
-
 // Uso en componentes
 const { addToast } = useToast();
 addToast("Empleado creado", "success");
@@ -803,15 +846,17 @@ Por página individual.
 
   {/* Protected — requieren negocio activo */}
   <Route path="/" element={<ProtectedRoute><MainLayout><Dashboard /></MainLayout></ProtectedRoute>} />
-  <Route path="/empleados" element={<ProtectedRoute><MainLayout><Employees /></MainLayout></ProtectedRoute>} />
-  <Route path="/sueldos" element={<ProtectedRoute><MainLayout><Salaries /></MainLayout></ProtectedRoute>} />
-  <Route path="/calendario" element={<ProtectedRoute><MainLayout><CalendarPage /></MainLayout></ProtectedRoute>} />
+  <Route path="/empleados" element={<ProtectedRoute><MainLayout><RestrictedModuleRoute moduleKey="personal"><Employees /></RestrictedModuleRoute></MainLayout></ProtectedRoute>} />
+  <Route path="/sueldos" element={<ProtectedRoute><MainLayout><RestrictedModuleRoute moduleKey="sueldos"><Salaries /></RestrictedModuleRoute></MainLayout></ProtectedRoute>} />
+  <Route path="/calendario" element={<ProtectedRoute><MainLayout><RestrictedModuleRoute moduleKey="calendario"><CalendarPage /></RestrictedModuleRoute></MainLayout></ProtectedRoute>} />
   <Route path="/compras" element={<ProtectedRoute><MainLayout><RestrictedModuleRoute moduleKey="compras"><Compras /></RestrictedModuleRoute></MainLayout></ProtectedRoute>} />
   <Route path="/configuracion" element={<ProtectedRoute><MainLayout><Settings /></MainLayout></ProtectedRoute>} />
+  <Route path="/owner" element={<ProtectedRoute><MainLayout><OwnerPanel /></MainLayout></ProtectedRoute>} />
   <Route path="/admin" element={<ProtectedRoute><MainLayout><Admin /></MainLayout></ProtectedRoute>} />
 </Routes>
 
-{/* Provider hierarchy: ErrorBoundary > AuthProvider > ToastProvider > Router > ModulePrefsProvider > SidebarProvider > ChatWidget */}
+{/* Provider hierarchy: ErrorBoundary > AuthProvider > Router > ModulePrefsProvider > SidebarProvider > ChatWidget + Routes */}
+{/* ChatWidget se renderiza a nivel de SidebarProvider, fuera de MainLayout, visible en todas las rutas */}
 ```
 
 ## Estilos y Tema

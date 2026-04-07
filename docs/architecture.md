@@ -12,10 +12,12 @@ Navegador
 Cloudflare Worker (Hono)
    ├── Sirve React SPA (archivos estáticos)
    └── API REST /api/*
-         ├── authMiddleware      → lee rol fresco de D1
-         ├── negocioMiddleware   → valida X-Negocio-ID
-         ├── usageLimitMiddleware → cuotas atómicas
+         ├── authMiddleware           → lee rol fresco de D1
+         ├── negocioMiddleware        → valida X-Negocio-ID
+         ├── moduleRestrictionMiddleware → bloquea gerentes de módulos restringidos
+         ├── usageLimitMiddleware     → cuotas atómicas
          └── Route handlers → D1 (SQLite)
+                              ├── R2 (almacenamiento de comprobantes)
                               └── Google Gemini API (chatbot)
 
 Google OAuth (accounts.google.com) ← intercambio de código en POST /api/sessions
@@ -32,6 +34,7 @@ Google OAuth (accounts.google.com) ← intercambio de código en POST /api/sessi
 | Backend | Hono | latest |
 | Runtime | Cloudflare Workers | Edge |
 | Base de datos | Cloudflare D1 (SQLite) | — |
+| Almacenamiento | Cloudflare R2 (comprobantes) | — |
 | Autenticación | Google OAuth nativo + JWT (jose) | — |
 | Validación | Zod | — |
 | IA | Google Gemini 2.5 Flash | v1beta |
@@ -80,6 +83,13 @@ Ejecuta antes de los 9 endpoints de escritura con cuota.
 ```
 
 Omite todo si `user.role === 'usuario_inteligente'`.
+
+### `createModuleRestrictionMiddleware(moduleKey)`
+
+Ejecuta en endpoints de módulos restringibles (`calendario`, `personal`, `sueldos`, `compras`).
+
+- Si el usuario es `owner` del negocio → acceso permitido siempre.
+- Si el usuario es `gerente` y el módulo está marcado como restringido en `negocio_module_restrictions` → devuelve 403 FORBIDDEN.
 
 ---
 
@@ -202,6 +212,8 @@ gastro-manager/
 │       └── pages/
 │           ├── Admin.tsx          # Panel de administración (6 secciones)
 │           ├── Dashboard.tsx
+│           ├── OwnerPanel.tsx     # Panel de owner (restricciones + owner requests)
+│           ├── Settings.tsx       # Configuración (módulos, miembros)
 │           ├── modulos/
 │           │   ├── Employees.tsx
 │           │   ├── Salaries.tsx
@@ -209,9 +221,6 @@ gastro-manager/
 │           │   └── Compras.tsx
 │           ├── NegocioSetup.tsx   # Selección/creación de negocio
 │           ├── InvitePage.tsx     # Flujo de invitación
-│           └── ...
-└── public/
-```
 │           └── ...
 └── public/
 ```
@@ -242,7 +251,7 @@ gastro-manager/
 Cada módulo tiene un hook (`useEmployees`, `useSalaries`, etc.) que encapsula el estado y las llamadas a API. Los componentes solo consumen el hook.
 
 ### Context API para estado global
-`AuthContext` expone `user`, `role`, `currentNegocio`, y la lista de negocios. `ToastContext` para notificaciones. `SidebarContext` para estado del menú. `ModulePrefsContext` distribuye las preferencias de visibilidad de módulos al Sidebar y Settings.
+`AuthContext` expone `user`, `role`, `currentNegocio`, y la lista de negocios. Toast notifications via componente `toast.tsx` de shadcn/ui. `SidebarContext` para estado del menú. `ModulePrefsContext` distribuye las preferencias de visibilidad de módulos al Sidebar y Settings.
 
 `currentNegocio` es la fuente única de verdad para el negocio activo. Cualquier vista con datos operativos debe reaccionar a cambios en `currentNegocio?.id` para refrescar su información.
 
@@ -251,7 +260,7 @@ Todos los endpoints devuelven `{ success: true, data }` o `{ success: false, err
 
 ### Middleware chain en Hono
 ```
-authMiddleware → negocioMiddleware → usageLimitMiddleware → handler
+authMiddleware → negocioMiddleware → moduleRestrictionMiddleware → usageLimitMiddleware → handler
 ```
 Cada middleware puede cortocircuitar la cadena devolviendo una respuesta sin llamar a `next()`.
 

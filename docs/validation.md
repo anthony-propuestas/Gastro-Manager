@@ -286,6 +286,85 @@ export const markSalaryPaidSchema = z.object({
 });
 ```
 
+### Negocios
+
+```typescript
+export const createNegocioSchema = z.object({
+  name: z.string()
+    .min(1, "Nombre es requerido")
+    .max(100, "Nombre muy largo"),
+});
+```
+
+**Reglas:**
+- `name`: 1-100 caracteres, requerido
+
+### Compras
+
+#### Constantes de Categorías
+
+```typescript
+const COMPRAS_CATEGORIAS = [
+  "carnes", "verduras", "bebidas", "limpieza", "descartables",
+  "servicios", "mantenimiento", "alquiler", "otros",
+] as const;
+```
+
+#### Crear Compra
+
+```typescript
+export const createCompraSchema = z.object({
+  fecha: z.string()
+    .refine((date) => isReasonableDate(date), "Fecha de compra inválida"),
+
+  monto: z.number()
+    .min(0.01, "El monto debe ser mayor a cero")
+    .max(10000000, "Monto muy alto"),
+
+  item: z.string()
+    .min(1, "Item es requerido")
+    .max(200, "Item muy largo"),
+
+  tipo: z.enum(["producto", "servicio"]),
+
+  categoria: z.enum(COMPRAS_CATEGORIAS),
+
+  comprador_id: z.number()
+    .int()
+    .positive()
+    .optional()
+    .nullable(),
+
+  descripcion: z.string()
+    .max(500, "Descripción muy larga")
+    .optional()
+    .nullable(),
+
+  comprobante_key: z.string()
+    .max(300)
+    .optional()
+    .nullable(),
+});
+```
+
+**Reglas:**
+- `fecha`: fecha razonable, requerida
+- `monto`: 0.01-10,000,000, requerido
+- `item`: 1-200 caracteres, requerido
+- `tipo`: `"producto"` | `"servicio"`, requerido
+- `categoria`: uno de `carnes`, `verduras`, `bebidas`, `limpieza`, `descartables`, `servicios`, `mantenimiento`, `alquiler`, `otros` — requerido
+- `comprador_id`: entero positivo, opcional (referencia a `employees.id`)
+- `descripcion`: máx 500 caracteres, opcional
+- `comprobante_key`: máx 300 caracteres, opcional (key de R2)
+
+#### Actualizar Compra
+
+```typescript
+export const updateCompraSchema = createCompraSchema.partial();
+```
+
+Todos los campos opcionales (permite actualización parcial).
+
 ## Uso en Backend
 
 ### Helper de Validación
@@ -542,7 +621,9 @@ addToast(validation.error, "error");
 
 ## Testing de Validaciones
 
-### Unit Tests (futuro)
+### Unit Tests
+
+Los tests de validación están implementados en `src/worker/validation.test.ts`:
 
 ```typescript
 describe("createEmployeeSchema", () => {

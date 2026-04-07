@@ -8,14 +8,16 @@
 
 ## Esquema General
 
-La base de datos tiene **14 tablas** en 4 grupos funcionales:
+La base de datos tiene **19 tablas** en 5 grupos funcionales:
 
 | Grupo | Tablas |
 |---|---|
 | Identidad y acceso | `users`, `admin_emails` |
 | Negocios compartidos | `negocios`, `negocio_members`, `invitations` |
+| Roles y restricciones | `owner_requests`, `negocio_module_restrictions`, `user_module_prefs` |
 | Cuotas | `usage_counters`, `usage_limits` |
 | Datos operativos | `employees`, `job_roles`, `topics`, `notes`, `advances`, `salary_payments`, `events`, `compras` |
+| Logging | `usage_logs` |
 
 ---
 
@@ -54,7 +56,6 @@ CREATE TABLE admin_emails (
   id         INTEGER PRIMARY KEY AUTOINCREMENT,
   email      TEXT NOT NULL UNIQUE,
   added_by   TEXT,
-  is_initial INTEGER DEFAULT 0,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
@@ -86,22 +87,29 @@ Relación muchos-a-muchos entre usuarios y negocios. Un usuario puede ser miembr
 
 ```sql
 CREATE TABLE negocio_members (
-  id         INTEGER PRIMARY KEY AUTOINCREMENT,
-  negocio_id INTEGER NOT NULL,
-  user_id    TEXT NOT NULL,
-  user_email TEXT NOT NULL,
-  user_name  TEXT NOT NULL,
-  invited_by TEXT NOT NULL,
-  joined_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
+  id           INTEGER PRIMARY KEY AUTOINCREMENT,
+  negocio_id   INTEGER NOT NULL,
+  user_id      TEXT NOT NULL,
+  user_email   TEXT NOT NULL,
+  user_name    TEXT NOT NULL,
+  invited_by   TEXT NOT NULL,
+  negocio_role TEXT NOT NULL DEFAULT 'gerente',  -- 'owner' | 'gerente'
+  joined_at    DATETIME DEFAULT CURRENT_TIMESTAMP,
   UNIQUE(negocio_id, user_id)
 );
 ```
+
+**Valores de `negocio_role`:** `'owner'` | `'gerente'`
+
+- El creador del negocio es automáticamente `owner`.
+- Los invitados ingresan como `gerente` por defecto.
+- Un gerente puede solicitar ser owner via `POST /api/negocios/:id/request-owner`.
 
 ---
 
 ### `invitations`
 
-Tokens de invitación de un solo uso para unirse a un negocio. Se genera un enlace con el token; al canjearse, `joined_at` se registra y el token queda invalidado.
+Tokens de invitación de un solo uso para unirse a un negocio. Se genera un token de 32 bytes, se hashea con SHA-256 y se almacena el hash. Expiran a las 48 horas. Máximo 10 activas por negocio.
 
 ```sql
 CREATE TABLE invitations (
@@ -109,9 +117,10 @@ CREATE TABLE invitations (
   negocio_id INTEGER NOT NULL,
   token_hash TEXT NOT NULL UNIQUE,
   invited_by TEXT NOT NULL,
-  joined_at  DATETIME,                    -- NULL = pendiente
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  expires_at DATETIME NOT NULL,
+  used_at    DATETIME,                    -- NULL = pendiente
+  used_by    TEXT,                         -- user_id de quien canjeó
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 ```
 
@@ -175,6 +184,79 @@ Los usuarios con `role = 'usuario_inteligente'` ignoran estos límites.
 
 ---
 
+## Roles y Restricciones
+
+### `owner_requests`
+
+Solicitudes pendientes para que un miembro del negocio sea promovido a `owner`. El flujo es: gerente solicita → owner existente aprueba o rechaza.
+
+```sql
+CREATE TABLE owner_requests (
+  id           INTEGER PRIMARY KEY AUTOINCREMENT,
+  negocio_id   INTEGER NOT NULL REFERENCES negocios(id) ON DELETE CASCADE,
+  user_id      TEXT    NOT NULL,
+  status       TEXT    NOT NULL DEFAULT 'pending',  -- 'pending' | 'approved' | 'rejected'
+  requested_at TEXT    NOT NULL DEFAULT (datetime('now')),
+  resolved_at  TEXT,
+  resolved_by  TEXT,
+  UNIQUE(negocio_id, user_id, status)
+);
+```
+
+---
+
+### `negocio_module_restrictions`
+
+Restricciones de módulos por negocio. El `owner` puede bloquear módulos específicos para los `gerentes`.
+
+```sql
+CREATE TABLE negocio_module_restrictions (
+  negocio_id    INTEGER NOT NULL REFERENCES negocios(id) ON DELETE CASCADE,
+  module_key    TEXT    NOT NULL,  -- 'calendario' | 'personal' | 'sueldos' | 'compras'
+  is_restricted INTEGER NOT NULL DEFAULT 0,
+  updated_at    TEXT    NOT NULL DEFAULT (datetime('now')),
+  PRIMARY KEY (negocio_id, module_key)
+);
+```
+
+---
+
+### `user_module_prefs`
+
+Preferencias de visibilidad de módulos por usuario. Independiente de las restricciones del owner — permite que cada usuario oculte voluntariamente módulos del sidebar.
+
+```sql
+CREATE TABLE user_module_prefs (
+  user_id    TEXT NOT NULL,
+  module_key TEXT NOT NULL,          -- 'calendario' | 'personal' | 'sueldos' | 'compras'
+  is_active  INTEGER NOT NULL DEFAULT 1,
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+  PRIMARY KEY (user_id, module_key)
+);
+```
+
+---
+
+## Logging
+
+### `usage_logs`
+
+Registro de acciones de usuario. Se usa internamente para tracking de operaciones.
+
+```sql
+CREATE TABLE usage_logs (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id     TEXT NOT NULL,
+  negocio_id  INTEGER,
+  action_type TEXT NOT NULL,
+  entity_type TEXT NOT NULL,
+  created_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at  DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+---
+
 ## Datos Operativos
 
 Todas estas tablas usan `negocio_id` para el aislamiento de datos. El `negocioMiddleware` inyecta el negocio activo en el contexto a partir del header `X-Negocio-ID`.
@@ -184,7 +266,8 @@ Todas estas tablas usan `negocio_id` para el aislamiento de datos. El `negocioMi
 ```sql
 CREATE TABLE employees (
   id             INTEGER PRIMARY KEY AUTOINCREMENT,
-  negocio_id     INTEGER NOT NULL,
+  user_id        TEXT NOT NULL,               -- Google ID del creador original
+  negocio_id     INTEGER,                     -- agregado en migración 8 (nullable por ALTER TABLE)
   name           TEXT NOT NULL,             -- 1-100 chars
   role           TEXT NOT NULL,             -- 1-50 chars
   phone          TEXT,
@@ -204,7 +287,8 @@ Puestos personalizados por negocio. Se combinan con roles predefinidos en el fro
 ```sql
 CREATE TABLE job_roles (
   id         INTEGER PRIMARY KEY AUTOINCREMENT,
-  negocio_id INTEGER NOT NULL,
+  user_id    TEXT NOT NULL,               -- Google ID del creador original
+  negocio_id INTEGER,                     -- agregado en migración 8 (nullable por ALTER TABLE)
   name       TEXT NOT NULL,                 -- 1-50 chars
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
@@ -247,7 +331,8 @@ CREATE TABLE notes (
 ```sql
 CREATE TABLE advances (
   id           INTEGER PRIMARY KEY AUTOINCREMENT,
-  negocio_id   INTEGER NOT NULL,
+  user_id      TEXT NOT NULL,               -- Google ID del creador original
+  negocio_id   INTEGER,                     -- agregado en migración 8 (nullable por ALTER TABLE)
   employee_id  INTEGER NOT NULL,
   amount       REAL NOT NULL,             -- 0.01-1,000,000
   period_month INTEGER NOT NULL,          -- 1-12
@@ -264,7 +349,8 @@ CREATE TABLE advances (
 ```sql
 CREATE TABLE salary_payments (
   id             INTEGER PRIMARY KEY AUTOINCREMENT,
-  negocio_id     INTEGER NOT NULL,
+  user_id        TEXT NOT NULL,               -- Google ID del creador original
+  negocio_id     INTEGER,                     -- agregado en migración 8 (nullable por ALTER TABLE)
   employee_id    INTEGER NOT NULL,
   period_month   INTEGER NOT NULL,
   period_year    INTEGER NOT NULL,
@@ -283,7 +369,8 @@ CREATE TABLE salary_payments (
 ```sql
 CREATE TABLE events (
   id          INTEGER PRIMARY KEY AUTOINCREMENT,
-  negocio_id  INTEGER NOT NULL,
+  user_id     TEXT NOT NULL,               -- Google ID del creador original
+  negocio_id  INTEGER,                     -- agregado en migración 8 (nullable por ALTER TABLE)
   title       TEXT NOT NULL,              -- 1-200 chars
   description TEXT,
   event_date  DATE NOT NULL,
@@ -338,7 +425,13 @@ users (Google ID)
   │                                  ├─── job_roles (1:N)
   │                                  ├─── events (1:N)
   │                                  ├─── compras (1:N)
-  │                                  └─── invitations (1:N)
+  │                                  │       └─── comprador_id ──► employees (FK opcional)
+  │                                  ├─── invitations (1:N)
+  │                                  ├─── owner_requests (1:N)
+  │                                  ├─── negocio_module_restrictions (1:N)
+  │                                  └─── usage_logs (1:N)
+  │
+  ├─── user_module_prefs (1:N, por módulo)
   │
   └─── usage_counters (scope: user_id + negocio_id)
               │
@@ -362,6 +455,6 @@ admin_emails  (standalone — consultado por isAdmin())
 
 ## Limitaciones de D1
 
-- No soporta foreign key constraints (la integridad referencial se valida en el backend).
+- No soporta foreign key constraints enforcement (la integridad referencial se valida en el backend).
 - No soporta triggers ni `PRAGMA` statements.
-- Límite de 10 GB storage y 500 req/s en Free tier.
+- Free tier: 5 GB storage, 5M reads/día, 100K writes/día, 100K requests/día.

@@ -139,6 +139,66 @@ El usuario actual abandona el negocio.
 
 ---
 
+### Sistema de Owner
+*Solo requieren autenticación (sin `X-Negocio-ID`)*
+
+#### `GET /api/negocios/:id/my-owner-request`
+Consulta el estado del usuario respecto al rol owner en un negocio.
+
+```json
+// Response data
+{ "status": "none" }       // No es owner ni tiene solicitud
+{ "status": "owner" }      // Ya es owner
+{ "status": "pending" }    // Solicitud pendiente de aprobación
+```
+
+#### `POST /api/negocios/:id/request-owner`
+Solicita ser `owner` del negocio. Crea un registro en `owner_requests` con `status = 'pending'`.
+
+#### `GET /api/negocios/:id/owner-requests`
+Lista las solicitudes de owner pendientes (solo owners del negocio).
+
+```json
+// Response data (array)
+[{
+  "id": 1,
+  "user_id": "google_sub_456",
+  "user_name": "María García",
+  "user_email": "maria@example.com",
+  "status": "pending",
+  "requested_at": "2026-04-01T10:00:00Z"
+}]
+```
+
+#### `POST /api/negocios/:id/owner-requests/:requestId/approve`
+Aprueba una solicitud de owner (solo owners). Actualiza `negocio_members.negocio_role` a `'owner'`.
+
+#### `POST /api/negocios/:id/owner-requests/:requestId/reject`
+Rechaza una solicitud de owner (solo owners).
+
+---
+
+### Restricciones de Módulos
+*Solo requieren autenticación (sin `X-Negocio-ID`)*
+
+#### `GET /api/negocios/:id/module-restrictions`
+Obtiene las restricciones de módulos del negocio (cualquier miembro puede consultar).
+
+```json
+// Response data
+{ "calendario": false, "personal": false, "sueldos": false, "compras": false }
+```
+
+#### `PUT /api/negocios/:id/module-restrictions`
+Activa o desactiva la restricción de un módulo para los gerentes (solo owners).
+
+```json
+// Request
+{ "module_key": "compras", "is_restricted": true }
+```
+
+---
+
 ### Preferencias de Módulos
 *Solo requieren autenticación (sin `X-Negocio-ID`)*
 
@@ -163,7 +223,7 @@ Las restricciones por negocio del owner viven aparte en `GET/PUT /api/negocios/:
 ---
 
 ### Empleados
-*Requieren `X-Negocio-ID`*
+*Requieren `X-Negocio-ID`* ⚠️ *Restringible por owner (módulo `personal`)*
 
 #### `GET /api/employees`
 Lista todos los empleados del negocio activo.
@@ -196,7 +256,7 @@ Elimina un empleado.
 ---
 
 ### Puestos de Trabajo
-*Requieren `X-Negocio-ID`*
+*Requieren `X-Negocio-ID`* ⚠️ *Restringible por owner (módulo `personal`)*
 
 #### `GET /api/job-roles`
 Lista los puestos personalizados del negocio.
@@ -212,7 +272,7 @@ Elimina un puesto personalizado.
 ---
 
 ### Tópicos
-*Requieren `X-Negocio-ID`*
+*Requieren `X-Negocio-ID`* ⚠️ *Restringible por owner (módulo `personal`)*
 
 #### `GET /api/employees/:employeeId/topics`
 Lista los tópicos de un empleado.
@@ -251,7 +311,7 @@ Lista todos los tópicos abiertos con fecha límite del negocio.
 ---
 
 ### Notas
-*Requieren `X-Negocio-ID`*
+*Requieren `X-Negocio-ID`* ⚠️ *Restringible por owner (módulo `personal`)*
 
 #### `GET /api/topics/:topicId/notes`
 Lista las notas de un tópico.
@@ -270,7 +330,7 @@ Elimina una nota.
 ---
 
 ### Eventos
-*Requieren `X-Negocio-ID`*
+*Requieren `X-Negocio-ID`* ⚠️ *Restringible por owner (módulo `calendario`)*
 
 #### `GET /api/events`
 Lista eventos del negocio. Soporta filtros por mes y año.
@@ -304,7 +364,7 @@ Elimina un evento.
 ---
 
 ### Sueldos
-*Requieren `X-Negocio-ID`*
+*Requieren `X-Negocio-ID`* ⚠️ *Restringible por owner (módulo `sueldos`)*
 
 #### `GET /api/salaries/overview`
 Resumen de sueldos del mes para todos los empleados activos.
@@ -337,7 +397,7 @@ GET /api/salaries/overview?month=4&year=2026
 ---
 
 ### Anticipos
-*Requieren `X-Negocio-ID`*
+*Requieren `X-Negocio-ID`* ⚠️ *Restringible por owner (módulo `sueldos`)*
 
 #### `GET /api/employees/:employeeId/advances`
 Lista anticipos de un empleado. Filtrable por `month` y `year`.
@@ -359,7 +419,7 @@ Elimina un anticipo.
 ---
 
 ### Pagos de Sueldo
-*Requieren `X-Negocio-ID`*
+*Requieren `X-Negocio-ID`* ⚠️ *Restringible por owner (módulo `sueldos`)*
 
 #### `GET /api/salary-payments`
 Lista los registros de pago del negocio.
@@ -418,7 +478,13 @@ GET /api/compras/summary?month=4&year=2026
 
 ```json
 // Response data (array de totales por día)
-[{ "fecha": "2026-04-10", "total": 3500.00 }]
+[{
+  "fecha": "2026-04-10",
+  "total_dia": 3500.00,
+  "total_productos": 2800.00,
+  "total_servicios": 700.00,
+  "cantidad": 3
+}]
 ```
 
 #### `POST /api/compras` ⚠️ *Sujeto a cuota `compras` · Restringible por owner*
@@ -445,7 +511,29 @@ Registra una nueva compra.
 Actualiza una compra (todos los campos opcionales, mismos valores válidos que POST).
 
 #### `DELETE /api/compras/:id` ⚠️ *Restringible por owner*
-Elimina una compra.
+Elimina una compra. Si tiene `comprobante_key`, también elimina el archivo de R2.
+
+#### `POST /api/compras/upload` ⚠️ *Restringible por owner*
+Sube una imagen de comprobante a Cloudflare R2.
+
+```
+Content-Type: multipart/form-data
+Body: file (campo "file")
+```
+
+**Restricciones:**
+- Tamaño máximo: 5 MB
+- Tipos aceptados: `image/jpeg`, `image/png`, `image/webp`, `image/heic`
+
+```json
+// Response data
+{ "key": "compras/1/abc123.jpg" }
+```
+
+La key devuelta se usa como `comprobante_key` al crear o actualizar la compra.
+
+#### `GET /api/compras/files/*` ⚠️ *Requiere `X-Negocio-ID`*
+Sirve una imagen de comprobante desde R2. La ruta debe estar scoped al negocio actual.
 
 ---
 

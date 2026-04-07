@@ -103,13 +103,29 @@ type Env = {
 };
 ```
 
-**Nota:** R2 está configurado pero actualmente no se usa. Está disponible para almacenamiento de archivos en el futuro.
+**Nota:** R2 se usa activamente en el módulo de **Compras** para almacenar comprobantes (imágenes de recibos). Los endpoints `POST /api/compras/upload` y `GET /api/compras/files/*` leen y escriben en este bucket.
 
 ---
 
 ## Migraciones de Base de Datos
 
-Las migraciones SQL están en `migrations/` (archivos `1.sql` a `10.sql`). Son **inmutables** — una vez aplicadas no se modifican.
+Las migraciones SQL están en `migrations/` (archivos `1.sql` a `13.sql`). Son **inmutables** — una vez aplicadas no se modifican.
+
+| Migración | Contenido |
+|-----------|-----------|
+| `1.sql` | Tablas `employees`, `topics`, `notes` |
+| `2.sql` | Tabla `events` |
+| `3.sql` | Columnas `due_date`/`due_time` en `topics` |
+| `4.sql` | Columna `monthly_salary` en `employees` |
+| `5.sql` | Tablas `advances`, `salary_payments` |
+| `6.sql` | Tabla `job_roles` |
+| `7.sql` | Tablas `admin_emails`, `usage_logs` |
+| `8.sql` | Tablas `negocios`, `negocio_members`, `invitations` + `negocio_id` en tablas existentes |
+| `9.sql` | Tabla `users` |
+| `10.sql` | Tablas `usage_counters`, `usage_limits` con seed de límites |
+| `11.sql` | Tabla `user_module_prefs` |
+| `12.sql` | Columna `negocio_role` en `negocio_members`, tablas `owner_requests`, `negocio_module_restrictions` |
+| `13.sql` | Tabla `compras` |
 
 ### Aplicar en desarrollo
 
@@ -127,10 +143,10 @@ wrangler d1 migrations apply gastro-manager-db
 
 ### Crear nueva migración
 
-Crear un nuevo archivo SQL numerado en `migrations/`, por ejemplo `11.sql`:
+Crear un nuevo archivo SQL numerado en `migrations/`, por ejemplo `14.sql`:
 
 ```sql
--- migrations/11.sql
+-- migrations/14.sql
 ALTER TABLE employees ADD COLUMN nueva_columna TEXT;
 ```
 
