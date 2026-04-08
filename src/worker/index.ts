@@ -3130,12 +3130,22 @@ app.post("/api/facturacion",
       }
       const d = validation.data!;
       const now = new Date().toISOString();
+      // Determine metodo_pago from pagos_detalle if present
+      let metodoPago = d.metodo_pago ?? null;
+      if (d.pagos_detalle) {
+        try {
+          const pagos: { metodo_pago: string; monto: number }[] = JSON.parse(d.pagos_detalle);
+          metodoPago = pagos.length === 1 ? pagos[0].metodo_pago as typeof metodoPago : "mixto";
+        } catch {
+          // keep provided metodo_pago
+        }
+      }
       const result = await db
         .prepare(
-          `INSERT INTO facturas (negocio_id, user_id, fecha, monto_total, metodo_pago, concepto, numero_comprobante, notas, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING *`
+          `INSERT INTO facturas (negocio_id, user_id, fecha, monto_total, metodo_pago, concepto, numero_comprobante, notas, turno, pagos_detalle, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING *`
         )
-        .bind(negocio.id, user.id, d.fecha, d.monto_total, d.metodo_pago, d.concepto ?? null, d.numero_comprobante ?? null, d.notas ?? null, now, now)
+        .bind(negocio.id, user.id, d.fecha, d.monto_total, metodoPago, d.concepto ?? null, d.numero_comprobante ?? null, d.notas ?? null, d.turno ?? null, d.pagos_detalle ?? null, now, now)
         .first();
       await logUsage(db, user.id, negocio.id, "create", "factura");
       return c.json(apiResponse(result), 201);
@@ -3176,10 +3186,29 @@ app.put("/api/facturacion/:id",
       const values: unknown[] = [];
       if (d.fecha !== undefined)              { fields.push("fecha = ?");              values.push(d.fecha); }
       if (d.monto_total !== undefined)        { fields.push("monto_total = ?");        values.push(d.monto_total); }
-      if (d.metodo_pago !== undefined)        { fields.push("metodo_pago = ?");        values.push(d.metodo_pago); }
+      if (d.pagos_detalle !== undefined) {
+        // Recalculate metodo_pago from pagos_detalle
+        let metodoPago = d.metodo_pago ?? null;
+        if (d.pagos_detalle) {
+          try {
+            const pagos: { metodo_pago: string; monto: number }[] = JSON.parse(d.pagos_detalle);
+            metodoPago = pagos.length === 1 ? pagos[0].metodo_pago as typeof metodoPago : "mixto";
+          } catch {
+            // keep provided metodo_pago
+          }
+        }
+        fields.push("metodo_pago = ?");
+        values.push(metodoPago);
+        fields.push("pagos_detalle = ?");
+        values.push(d.pagos_detalle ?? null);
+      } else if (d.metodo_pago !== undefined) {
+        fields.push("metodo_pago = ?");
+        values.push(d.metodo_pago ?? null);
+      }
       if (d.concepto !== undefined)           { fields.push("concepto = ?");           values.push(d.concepto ?? null); }
       if (d.numero_comprobante !== undefined) { fields.push("numero_comprobante = ?"); values.push(d.numero_comprobante ?? null); }
       if (d.notas !== undefined)              { fields.push("notas = ?");              values.push(d.notas ?? null); }
+      if (d.turno !== undefined)              { fields.push("turno = ?");              values.push(d.turno ?? null); }
       fields.push("updated_at = ?");
       values.push(now);
       values.push(id);

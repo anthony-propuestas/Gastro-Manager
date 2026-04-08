@@ -1,6 +1,11 @@
 import { X, Pencil, Trash2 } from "lucide-react";
 import { useToast } from "@/react-app/components/ui/toast";
-import { useFacturacion, METODOS_PAGO, type Factura } from "@/react-app/hooks/useFacturacion";
+import {
+  useFacturacion,
+  METODOS_PAGO,
+  parsePagosDetalle,
+  type Factura,
+} from "@/react-app/hooks/useFacturacion";
 
 interface DayDetailModalProps {
   isOpen: boolean;
@@ -42,6 +47,83 @@ export default function DayDetailModal({ isOpen, onClose, fecha, facturas, onEdi
 
   if (!isOpen) return null;
 
+  // Group by turno
+  const grupoMañana = facturas.filter((f) => f.turno === "mañana");
+  const grupoTarde  = facturas.filter((f) => f.turno === "tarde");
+  const sinTurno    = facturas.filter((f) => !f.turno);
+  const hayTurnos   = grupoMañana.length > 0 || grupoTarde.length > 0;
+
+  const renderFactura = (f: Factura) => {
+    const pagos = parsePagosDetalle(f.pagos_detalle);
+    return (
+      <div key={f.id} className="p-4 hover:bg-muted/30 transition-colors">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              {pagos.length > 1 ? (
+                pagos.map((p, i) => (
+                  <span key={i} className="text-sm font-medium">
+                    {getMetodoLabel(p.metodo_pago)}{" "}
+                    <span className="text-muted-foreground">{formatCurrency(p.monto)}</span>
+                    {i < pagos.length - 1 && <span className="mx-1 text-muted-foreground">·</span>}
+                  </span>
+                ))
+              ) : (
+                <span className="font-medium">{getMetodoLabel(f.metodo_pago ?? "")}</span>
+              )}
+              {f.numero_comprobante && (
+                <span className="text-xs px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground">
+                  #{f.numero_comprobante}
+                </span>
+              )}
+            </div>
+            {f.concepto && (
+              <p className="text-sm text-muted-foreground mt-1">{f.concepto}</p>
+            )}
+            {f.notas && (
+              <p className="text-sm text-muted-foreground mt-1 italic">{f.notas}</p>
+            )}
+          </div>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <span className="font-semibold text-lg">{formatCurrency(f.monto_total)}</span>
+            <div className="flex gap-1">
+              <button
+                onClick={() => onEdit(f)}
+                className="p-1.5 rounded-md hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
+              >
+                <Pencil className="w-3.5 h-3.5" />
+              </button>
+              <button
+                onClick={() => handleDelete(f)}
+                className="p-1.5 rounded-md hover:bg-destructive/10 transition-colors text-muted-foreground hover:text-destructive"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderSection = (label: string, icon: string, items: Factura[]) => {
+    if (items.length === 0) return null;
+    const sectionTotal = items.reduce((s, f) => s + f.monto_total, 0);
+    return (
+      <div>
+        <div className="flex items-center justify-between px-4 py-2 bg-muted/40 border-y border-border">
+          <span className="text-sm font-semibold text-muted-foreground">
+            {icon} {label}
+          </span>
+          <span className="text-sm font-semibold">{formatCurrency(sectionTotal)}</span>
+        </div>
+        <div className="divide-y divide-border">
+          {items.map(renderFactura)}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
@@ -67,46 +149,22 @@ export default function DayDetailModal({ isOpen, onClose, fecha, facturas, onEdi
         </div>
 
         {/* Items list */}
-        <div className="overflow-y-auto flex-1 divide-y divide-border">
-          {facturas.map((f) => (
-            <div key={f.id} className="p-4 hover:bg-muted/30 transition-colors">
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-medium">{getMetodoLabel(f.metodo_pago)}</span>
-                    {f.numero_comprobante && (
-                      <span className="text-xs px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground">
-                        #{f.numero_comprobante}
-                      </span>
-                    )}
-                  </div>
-                  {f.concepto && (
-                    <p className="text-sm text-muted-foreground mt-1">{f.concepto}</p>
-                  )}
-                  {f.notas && (
-                    <p className="text-sm text-muted-foreground mt-1 italic">{f.notas}</p>
-                  )}
+        <div className="overflow-y-auto flex-1">
+          {hayTurnos ? (
+            <>
+              {renderSection("Turno mañana", "☀️", grupoMañana)}
+              {renderSection("Turno tarde", "🌙", grupoTarde)}
+              {sinTurno.length > 0 && (
+                <div className="divide-y divide-border">
+                  {sinTurno.map(renderFactura)}
                 </div>
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  <span className="font-semibold text-lg">{formatCurrency(f.monto_total)}</span>
-                  <div className="flex gap-1">
-                    <button
-                      onClick={() => onEdit(f)}
-                      className="p-1.5 rounded-md hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
-                    >
-                      <Pencil className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      onClick={() => handleDelete(f)}
-                      className="p-1.5 rounded-md hover:bg-destructive/10 transition-colors text-muted-foreground hover:text-destructive"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                </div>
-              </div>
+              )}
+            </>
+          ) : (
+            <div className="divide-y divide-border">
+              {facturas.map(renderFactura)}
             </div>
-          ))}
+          )}
         </div>
       </div>
     </div>

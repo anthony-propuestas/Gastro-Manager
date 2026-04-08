@@ -3,7 +3,12 @@ import { X, Pencil, Trash2, Search } from "lucide-react";
 import { Button } from "@/react-app/components/ui/button";
 import { Input } from "@/react-app/components/ui/input";
 import { useToast } from "@/react-app/components/ui/toast";
-import { useFacturacion, METODOS_PAGO, type Factura } from "@/react-app/hooks/useFacturacion";
+import {
+  useFacturacion,
+  METODOS_PAGO,
+  parsePagosDetalle,
+  type Factura,
+} from "@/react-app/hooks/useFacturacion";
 import FacturaModal from "./FacturaModal";
 
 interface FacturasHistoryModalProps {
@@ -18,6 +23,7 @@ export default function FacturasHistoryModal({ isOpen, onClose, facturas, onChan
   const { showToast } = useToast();
   const [search, setSearch] = useState("");
   const [filterMetodo, setFilterMetodo] = useState("");
+  const [filterTurno, setFilterTurno] = useState("");
   const [editingFactura, setEditingFactura] = useState<Factura | null>(null);
 
   const getMetodoLabel = (value: string) =>
@@ -28,7 +34,9 @@ export default function FacturasHistoryModal({ isOpen, onClose, facturas, onChan
       (f.concepto?.toLowerCase().includes(search.toLowerCase())) ||
       (f.numero_comprobante?.toLowerCase().includes(search.toLowerCase()));
     const matchesMetodo = !filterMetodo || f.metodo_pago === filterMetodo;
-    return matchesSearch && matchesMetodo;
+    const matchesTurno = !filterTurno ||
+      (filterTurno === "sin_turno" ? !f.turno : f.turno === filterTurno);
+    return matchesSearch && matchesMetodo && matchesTurno;
   });
 
   const handleDelete = async (factura: Factura) => {
@@ -51,6 +59,12 @@ export default function FacturasHistoryModal({ isOpen, onClose, facturas, onChan
     return d.toLocaleDateString("es-MX", { day: "numeric", month: "short" });
   };
 
+  const turnoLabel = (turno: string | null) => {
+    if (turno === "mañana") return "☀️ Mañana";
+    if (turno === "tarde")  return "🌙 Tarde";
+    return "—";
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -71,8 +85,8 @@ export default function FacturasHistoryModal({ isOpen, onClose, facturas, onChan
           </div>
 
           {/* Filters */}
-          <div className="flex gap-3 p-4 border-b border-border">
-            <div className="relative flex-1">
+          <div className="flex flex-wrap gap-2 p-4 border-b border-border">
+            <div className="relative flex-1 min-w-40">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
                 value={search}
@@ -90,6 +104,17 @@ export default function FacturasHistoryModal({ isOpen, onClose, facturas, onChan
               {METODOS_PAGO.map((m) => (
                 <option key={m.value} value={m.value}>{m.label}</option>
               ))}
+              <option value="mixto">Mixto</option>
+            </select>
+            <select
+              value={filterTurno}
+              onChange={(e) => setFilterTurno(e.target.value)}
+              className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+            >
+              <option value="">Todos los turnos</option>
+              <option value="mañana">☀️ Mañana</option>
+              <option value="tarde">🌙 Tarde</option>
+              <option value="sin_turno">Sin turno</option>
             </select>
           </div>
 
@@ -104,38 +129,56 @@ export default function FacturasHistoryModal({ isOpen, onClose, facturas, onChan
                 <thead className="bg-muted/50 border-b border-border sticky top-0">
                   <tr>
                     <th className="text-left p-3 font-medium text-sm">Fecha</th>
-                    <th className="text-left p-3 font-medium text-sm">Método</th>
+                    <th className="text-left p-3 font-medium text-sm">Turno</th>
+                    <th className="text-left p-3 font-medium text-sm">Método(s)</th>
                     <th className="text-right p-3 font-medium text-sm">Monto</th>
                     <th className="text-left p-3 font-medium text-sm hidden sm:table-cell">Concepto</th>
                     <th className="text-center p-3 font-medium text-sm">Acciones</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
-                  {filtered.map((f) => (
-                    <tr key={f.id} className="hover:bg-muted/30 transition-colors">
-                      <td className="p-3 text-sm">{formatDate(f.fecha)}</td>
-                      <td className="p-3">
-                        <span className="text-sm font-medium">{getMetodoLabel(f.metodo_pago)}</span>
-                        {f.numero_comprobante && (
-                          <div className="text-xs text-muted-foreground">#{f.numero_comprobante}</div>
-                        )}
-                      </td>
-                      <td className="p-3 text-right font-semibold text-sm">{formatCurrency(f.monto_total)}</td>
-                      <td className="p-3 text-sm text-muted-foreground hidden sm:table-cell">
-                        {f.concepto || "—"}
-                      </td>
-                      <td className="p-3">
-                        <div className="flex items-center justify-center gap-1">
-                          <Button size="sm" variant="outline" onClick={() => setEditingFactura(f)}>
-                            <Pencil className="w-3.5 h-3.5" />
-                          </Button>
-                          <Button size="sm" variant="outline" onClick={() => handleDelete(f)} className="text-destructive hover:text-destructive">
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </Button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                  {filtered.map((f) => {
+                    const pagos = parsePagosDetalle(f.pagos_detalle);
+                    return (
+                      <tr key={f.id} className="hover:bg-muted/30 transition-colors">
+                        <td className="p-3 text-sm">{formatDate(f.fecha)}</td>
+                        <td className="p-3 text-sm">{turnoLabel(f.turno)}</td>
+                        <td className="p-3">
+                          {pagos.length > 1 ? (
+                            <div className="flex flex-wrap gap-1">
+                              {pagos.map((p, i) => (
+                                <span
+                                  key={i}
+                                  className="text-xs px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground"
+                                >
+                                  {getMetodoLabel(p.metodo_pago)}
+                                </span>
+                              ))}
+                            </div>
+                          ) : (
+                            <span className="text-sm font-medium">{getMetodoLabel(f.metodo_pago ?? "")}</span>
+                          )}
+                          {f.numero_comprobante && (
+                            <div className="text-xs text-muted-foreground">#{f.numero_comprobante}</div>
+                          )}
+                        </td>
+                        <td className="p-3 text-right font-semibold text-sm">{formatCurrency(f.monto_total)}</td>
+                        <td className="p-3 text-sm text-muted-foreground hidden sm:table-cell">
+                          {f.concepto || "—"}
+                        </td>
+                        <td className="p-3">
+                          <div className="flex items-center justify-center gap-1">
+                            <Button size="sm" variant="outline" onClick={() => setEditingFactura(f)}>
+                              <Pencil className="w-3.5 h-3.5" />
+                            </Button>
+                            <Button size="sm" variant="outline" onClick={() => handleDelete(f)} className="text-destructive hover:text-destructive">
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             )}

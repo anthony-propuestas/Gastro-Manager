@@ -1,17 +1,32 @@
 import { useState, useEffect } from "react";
-import { X } from "lucide-react";
+import { X, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/react-app/components/ui/button";
 import { Input } from "@/react-app/components/ui/input";
 import { Label } from "@/react-app/components/ui/label";
 import { Textarea } from "@/react-app/components/ui/textarea";
 import { useToast } from "@/react-app/components/ui/toast";
-import { useFacturacion, METODOS_PAGO, type Factura, type FacturaInput } from "@/react-app/hooks/useFacturacion";
+import {
+  useFacturacion,
+  METODOS_PAGO_SELECCIONABLES,
+  parsePagosDetalle,
+  type Factura,
+  type FacturaInput,
+  type MetodoPago,
+  type PagoDetalle,
+  type Turno,
+} from "@/react-app/hooks/useFacturacion";
 
 interface FacturaModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSaved: () => void;
   factura?: Factura | null;
+}
+
+const DEFAULT_METODO: MetodoPago = "efectivo";
+
+function newPagoRow(): PagoDetalle {
+  return { metodo_pago: DEFAULT_METODO, monto: 0 };
 }
 
 export default function FacturaModal({ isOpen, onClose, onSaved, factura }: FacturaModalProps) {
@@ -21,8 +36,8 @@ export default function FacturaModal({ isOpen, onClose, onSaved, factura }: Fact
   const today = new Date().toISOString().split("T")[0];
 
   const [fecha, setFecha] = useState(today);
-  const [monto, setMonto] = useState("");
-  const [metodoPago, setMetodoPago] = useState<FacturaInput["metodo_pago"]>("efectivo");
+  const [turno, setTurno] = useState<Turno | "">("");
+  const [paymentRows, setPaymentRows] = useState<PagoDetalle[]>([newPagoRow()]);
   const [concepto, setConcepto] = useState("");
   const [numeroComprobante, setNumeroComprobante] = useState("");
   const [notas, setNotas] = useState("");
@@ -31,31 +46,61 @@ export default function FacturaModal({ isOpen, onClose, onSaved, factura }: Fact
 
   const isEditing = !!factura;
 
+  // Computed total from rows
+  const computedTotal = paymentRows.reduce((s, r) => s + (r.monto || 0), 0);
+
   useEffect(() => {
-    if (factura && isOpen) {
-      setFecha(factura.fecha);
-      setMonto(String(factura.monto_total));
-      setMetodoPago(factura.metodo_pago);
-      setConcepto(factura.concepto || "");
-      setNumeroComprobante(factura.numero_comprobante || "");
-      setNotas(factura.notas || "");
-    } else if (isOpen) {
-      setFecha(today);
-      setMonto("");
-      setMetodoPago("efectivo");
-      setConcepto("");
-      setNumeroComprobante("");
-      setNotas("");
+    if (isOpen) {
+      if (factura) {
+        setFecha(factura.fecha);
+        setTurno(factura.turno ?? "");
+        setConcepto(factura.concepto || "");
+        setNumeroComprobante(factura.numero_comprobante || "");
+        setNotas(factura.notas || "");
+        const pagos = parsePagosDetalle(factura.pagos_detalle);
+        if (pagos.length > 0) {
+          setPaymentRows(pagos);
+        } else {
+          // Single-method legacy record
+          setPaymentRows([{
+            metodo_pago: (factura.metodo_pago as MetodoPago) || DEFAULT_METODO,
+            monto: factura.monto_total,
+          }]);
+        }
+      } else {
+        setFecha(today);
+        setTurno("");
+        setPaymentRows([newPagoRow()]);
+        setConcepto("");
+        setNumeroComprobante("");
+        setNotas("");
+      }
+      setError(null);
     }
-    setError(null);
   }, [factura, isOpen, today]);
+
+  // Payment row helpers
+  const updateRow = (idx: number, field: keyof PagoDetalle, value: string | number) => {
+    setPaymentRows((rows) =>
+      rows.map((r, i) =>
+        i === idx ? { ...r, [field]: field === "monto" ? Number(value) : value } : r
+      )
+    );
+  };
+
+  const addRow = () => setPaymentRows((rows) => [...rows, newPagoRow()]);
+
+  const removeRow = (idx: number) => {
+    if (paymentRows.length === 1) return; // keep at least one row
+    setPaymentRows((rows) => rows.filter((_, i) => i !== idx));
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    const numMonto = parseFloat(monto);
-    if (!numMonto || numMonto <= 0) {
-      setError("El monto debe ser mayor a cero");
+    const validRows = paymentRows.filter((r) => r.monto > 0);
+    if (validRows.length === 0) {
+      setError("Debés ingresar al menos un monto mayor a cero");
       return;
     }
     if (!fecha) {
@@ -63,14 +108,19 @@ export default function FacturaModal({ isOpen, onClose, onSaved, factura }: Fact
       return;
     }
 
+    const total = validRows.reduce((s, r) => s + r.monto, 0);
+    const metodo: MetodoPago = validRows.length === 1 ? validRows[0].metodo_pago : "mixto";
+
     setError(null);
     setIsSubmitting(true);
 
     try {
       const input: FacturaInput = {
         fecha,
-        monto_total: numMonto,
-        metodo_pago: metodoPago,
+        monto_total: total,
+        metodo_pago: metodo,
+        turno: turno || null,
+        pagos_detalle: validRows.length > 1 ? JSON.stringify(validRows) : null,
         concepto: concepto.trim() || null,
         numero_comprobante: numeroComprobante.trim() || null,
         notas: notas.trim() || null,
@@ -99,6 +149,8 @@ export default function FacturaModal({ isOpen, onClose, onSaved, factura }: Fact
 
   if (!isOpen) return null;
 
+  const multipleRows = paymentRows.length > 1;
+
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
@@ -125,6 +177,7 @@ export default function FacturaModal({ isOpen, onClose, onSaved, factura }: Fact
             </div>
           )}
 
+          {/* Fecha + Turno */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="fecha">Fecha *</Label>
@@ -137,32 +190,77 @@ export default function FacturaModal({ isOpen, onClose, onSaved, factura }: Fact
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="monto">Monto total *</Label>
-              <Input
-                id="monto"
-                type="number"
-                step="0.01"
-                min="0.01"
-                value={monto}
-                onChange={(e) => setMonto(e.target.value)}
-                placeholder="0.00"
-                required
-              />
+              <Label htmlFor="turno">Turno</Label>
+              <select
+                id="turno"
+                value={turno}
+                onChange={(e) => setTurno(e.target.value as Turno | "")}
+                className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm"
+              >
+                <option value="">Sin turno</option>
+                <option value="mañana">Turno mañana</option>
+                <option value="tarde">Turno tarde</option>
+              </select>
             </div>
           </div>
 
+          {/* Métodos de pago */}
           <div className="space-y-2">
-            <Label htmlFor="metodo_pago">Método de pago *</Label>
-            <select
-              id="metodo_pago"
-              value={metodoPago}
-              onChange={(e) => setMetodoPago(e.target.value as FacturaInput["metodo_pago"])}
-              className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm"
-            >
-              {METODOS_PAGO.map((m) => (
-                <option key={m.value} value={m.value}>{m.label}</option>
+            <div className="flex items-center justify-between">
+              <Label>Métodos de pago *</Label>
+              <button
+                type="button"
+                onClick={addRow}
+                className="flex items-center gap-1 text-xs text-primary hover:underline"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                Agregar método
+              </button>
+            </div>
+
+            <div className="space-y-2">
+              {paymentRows.map((row, idx) => (
+                <div key={idx} className="flex gap-2 items-center">
+                  <select
+                    value={row.metodo_pago}
+                    onChange={(e) => updateRow(idx, "metodo_pago", e.target.value)}
+                    className="flex-1 h-10 rounded-md border border-input bg-background px-3 text-sm"
+                  >
+                    {METODOS_PAGO_SELECCIONABLES.map((m) => (
+                      <option key={m.value} value={m.value}>{m.label}</option>
+                    ))}
+                  </select>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={row.monto === 0 ? "" : row.monto}
+                    onChange={(e) => updateRow(idx, "monto", e.target.value)}
+                    placeholder="0.00"
+                    className="w-28"
+                  />
+                  {paymentRows.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => removeRow(idx)}
+                      className="p-2 rounded-md hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
               ))}
-            </select>
+            </div>
+
+            {/* Total visual */}
+            <div className={`flex justify-between text-sm pt-1 ${multipleRows ? "border-t border-border" : ""}`}>
+              {multipleRows && (
+                <span className="text-muted-foreground">Total calculado</span>
+              )}
+              <span className={`font-semibold ml-auto ${computedTotal <= 0 ? "text-muted-foreground" : ""}`}>
+                {new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" }).format(computedTotal)}
+              </span>
+            </div>
           </div>
 
           <div className="space-y-2">

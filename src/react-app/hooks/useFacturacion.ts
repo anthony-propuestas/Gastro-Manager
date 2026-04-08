@@ -8,7 +8,10 @@ export type MetodoPago =
   | "tarjeta_debito"
   | "transferencia"
   | "mercado_pago"
+  | "mixto"
   | "otros";
+
+export type Turno = "mañana" | "tarde";
 
 export const METODOS_PAGO: { value: MetodoPago; label: string }[] = [
   { value: "efectivo",        label: "Efectivo" },
@@ -19,16 +22,25 @@ export const METODOS_PAGO: { value: MetodoPago; label: string }[] = [
   { value: "otros",           label: "Otros" },
 ];
 
+export const METODOS_PAGO_SELECCIONABLES = METODOS_PAGO; // sin "mixto" — se calcula automáticamente
+
+export interface PagoDetalle {
+  metodo_pago: MetodoPago;
+  monto: number;
+}
+
 export interface Factura {
   id: number;
   negocio_id: number;
   user_id: string;
   fecha: string;
   monto_total: number;
-  metodo_pago: MetodoPago;
+  metodo_pago: MetodoPago | null;
   concepto: string | null;
   numero_comprobante: string | null;
   notas: string | null;
+  turno: Turno | null;
+  pagos_detalle: string | null; // JSON string de PagoDetalle[]
   created_at: string;
   updated_at: string;
 }
@@ -36,16 +48,28 @@ export interface Factura {
 export interface FacturaInput {
   fecha: string;
   monto_total: number;
-  metodo_pago: MetodoPago;
+  metodo_pago?: MetodoPago | null;
   concepto?: string | null;
   numero_comprobante?: string | null;
   notas?: string | null;
+  turno?: Turno | null;
+  pagos_detalle?: string | null;
 }
 
 export interface FacturaDailySummary {
   fecha: string;
   total_dia: number;
   cantidad: number;
+}
+
+/** Parsea pagos_detalle desde string JSON. Retorna array vacío si falla. */
+export function parsePagosDetalle(raw: string | null): PagoDetalle[] {
+  if (!raw) return [];
+  try {
+    return JSON.parse(raw) as PagoDetalle[];
+  } catch {
+    return [];
+  }
 }
 
 export function useFacturacion() {

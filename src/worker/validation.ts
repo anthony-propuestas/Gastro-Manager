@@ -181,10 +181,12 @@ export const updateCompraSchema = createCompraSchema.partial();
 export const createFacturaSchema = z.object({
   fecha: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Fecha inválida"),
   monto_total: z.number().positive("El monto debe ser positivo").max(10000000, "Monto muy alto"),
-  metodo_pago: z.enum(["efectivo", "tarjeta_credito", "tarjeta_debito", "transferencia", "mercado_pago", "otros"]),
+  metodo_pago: z.enum(["efectivo", "tarjeta_credito", "tarjeta_debito", "transferencia", "mercado_pago", "mixto", "otros"]).optional().nullable(),
   concepto: z.string().max(200, "Concepto muy largo").optional().nullable(),
   numero_comprobante: z.string().max(50, "Número de comprobante muy largo").optional().nullable(),
   notas: z.string().max(500, "Notas muy largas").optional().nullable(),
+  turno: z.enum(["mañana", "tarde"]).optional().nullable(),
+  pagos_detalle: z.string().max(2000, "Pagos detalle muy largo").optional().nullable(),
 });
 
 export const updateFacturaSchema = createFacturaSchema.partial();
