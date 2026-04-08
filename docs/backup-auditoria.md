@@ -13,16 +13,21 @@ Comparación entre lo que describe `docs/backup.md` y lo que ejecuta `.github/wo
 
 | Severidad | Cantidad | Descripción |
 |---|---|---|
-| 🔴 Crítica | 1 | Comportamiento real opuesto a lo documentado |
-| 🟡 Menor | 5 | Detalles de implementación no documentados |
+| 🟡 Menor | 4 | Hallazgos vigentes de contexto operativo |
+
+## Estado actual
+
+`docs/backup.md` fue corregido después de esta auditoría inicial y hoy ya describe correctamente el comportamiento de `rclone sync`, incluida la propagación de borrados.
+
+Este documento se conserva como registro histórico del desajuste detectado el 2026-04-07, pero la diferencia crítica original entre `backup.md` y `.github/workflows/backup.yml` ya no aplica al estado actual del repositorio.
 
 ---
 
-## 🔴 Diferencia Crítica
+## Hallazgo histórico resuelto
 
 ### 1. Propagación de borrados en el backup de R2
 
-**Lo que dice la documentación (`backup.md`, sección "Componente 2 — Archivos (R2)"):**
+**Lo que decía la documentación en el momento de la auditoría (`backup.md`, sección "Componente 2 — Archivos (R2)"):**
 
 > "Si un archivo es eliminado en producción, **permanece en el backup** (no se propaga el borrado)."
 
@@ -53,7 +58,7 @@ Cuando un usuario elimina una compra desde la app (`DELETE /api/compras/:id`), e
 | B — Mantener `sync` y corregir la documentación | Sin cambio de código | El backup de archivos refleja el estado actual de producción, no un historial |
 | C — Agregar `--backup-dir` | `rclone sync --backup-dir [ruta]` | Los archivos borrados se mueven a un directorio de historial en lugar de eliminarse |
 
-La opción B es la más honesta si el objetivo es tener una réplica del estado actual. La opción A es mejor si el objetivo es conservar comprobantes incluso después de borrarlos.
+La opción B fue la adoptada posteriormente en la documentación principal: hoy `backup.md` ya deja explícito que el backup de archivos es una réplica del estado actual y no un historial.
 
 ---
 
@@ -66,9 +71,9 @@ La opción B es la más honesta si el objetivo es tener una réplica del estado 
 --s3-no-check-bucket
 ```
 
-**En la documentación:** no mencionado.
+**En la documentación actual:** ya mencionado en `backup.md`.
 
-**Por qué importa:** Este flag le indica a rclone que no intente verificar ni crear el bucket antes de operar. Sin él, rclone haría una llamada de verificación que requeriría permisos de administrador de bucket (no solo Object Read & Write). Al documentar los permisos mínimos requeridos, omitir este flag puede llevar a errores de autenticación si alguien replica la configuración sin incluirlo.
+**Por qué importa:** Fue un detalle faltante al momento de la auditoría original. Hoy la documentación principal ya aclara que este flag evita verificaciones de bucket que requerirían permisos más altos que Object Read & Write.
 
 ---
 
@@ -148,10 +153,10 @@ Riesgo actual: bajo (Cloudflare Workers runners son efímeros y desechados tras 
 | Herramienta D1: `wrangler d1 export` | `wrangler d1 export ... --remote` | ✅ Correcto |
 | Destino del SQL: `/backups/d1/YYYY-MM-DD/` | `backups/d1/${DATE}/gastro-manager-db.sql` | ✅ Correcto |
 | Herramienta R2: `rclone sync` | `rclone sync` | ✅ Correcto |
-| Archivos borrados en prod **permanecen** en backup | `rclone sync` **los borra** | 🔴 Incorrecto |
+| `backup.md` actual documenta propagación de borrados | `rclone sync` **los borra** | ✅ Correcto |
 | 4 secrets requeridos | 4 variables referenciadas | ✅ Correcto |
 | Ejecución manual disponible | `workflow_dispatch` | ✅ Correcto |
-| Flag `--s3-no-check-bucket` | Presente en código | 🟡 No documentado |
+| Flag `--s3-no-check-bucket` | Presente en código | ✅ Documentado en `backup.md` |
 | Flag `--verbose` | Presente en código | 🟡 No documentado |
 | Mapeo secret → variable de entorno wrangler | Implícito en el `env:` del step | 🟡 No documentado |
 | Instalación de rclone vía `curl \| bash` | Presente en código | 🟡 No documentado |
@@ -161,16 +166,6 @@ Riesgo actual: bajo (Cloudflare Workers runners son efímeros y desechados tras 
 
 ## Acciones Recomendadas
 
-### Prioritaria (antes de la próxima ejecución)
-
-1. **Decidir el comportamiento de borrados en R2 y corregir código o documentación según la decisión.** La documentación actual genera una expectativa falsa de que los comprobantes borrados quedan protegidos en el backup.
-
-### A corto plazo (antes de junio 2026)
-
-2. **Actualizar `node-version` de `'20'` a `'22'`** en el workflow para evitar warnings y prepararse para la deprecación.
-
-### Mejora de documentación
-
-3. Documentar la flag `--s3-no-check-bucket` en la sección de permisos requeridos de R2.
-4. Agregar una nota sobre el mapeo `CF_API_TOKEN` → `CLOUDFLARE_API_TOKEN` en la tabla de secrets.
-5. Registrar la decisión de usar `curl | bash` para instalar rclone como decisión consciente, o reemplazarlo por una alternativa con verificación de integridad.
+1. Actualizar `node-version` de `'20'` a `'22'` o superior en el workflow antes de septiembre de 2026.
+2. Agregar en `backup.md` una nota sobre el mapeo `CF_API_TOKEN` → `CLOUDFLARE_API_TOKEN` para facilitar debugging de wrangler.
+3. Registrar la decisión de usar `curl | bash` para instalar rclone como decisión consciente, o reemplazarlo por una alternativa con verificación de integridad.

@@ -27,6 +27,9 @@ JWT_SECRET=string_hex_64_caracteres_aleatorio
 # Google Gemini AI (obtener en https://aistudio.google.com)
 GEMINI_API_KEY=tu_gemini_api_key
 
+# Resend (obtener en https://resend.com)
+RESEND_API_KEY=tu_resend_api_key
+
 # Primer administrador del sistema
 INITIAL_ADMIN_EMAIL=tu_email@gmail.com
 ```
@@ -40,6 +43,7 @@ wrangler secret put GOOGLE_CLIENT_ID
 wrangler secret put GOOGLE_CLIENT_SECRET
 wrangler secret put JWT_SECRET
 wrangler secret put GEMINI_API_KEY
+wrangler secret put RESEND_API_KEY
 wrangler secret put INITIAL_ADMIN_EMAIL
 ```
 
@@ -60,9 +64,12 @@ wrangler secret put INITIAL_ADMIN_EMAIL
 | `GOOGLE_CLIENT_SECRET` | Secret | Client Secret de Google OAuth |
 | `JWT_SECRET` | Secret | Clave para firmar sesiones JWT (HS256) |
 | `GEMINI_API_KEY` | Secret | API key para el chatbot IA (opcional) |
+| `RESEND_API_KEY` | Secret | API key para enviar emails de verificación |
 | `INITIAL_ADMIN_EMAIL` | Secret | Email del primer administrador |
 
-**Nota:** `GEMINI_API_KEY` es opcional. Si no está configurada, el endpoint `/api/chat` devuelve error `API_KEY_MISSING`. El resto de la app funciona normalmente.
+**Notas:**
+- `GEMINI_API_KEY` es opcional. Si no está configurada, el endpoint `/api/chat` devuelve error `API_KEY_MISSING`. El resto de la app funciona normalmente.
+- `RESEND_API_KEY` es obligatoria para el flujo de verificación por correo. Si no está configurada, `POST /api/sessions` no podrá completar el alta/login de usuarios no verificados.
 
 ---
 
@@ -98,6 +105,7 @@ type Env = {
   GOOGLE_CLIENT_ID: string;
   GOOGLE_CLIENT_SECRET: string;
   JWT_SECRET: string;
+  RESEND_API_KEY: string;
   INITIAL_ADMIN_EMAIL?: string;
   GEMINI_API_KEY?: string;
 };
@@ -109,7 +117,7 @@ type Env = {
 
 ## Migraciones de Base de Datos
 
-Las migraciones SQL están en `migrations/` (archivos `1.sql` a `13.sql`). Son **inmutables** — una vez aplicadas no se modifican.
+Las migraciones SQL están en `migrations/` (archivos `1.sql` a `17.sql`). Son **inmutables** — una vez aplicadas no se modifican.
 
 | Migración | Contenido |
 |-----------|-----------|
@@ -126,6 +134,10 @@ Las migraciones SQL están en `migrations/` (archivos `1.sql` a `13.sql`). Son *
 | `11.sql` | Tabla `user_module_prefs` |
 | `12.sql` | Columna `negocio_role` en `negocio_members`, tablas `owner_requests`, `negocio_module_restrictions` |
 | `13.sql` | Tabla `compras` |
+| `14.sql` | Tabla `facturas` |
+| `15.sql` | Columnas `turno` y `pagos_detalle` en `facturas` |
+| `16.sql` | Seeds de `usage_limits` para `compras` y `facturacion` |
+| `17.sql` | Columna `email_verified` en `users` y tabla `email_verification_tokens` |
 
 ### Aplicar en desarrollo
 
@@ -143,10 +155,10 @@ wrangler d1 migrations apply gastro-manager-db
 
 ### Crear nueva migración
 
-Crear un nuevo archivo SQL numerado en `migrations/`, por ejemplo `14.sql`:
+Crear un nuevo archivo SQL numerado en `migrations/`, por ejemplo `18.sql`:
 
 ```sql
--- migrations/14.sql
+-- migrations/18.sql
 ALTER TABLE employees ADD COLUMN nueva_columna TEXT;
 ```
 

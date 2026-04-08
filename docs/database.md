@@ -8,11 +8,11 @@
 
 ## Esquema General
 
-La base de datos tiene **20 tablas** en 5 grupos funcionales:
+La base de datos tiene **21 tablas** en 6 grupos funcionales:
 
 | Grupo | Tablas |
 |---|---|
-| Identidad y acceso | `users`, `admin_emails` |
+| Identidad y acceso | `users`, `admin_emails`, `email_verification_tokens` |
 | Negocios compartidos | `negocios`, `negocio_members`, `invitations` |
 | Roles y restricciones | `owner_requests`, `negocio_module_restrictions`, `user_module_prefs` |
 | Cuotas | `usage_counters`, `usage_limits` |
@@ -34,6 +34,7 @@ CREATE TABLE users (
   name       TEXT NOT NULL,
   picture    TEXT NOT NULL DEFAULT '',
   role       TEXT NOT NULL DEFAULT 'usuario_basico',
+  email_verified INTEGER NOT NULL DEFAULT 0,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
@@ -43,7 +44,29 @@ CREATE TABLE users (
 
 **Comportamiento crítico:**
 - El UPSERT de login **no sobreescribe** el `role` — se preserva el rol asignado por el admin.
-- El `authMiddleware` lee el `role` de esta tabla en cada request (no del JWT) para garantizar que los cambios sean inmediatos.
+- El UPSERT de login **no sobreescribe** `email_verified` — si un usuario ya verificó su email, ese estado se conserva en logins posteriores.
+- El `authMiddleware` lee `role` y `email_verified` de esta tabla en cada request (no del JWT) para garantizar que los cambios sean inmediatos.
+
+---
+
+### `email_verification_tokens`
+
+Tokens de verificación de email para usuarios pendientes. El token plano nunca se guarda; solo se persiste su hash SHA-256. Cada token expira a las 24 horas.
+
+```sql
+CREATE TABLE email_verification_tokens (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id    TEXT NOT NULL,
+  token_hash TEXT NOT NULL UNIQUE,
+  expires_at TEXT NOT NULL,
+  used_at    TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+```
+
+**Comportamiento crítico:**
+- `POST /api/sessions` invalida tokens previos sin usar y genera uno nuevo para usuarios no verificados.
+- `GET /api/auth/verify-email` marca el token como usado y actualiza `users.email_verified = 1`.
 
 ---
 

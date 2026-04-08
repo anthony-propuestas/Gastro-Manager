@@ -13,13 +13,13 @@ Desarrollo:  http://localhost:5173
 
 ## Autenticación
 
-Todas las rutas `/api/*` (excepto OAuth) requieren una cookie de sesión válida.
+Todas las rutas `/api/*` (excepto OAuth y verificación de email) requieren una cookie de sesión válida.
 
 ```
 Cookie: session_token=<jwt>
 ```
 
-El token se establece automáticamente tras el login con Google OAuth.
+El token se establece automáticamente tras el login con Google OAuth o después de verificar un email pendiente.
 
 ---
 
@@ -64,6 +64,16 @@ Intercambia el código OAuth por una cookie de sesión. Persiste al usuario en l
 { "code": "oauth_code_from_google" }
 ```
 
+**Comportamiento especial:** si el usuario todavía no está verificado, este endpoint no crea sesión. En su lugar genera un token de verificación, envía un correo y responde con `error.code = "PENDING_VERIFICATION"`.
+
+#### `GET /api/auth/verify-email`
+Valida el token de verificación recibido por email. Si el token es válido, marca al usuario como verificado, crea la cookie `session_token` y devuelve éxito.
+
+```json
+// Query string
+?token=token_plano_recibido_por_email
+```
+
 #### `GET /api/logout`
 Cierra la sesión del usuario actual. Elimina la cookie `session_token`.
 
@@ -77,7 +87,8 @@ Información del usuario autenticado.
   "email": "usuario@example.com",
   "name": "Juan Pérez",
   "picture": "https://...",
-  "role": "usuario_basico"
+  "role": "usuario_basico",
+  "email_verified": true
 }
 ```
 

@@ -742,7 +742,9 @@ export function useChat() {
 
 ### AuthProvider
 
-Proveedor de autenticación implementado en `context/AuthContext.tsx`. Al montar la app llama a `GET /api/users/me` para verificar la sesión activa y expone `user`, `role`, `currentNegocio`, `negocios` y `logout` al árbol de componentes.
+Proveedor de autenticación implementado en `context/AuthContext.tsx`. Al montar la app llama a `GET /api/users/me` para verificar la sesión activa y expone `user`, `currentNegocio`, `negocios`, `refreshNegocios` y `logout` al árbol de componentes.
+
+El objeto `user` incluye `email_verified`. Ese campo se usa para bloquear rutas protegidas hasta que el usuario complete la activación por correo.
 
 ```tsx
 import { AuthProvider } from "@/react-app/context/AuthContext";
@@ -751,6 +753,8 @@ import { AuthProvider } from "@/react-app/context/AuthContext";
   <App />
 </AuthProvider>
 ```
+
+La app también registra la ruta pública `/verify-email`, usada tanto para mostrar el estado "revisá tu correo" como para consumir el token recibido por email.
 
 ### ToastProvider
 

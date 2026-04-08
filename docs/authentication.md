@@ -20,11 +20,19 @@ Google redirect a /auth/callback?code=XXX
 POST /api/sessions { code }
         ↓ Worker intercambia code con Google (oauth2.googleapis.com/token)
         ↓ Fetch info del usuario (googleapis.com/oauth2/v2/userinfo)
-        ↓ UPSERT en tabla users (sin sobrescribir role)
-        ↓ Crea JWT firmado con JWT_SECRET (jose, HS256, TTL 7 días)
-Cookie session_token=<jwt> (HttpOnly, Secure, SameSite=Lax)
+        ↓ UPSERT en tabla users (sin sobrescribir role ni email_verified)
         ↓
-Redirect a /dashboard
+        ├─ Si el usuario ya está verificado:
+        │    ↓ Crea JWT firmado con JWT_SECRET (jose, HS256, TTL 7 días)
+        │  Cookie session_token=<jwt> (HttpOnly, Secure, SameSite=Lax)
+        │    ↓
+        │  Redirect a /
+        ↓
+        └─ Si el usuario es nuevo o no está verificado:
+             ↓ Genera token de verificación (24h) y lo guarda hasheado
+             ↓ Envía email via Resend con enlace /verify-email?token=...
+             ↓ Responde error.code=PENDING_VERIFICATION
+             ↓ Frontend redirige a /verify-email
 ```
 
 ### 2. Requests Subsecuentes
@@ -37,7 +45,7 @@ Request a /api/endpoint
 Cookie session_token enviada automáticamente
         ↓
 authMiddleware: jwtVerify(token, JWT_SECRET)
-        ↓ Lee role fresco de tabla users (nunca confía en el JWT para role)
+  ↓ Lee role y email_verified frescos de tabla users
 Si válido → continúa con el handler
 Si inválido → 401 INVALID_SESSION
 ```
@@ -63,6 +71,7 @@ Redirect a /login
 | `GOOGLE_CLIENT_ID` | Client ID de la app en Google Cloud Console |
 | `GOOGLE_CLIENT_SECRET` | Client Secret de Google OAuth |
 | `JWT_SECRET` | Clave secreta para firmar/verificar JWTs (mínimo 32 bytes, hex aleatorio) |
+| `RESEND_API_KEY` | API key de Resend para enviar emails de verificación |
 | `INITIAL_ADMIN_EMAIL` | Email del primer administrador del sistema |
 
 ---
@@ -146,11 +155,22 @@ app.post("/api/sessions", async (c) => {
       picture = excluded.picture, updated_at = excluded.updated_at
   `).bind(googleUser.id, googleUser.email, googleUser.name, googleUser.picture).run();
 
-  // 4. Leer role asignado (puede haber sido promovido previamente)
+  // 4. Si el usuario no está verificado, enviar email y no crear sesión todavía
+  const existingUser = await db.prepare("SELECT id, email_verified FROM users WHERE id = ?")
+    .bind(googleUser.id).first();
+
+  if (existingUser?.email_verified !== 1) {
+    return c.json(
+      { success: false, error: { code: "PENDING_VERIFICATION", message: `Revisá tu email. Te enviamos un correo a ${googleUser.email}` } },
+      200
+    );
+  }
+
+  // 5. Leer role asignado (puede haber sido promovido previamente)
   const dbUser = await db.prepare("SELECT role FROM users WHERE id = ?")
     .bind(googleUser.id).first();
 
-  // 5. Crear JWT y setear cookie
+  // 6. Crear JWT y setear cookie
   const jwt = await createSession(
     { id: googleUser.id, email: googleUser.email, name: googleUser.name,
       picture: googleUser.picture, role: dbUser?.role ?? "usuario_basico" },
@@ -161,6 +181,18 @@ app.post("/api/sessions", async (c) => {
     `${COOKIE_NAME}=${jwt}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=604800`
   );
   return c.json({ success: true }, 200);
+});
+```
+
+#### Verificar email
+
+```typescript
+app.get("/api/auth/verify-email", async (c) => {
+  const token = c.req.query("token");
+  if (!token) return c.redirect("/login?error=invalid_token");
+
+  // Busca el token hasheado, valida expiración/uso y marca al usuario como verificado.
+  // Si es válido, crea la sesión y devuelve { success: true }.
 });
 ```
 
@@ -189,12 +221,13 @@ const authMiddleware = async (c, next) => {
   try {
     const user = await verifySession(token, c.env.JWT_SECRET);
 
-    // Rol siempre desde DB, nunca del JWT (para que cambios del admin sean inmediatos)
+    // Rol y email_verified siempre desde DB, nunca del JWT
     const dbUser = await c.env.DB
-      .prepare("SELECT role FROM users WHERE id = ?")
+      .prepare("SELECT role, email_verified FROM users WHERE id = ?")
       .bind(user.id)
       .first();
     user.role = dbUser?.role ?? "usuario_basico";
+    user.email_verified = dbUser?.email_verified === 1;
 
     c.set("user", user);
     await next();
@@ -216,20 +249,21 @@ const authMiddleware = async (c, next) => {
 El contexto de autenticación está implementado en `src/react-app/context/AuthContext.tsx`. Expone:
 
 ```tsx
-const { user, role, currentNegocio, negocios, logout } = useAuth();
+const { user, currentNegocio, negocios, logout } = useAuth();
 ```
 
-Al montar la app, llama a `GET /api/users/me`. Si la cookie `session_token` es válida, el servidor devuelve los datos del usuario. Si no, redirige a `/login`.
+Al montar la app, llama a `GET /api/users/me`. Si la cookie `session_token` es válida, el servidor devuelve los datos del usuario, incluyendo `email_verified`. Si no, deja `user = null`.
 
 ### ProtectedRoute
 
 ```tsx
 // components/auth/ProtectedRoute.tsx
 export default function ProtectedRoute({ children }) {
-  const { user, isLoading } = useAuth();
+  const { user, isPending } = useAuth();
 
-  if (isLoading) return <div>Cargando...</div>;
+  if (isPending) return <div>Cargando...</div>;
   if (!user) return <Navigate to="/login" replace />;
+  if (!user.email_verified) return <Navigate to="/verify-email" replace />;
   return <>{children}</>;
 }
 ```
@@ -258,11 +292,24 @@ useEffect(() => {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ code }),
   }).then(res => res.json()).then(data => {
-    if (data.success) navigate("/dashboard");
+    if (data.error?.code === "PENDING_VERIFICATION") {
+      navigate("/verify-email", { replace: true });
+      return;
+    }
+    if (data.success) navigate("/");
     else navigate("/login");
   });
 }, []);
 ```
+
+### VerifyEmailPage
+
+La ruta `/verify-email` cumple dos funciones:
+
+- Sin `token`: muestra el estado "revisá tu correo" luego del login pendiente.
+- Con `token`: llama a `GET /api/auth/verify-email?token=...`, valida el enlace y redirige al usuario autenticado al dashboard.
+
+El frontend también usa `BroadcastChannel` para notificar a la pestaña original cuando la verificación se completa en otra pestaña.
 
 ---
 
@@ -307,6 +354,7 @@ async function isAdmin(email: string, db: D1Database, env: Env): Promise<boolean
 | `SameSite=Lax` | Previene CSRF |
 | `Max-Age=604800` | Expira en 7 días |
 | Rol fresco | Role leído de DB, nunca del JWT |
+| `email_verified` fresco | Estado de verificación leído de DB en cada request |
 | UPSERT sin sobrescribir role | El login nunca revierte una promoción a `usuario_inteligente` |
 
 ---
