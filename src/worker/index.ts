@@ -2567,7 +2567,10 @@ app.put("/api/admin/usage-limits", authMiddleware, async (c) => {
     return c.json(apiError("VALIDATION_ERROR", "No hay herramientas válidas para actualizar"), 400);
   }
   const stmts = entries.map(([tool, limit]) =>
-    db.prepare(`UPDATE usage_limits SET "limit" = ? WHERE tool = ?`).bind(limit, tool)
+    db.prepare(
+      `INSERT INTO usage_limits (tool, "limit") VALUES (?, ?)
+       ON CONFLICT(tool) DO UPDATE SET "limit" = excluded."limit"`
+    ).bind(tool, limit)
   );
   await db.batch(stmts);
   return c.json(apiResponse({ updated: entries.length }), 200);
