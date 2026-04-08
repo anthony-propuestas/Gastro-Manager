@@ -1,8 +1,11 @@
-import { ChefHat, Loader2 } from "lucide-react";
+import { ChefHat, Loader2, CheckCircle } from "lucide-react";
 import { useState } from "react";
+import { useSearchParams } from "react-router";
 
 export default function Login() {
   const [isLoading, setIsLoading] = useState(false);
+  const [searchParams] = useSearchParams();
+  const isVerified = searchParams.get("verified") === "true";
 
   const handleLogin = async () => {
     setIsLoading(true);
@@ -25,6 +28,12 @@ export default function Login() {
       </div>
 
       <div className="relative w-full max-w-md">
+        {isVerified && (
+          <div className="mb-4 flex items-center gap-3 bg-success/10 border border-success/20 rounded-xl px-4 py-3 text-sm text-success">
+            <CheckCircle className="w-4 h-4 flex-shrink-0" />
+            <span>¡Email verificado! Iniciá sesión para continuar.</span>
+          </div>
+        )}
         {/* Card */}
         <div className="bg-card rounded-2xl shadow-xl border border-border/50 p-8 space-y-8">
           {/* Logo & Header */}

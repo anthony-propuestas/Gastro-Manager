@@ -375,7 +375,7 @@ app.post("/api/sessions", async (c) => {
         .run();
 
       const origin = new URL(c.req.url).origin;
-      const verifyUrl = `${origin}/api/auth/verify-email?token=${plainToken}`;
+      const verifyUrl = `${origin}/verify-email?token=${plainToken}`;
 
       await sendVerificationEmail(c.env.RESEND_API_KEY, googleUser.email, googleUser.name, verifyUrl);
 
@@ -440,7 +440,7 @@ app.get("/api/auth/verify-email", async (c) => {
     );
 
     c.header("Set-Cookie", `${COOKIE_NAME}=${jwt}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=604800`);
-    return c.redirect("/", 302);
+    return c.json({ success: true }, 200);
   } catch (error) {
     console.error("Error verifying email:", error);
     return c.redirect("/login?error=invalid_token");
