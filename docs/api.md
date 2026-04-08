@@ -186,7 +186,7 @@ Obtiene las restricciones de módulos del negocio (cualquier miembro puede consu
 
 ```json
 // Response data
-{ "calendario": false, "personal": false, "sueldos": false, "compras": false }
+{ "calendario": false, "personal": false, "sueldos": false, "compras": false, "facturacion": false }
 ```
 
 #### `PUT /api/negocios/:id/module-restrictions`
@@ -658,8 +658,8 @@ Devuelve el uso actual y los límites del usuario para el negocio activo en el p
     "salary_payments":  { "count": 5, "limit": 10 },
     "events":           { "count": 4, "limit": 15 },
     "chat":             { "count": 8, "limit": 20 },
-    "compras":          { "count": 1, "limit": null },
-    "facturacion":      { "count": 5, "limit": null }
+    "compras":          { "count": 1, "limit": 50 },
+    "facturacion":      { "count": 5, "limit": 50 }
   }
 }
 ```
@@ -738,11 +738,11 @@ Devuelve los límites mensuales actuales para todas las herramientas.
 
 ```json
 // Response data
-{ "employees": 5, "job_roles": 3, "topics": 10, "notes": 20, "advances": 10, "salary_payments": 10, "events": 15, "chat": 20, "compras": null }
+{ "employees": 5, "job_roles": 3, "topics": 10, "notes": 20, "advances": 10, "salary_payments": 10, "events": 15, "chat": 20, "compras": 50, "facturacion": 50 }
 ```
 
 #### `PUT /api/admin/usage-limits`
-Actualiza los límites mensuales. Solo los tools válidos son aceptados; la actualización es atómica (`db.batch`).
+Actualiza los límites mensuales. Solo los tools válidos son aceptados; la actualización es atómica (`db.batch`). Usa `INSERT ... ON CONFLICT DO UPDATE SET` internamente — crea la fila si no existe, la actualiza si existe. Elimina la falla silenciosa que ocurría cuando la fila del tool no existía en `usage_limits`.
 
 ```json
 // Request (campos parciales permitidos)

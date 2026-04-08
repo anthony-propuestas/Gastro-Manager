@@ -292,8 +292,8 @@ Panel de administración (solo admins). Si el usuario no es admin, muestra una t
 **6 secciones:**
 1. **Stats cards:** Total de usuarios, emails registrados, promedio de empleados y eventos por negocio
 2. **Estadísticas de uso:** Gráficos de barras por módulo (empleados, sueldos, calendario, puestos, tópicos, notas, chat)
-3. **Cuotas mensuales usadas:** Grid de 9 herramientas (employees, job_roles, topics, notes, advances, salary_payments, events, chat, compras) con tabla de uso por usuario/negocio
-4. **Configuración de límites mensuales:** Inputs editables por herramienta para usuarios "Básico", con botón guardar (`updateLimits`)
+3. **Cuotas mensuales usadas:** Grid de 10 herramientas (employees, job_roles, topics, notes, advances, salary_payments, events, chat, compras, facturacion) con tabla de uso por usuario/negocio
+4. **Configuración de límites mensuales:** Inputs editables por herramienta para usuarios "Básico" — renderizados a partir del array `TOOL_LABELS` en `Admin.tsx`. Agregar una nueva herramienta requiere añadir una entrada a `TOOL_LABELS` además de la configuración backend.
 5. **Gestión de roles de usuario:** Buscar usuarios por email, promover a "Usuario Inteligente" (sin límites) o degradar a "Básico", tabla de usuarios inteligentes actuales
 6. **Gestión de emails administradores:** Agregar/eliminar emails admin
 
