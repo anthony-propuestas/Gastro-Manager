@@ -2905,7 +2905,12 @@ Responde de manera concisa en español sobre los datos de este negocio.
     if (!geminiResponse.ok) {
       const errorText = await geminiResponse.text();
       console.error("Gemini API error:", geminiResponse.status, errorText);
-      return c.json(apiError("GEMINI_API_ERROR", "El asistente no está disponible en este momento. Intenta más tarde."), 500);
+      let userMessage = "El asistente no está disponible en este momento. Intenta más tarde.";
+      if (geminiResponse.status === 400) userMessage = "Error en la solicitud al asistente (modelo no válido o parámetros incorrectos).";
+      if (geminiResponse.status === 401 || geminiResponse.status === 403) userMessage = "API key de Gemini inválida o sin permisos.";
+      if (geminiResponse.status === 404) userMessage = "Modelo de IA no encontrado. Contacta al administrador.";
+      if (geminiResponse.status === 429) userMessage = "Límite de la API de Gemini alcanzado. Intenta más tarde.";
+      return c.json(apiError("GEMINI_API_ERROR", userMessage), 500);
     }
 
     let geminiData: any;
