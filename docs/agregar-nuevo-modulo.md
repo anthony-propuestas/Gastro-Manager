@@ -38,12 +38,13 @@ src/worker/index.ts  (línea ~992)             ← 12. Agregar a VALID_MODULE_KE
 src/worker/index.ts  (GET /module-restrictions)← 13. Agregar valor por defecto en respuesta
 src/worker/index.ts  (PUT /module-restrictions)← 14. Agregar a VALID_KEYS
 src/worker/index.ts  (PUT /admin/usage-limits) ← 15. Agregar a validTools
+src/react-app/pages/Admin.tsx                 ← 15b. Agregar tool a TOOL_LABELS (casilla en panel)
 src/worker/validation.ts                      ← 16. Agregar schema Zod de validación
 src/worker/index.ts                           ← 17. Crear los endpoints del módulo (GET, POST, etc.)
 
 BASE DE DATOS
 ────────────────────────────────────────────────────────────────────
-migrations/N.sql                              ← 18. Crear migración con la tabla del módulo
+migrations/N.sql                              ← 18. Crear migración con la tabla del módulo + INSERT en usage_limits
                                               ← 19. Aplicar la migración con wrangler
 ```
 
@@ -467,6 +468,25 @@ const validTools = [
 ];
 ```
 
+#### 15b. `TOOL_LABELS` en Admin.tsx — casilla de límite visible en el panel
+
+[src/react-app/pages/Admin.tsx](../src/react-app/pages/Admin.tsx) — array `TOOL_LABELS` (línea ~11)
+
+Sin este paso el panel admin **no muestra** la casilla del nuevo módulo aunque el backend y la DB estén configurados correctamente. El array controla qué inputs se renderizan en la sección "Límites Mensuales".
+
+Elegir un color Tailwind que no esté duplicado entre los existentes:
+
+```ts
+const TOOL_LABELS = [
+  // ... existentes ...
+  { key: "mi_modulo_action", label: "Mi Módulo", color: "bg-violet-500" }, // ← nuevo
+] as const;
+```
+
+> **Por qué esto es necesario:** El panel itera sobre `TOOL_LABELS` para renderizar inputs.
+> El hook `fetchLimits()` ya trae todos los tools de la DB (incluido el nuevo), pero sin
+> esta entrada el input nunca se renderiza y el admin no puede configurar el límite.
+
 ---
 
 ### 16. Agregar schema de validación
@@ -599,7 +619,16 @@ CREATE TABLE mi_modulo_items (
 );
 
 CREATE INDEX idx_mi_modulo_items_negocio ON mi_modulo_items(negocio_id);
+
+-- Límite mensual por defecto para usuario_basico.
+-- Sin esta fila el backend no encontrará el row y el admin no podrá guardar el límite.
+-- El admin puede cambiarlo desde /admin > Límites Mensuales.
+INSERT OR IGNORE INTO usage_limits (tool, "limit") VALUES ('mi_modulo_action', 50);
 ```
+
+> **Por qué el INSERT en `usage_limits` es obligatorio:** el backend usa `UPDATE ... WHERE tool = ?`.
+> Si la fila no existe, el UPDATE afecta 0 filas y retorna éxito silencioso — el valor que el admin
+> guarda nunca persiste. `INSERT OR IGNORE` es idempotente: no falla si la fila ya existe.
 
 **Reglas de la DB:**
 - Toda tabla de módulo **debe tener `negocio_id`** — todos los datos están aislados por negocio
@@ -615,10 +644,19 @@ CREATE INDEX idx_mi_modulo_items_negocio ON mi_modulo_items(negocio_id);
 npx wrangler d1 migrations apply gastro-manager-db --local
 
 # Producción:
-npx wrangler d1 migrations apply gastro-manager-db
+npx wrangler d1 migrations apply gastro-manager-db --remote
 ```
 
 Wrangler detecta automáticamente los archivos `.sql` en `/migrations` por número de secuencia y aplica solo los que aún no han sido ejecutados.
+
+> **Bug conocido de Wrangler (local):** `migrations apply --local` puede fallar con el error
+> `SQLITE_READONLY`. Si ocurre, aplicar la migración manualmente con:
+>
+> ```bash
+> npx wrangler d1 execute gastro-manager-db --local --command "$(cat migrations/N.sql)"
+> ```
+>
+> El flag `--remote` siempre funciona correctamente para producción.
 
 ---
 
