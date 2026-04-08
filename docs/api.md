@@ -547,6 +547,96 @@ Sirve una imagen de comprobante desde R2. La ruta debe estar scoped al negocio a
 
 ---
 
+### Facturación
+*Requieren `X-Negocio-ID`* ⚠️ *Restringible por owner (módulo `facturacion`)*
+
+#### `GET /api/facturacion` ⚠️ *Restringible por owner*
+Lista las ventas del negocio para un mes/año dado.
+
+```
+GET /api/facturacion?month=4&year=2026
+```
+
+```json
+// Response data (array)
+[{
+  "id": 1,
+  "negocio_id": 1,
+  "user_id": "google_sub_123",
+  "fecha": "2026-04-08",
+  "monto_total": 1500.50,
+  "metodo_pago": "mixto",
+  "concepto": "Ventas turno mañana",
+  "numero_comprobante": "0001-00001234",
+  "notas": "Observaciones",
+  "turno": "mañana",
+  "pagos_detalle": "[{\"metodo_pago\":\"efectivo\",\"monto\":800},{\"metodo_pago\":\"tarjeta_credito\",\"monto\":700.50}]",
+  "created_at": "2026-04-08T12:30:00Z",
+  "updated_at": "2026-04-08T12:30:00Z"
+}]
+```
+
+Parámetros `month` y `year` son opcionales; por defecto se usa el mes y año actuales. Ordenado por `fecha DESC`, luego `created_at DESC`.
+
+#### `GET /api/facturacion/summary` ⚠️ *Restringible por owner*
+Totales diarios de ventas para el mes (usado por el calendario de facturación).
+
+```
+GET /api/facturacion/summary?month=4&year=2026
+```
+
+```json
+// Response data (array de totales por día)
+[{
+  "fecha": "2026-04-08",
+  "total_dia": 2500.75,
+  "cantidad": 3
+}]
+```
+
+Ordenado por `fecha ASC`.
+
+#### `POST /api/facturacion` ⚠️ *Sujeto a cuota `facturacion` · Restringible por owner*
+Registra una nueva venta.
+
+```json
+// Request
+{
+  "fecha": "2026-04-08",
+  "monto_total": 1500.50,
+  "turno": "mañana",
+  "pagos_detalle": "[{\"metodo_pago\":\"efectivo\",\"monto\":800},{\"metodo_pago\":\"tarjeta_credito\",\"monto\":700.50}]",
+  "concepto": "Ventas turno mañana",
+  "numero_comprobante": "0001-00001234",
+  "notas": "Observaciones"
+}
+```
+
+**Valores válidos de `turno`:** `"mañana"` | `"tarde"` | `null`
+
+**Valores válidos de `metodo_pago`:** `"efectivo"` | `"tarjeta_credito"` | `"tarjeta_debito"` | `"transferencia"` | `"mercado_pago"` | `"mixto"` | `"otros"`
+
+**Comportamiento real del frontend al enviar este endpoint:**
+- Si el usuario carga **una sola fila** de pago → el cliente envía `metodo_pago` con ese método y `pagos_detalle: null`. No se almacena JSON.
+- Si el usuario carga **dos o más filas** → el cliente envía `pagos_detalle` (JSON string) y `metodo_pago: null` (el backend lo recalcula).
+
+**Lógica de `metodo_pago` en el backend:** si `pagos_detalle` está presente en el body, el servidor lo parsea y calcula `metodo_pago` automáticamente: 1 método → ese método; 2+ métodos → `"mixto"`. Si el parse de `pagos_detalle` falla, se usa el `metodo_pago` enviado por el cliente tal cual.
+
+#### `PUT /api/facturacion/:id` ⚠️ *Sujeto a cuota `facturacion` · Restringible por owner*
+Actualiza una venta existente. Solo actualiza los campos proporcionados. Verifica que la venta pertenezca al negocio activo.
+
+⚠️ **Nota:** Al igual que en `compras`, **tanto `POST` como `PUT` y `DELETE` consumen cuota** del tool `facturacion`.
+
+#### `DELETE /api/facturacion/:id` ⚠️ *Sujeto a cuota `facturacion` · Restringible por owner*
+Elimina una venta. Verifica que pertenezca al negocio activo antes de borrar.
+
+```json
+// Response data
+{ "deleted": true }
+```
+
+---
+
 ### Cuotas del Usuario
 
 #### `GET /api/usage/me`
@@ -568,7 +658,8 @@ Devuelve el uso actual y los límites del usuario para el negocio activo en el p
     "salary_payments":  { "count": 5, "limit": 10 },
     "events":           { "count": 4, "limit": 15 },
     "chat":             { "count": 8, "limit": 20 },
-    "compras":          { "count": 1, "limit": null }
+    "compras":          { "count": 1, "limit": null },
+    "facturacion":      { "count": 5, "limit": null }
   }
 }
 ```
@@ -721,7 +812,7 @@ El contexto enviado a Gemini incluye: empleados activos, sueldos del mes, antici
 
 ## Notas Generales
 
-- **Total de endpoints**: 70 rutas registradas en el Worker (GET, POST, PUT, DELETE).
+- **Total de endpoints**: 75 rutas registradas en el Worker (GET, POST, PUT, DELETE).
 - **Sin paginación**: todos los listados retornan el conjunto completo. Filtrado se realiza en cliente.
 - **Sin rate limiting propio**: Cloudflare Workers aplica 100,000 req/día en Free tier.
 - **CORS**: no configurado explícitamente; funciona por same-origin (SPA y API servidos por el mismo Worker via `not_found_handling: single-page-application`).
@@ -741,6 +832,9 @@ El contexto enviado a Gemini incluye: empleados activos, sueldos del mes, antici
 | `POST /api/chat` | `usageLimitMiddleware('chat')` | Estándar |
 | `POST /api/compras` | `usageLimitMiddleware('compras')` | Estándar |
 | `PUT /api/compras/:id` | `usageLimitMiddleware('compras')` | **Excepcional:** PUT también consume cuota |
+| `POST /api/facturacion` | `usageLimitMiddleware('facturacion')` | Estándar |
+| `PUT /api/facturacion/:id` | `usageLimitMiddleware('facturacion')` | PUT también consume cuota |
+| `DELETE /api/facturacion/:id` | `usageLimitMiddleware('facturacion')` | DELETE también consume cuota |
 
 ### Notas sobre restricciones de módulo
 
@@ -751,4 +845,5 @@ El contexto enviado a Gemini incluye: empleados activos, sueldos del mes, antici
 | `/api/salaries*`, `/api/advances*`, `/api/salary-payments*` | `sueldos` | Sí | Todos los endpoints |
 | `/api/compras` (CRUD + upload + summary) | `compras` | Sí | Todos excepto files |
 | `GET /api/compras/files/*` | `compras` | **No** | Solo valida auth + negocio |
+| `/api/facturacion` (CRUD + summary) | `facturacion` | Sí | Todos los endpoints |
 | `POST /api/chat` | — | **No** | No restringible por owner |

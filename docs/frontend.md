@@ -21,9 +21,10 @@ src/react-app/
 │   ├── auth/            # Componentes de autenticación
 │   ├── employees/       # Componentes de empleados
 │   ├── salaries/        # Componentes de sueldos
-│   └── compras/         # Componentes de compras
+│   ├── compras/         # Componentes de compras
+│   └── facturacion/     # Componentes de facturación
 ├── pages/               # Páginas/vistas principales
-│   ├── modulos/         # Módulos operativos (personal, sueldos, calendario, compras)
+│   ├── modulos/         # Módulos operativos (personal, sueldos, calendario, compras, facturacion)
 │   └── ...
 ├── hooks/               # Custom hooks
 ├── lib/                 # Utilidades
@@ -98,8 +99,9 @@ const navItems = [
   { label: "Calendario", icon: Calendar,      path: "/calendario", moduleKey: "calendario" },
   { label: "Personal",   icon: Users,          path: "/empleados",  moduleKey: "personal" },
   { label: "Sueldos",    icon: Banknote,        path: "/sueldos",    moduleKey: "sueldos" },
-  { label: "Compras",    icon: ShoppingCart,    path: "/compras",    moduleKey: "compras" },
-  { label: "Configuración", icon: Settings,    path: "/configuracion" },
+  { label: "Compras",      icon: ShoppingCart,    path: "/compras",       moduleKey: "compras" },
+  { label: "Facturación",  icon: Receipt,         path: "/facturacion",   moduleKey: "facturacion" },
+  { label: "Configuración", icon: Settings,       path: "/configuracion" },
 ];
 
 // El enlace Admin se renderiza condicionalmente fuera de navItems
@@ -122,7 +124,7 @@ Navegación inferior para dispositivos móviles (`components/layout/BottomNav.ts
 
 **Comportamiento:**
 - Visible solo en pantallas pequeñas (`md:hidden`)
-- Muestra los mismos items de navegación que el Sidebar (Dashboard, Calendario, Personal, Sueldos, Compras)
+- Muestra los mismos items de navegación que el Sidebar (Dashboard, Calendario, Personal, Sueldos, Compras, Facturación)
 - Respeta las mismas reglas de filtrado por `moduleKey` y restricciones del owner
 - Íconos compactos con label debajo
 - Indicador visual del item activo
@@ -231,6 +233,28 @@ Registro y gestión de compras y gastos del negocio.
 - `ComprasHistoryModal`: Historial de compras con filtros
 - `DayDetailModal`: Detalle de compras de un día específico
 
+### Facturacion (`pages/modulos/Facturacion.tsx`)
+
+Registro y seguimiento de ventas del negocio, con vista de calendario mensual.
+
+**Características:**
+- Selector de período (mes/año) — el selector de año tiene valores **hardcodeados**: 2024, 2025, 2026, 2027
+- 3 tarjetas de resumen: Total del Mes, Cantidad de Ventas, Promedio por Venta
+- Calendario interactivo — grid de 7 columnas (Lun–Dom) con totales y cantidad de ventas por día
+- Click en día con ventas abre `DayDetailModal`
+- Botón "Nueva Venta" abre `FacturaModal` en modo creación
+- Botón "Historial" abre `FacturasHistoryModal` con tabla completa filtrable
+- Módulo restringible por el owner desde `/owner`
+
+**Hooks usados:**
+- `useFacturacion()` — datos y operaciones CRUD
+- `useMyUsage()` — cuota del tool `facturacion` (para mostrar `UsageBanner` si corresponde)
+
+**Componentes usados:**
+- `FacturaModal`: Formulario para crear o editar una venta
+- `DayDetailModal`: Detalle de ventas de un día, agrupadas por turno
+- `FacturasHistoryModal`: Historial completo con búsqueda y filtros
+
 ### NegocioSetup (`pages/NegocioSetup.tsx`)
 
 Pantalla completa para selección o creación de negocio. Se muestra cuando un usuario autenticado no tiene ningún negocio seleccionado.
@@ -258,7 +282,7 @@ Configuración de la cuenta y del negocio.
 
 **Características:**
 - **Perfil:** Card con header (contenido pendiente de implementar)
-- **Módulos de Gestión:** Switches para activar/desactivar los 4 módulos visibles en el sidebar (calendario, personal, sueldos, compras) via `useModulePrefsContext`
+- **Módulos de Gestión:** Switches para activar/desactivar los 5 módulos visibles en el sidebar (calendario, personal, sueldos, compras, facturacion) via `useModulePrefsContext`
 - **Administradores del negocio:** Lista de miembros del negocio actual, botón para remover miembros (solo el creador), y botón para abandonar el negocio
 
 ### Admin (`pages/Admin.tsx`)
@@ -278,7 +302,7 @@ Panel de administración (solo admins). Si el usuario no es admin, muestra una t
 Panel de gestión de negocio para owners. Accesible desde `/owner`. Si el usuario no es `owner` del negocio actual, redirige a `/`.
 
 **Características:**
-- **Restricciones de módulos:** Toggles para activar/desactivar la visibilidad de cada módulo (calendario, personal, sueldos, compras) para los gerentes del negocio
+- **Restricciones de módulos:** Toggles para activar/desactivar la visibilidad de cada módulo (calendario, personal, sueldos, compras, facturacion) para los gerentes del negocio
 - **Solicitudes de owner:** Lista de solicitudes pendientes con botones para aprobar o rechazar
 - Usa `useOwnerPanel` para las llamadas API
 
@@ -409,6 +433,61 @@ export function useCompras() {
     updateCompra,
     deleteCompra,
   };
+}
+```
+
+### useFacturacion
+
+Gestión de ventas del negocio. Exporta también los tipos y constantes de métodos de pago.
+
+```tsx
+// Tipos exportados
+type MetodoPago = "efectivo" | "tarjeta_credito" | "tarjeta_debito" | "transferencia" | "mercado_pago" | "mixto" | "otros"
+type Turno = "mañana" | "tarde"
+
+interface PagoDetalle { metodo_pago: MetodoPago; monto: number }
+
+interface Factura {
+  id: number; negocio_id: number; user_id: string;
+  fecha: string; monto_total: number;
+  metodo_pago: MetodoPago | null;  // ⚠️ nullable en el tipo TS, pero NOT NULL en la DB (ver database.md)
+  concepto: string | null; numero_comprobante: string | null; notas: string | null;
+  turno: Turno | null;
+  pagos_detalle: string | null;  // JSON string de PagoDetalle[]; NULL si hay un solo método de pago
+  created_at: string; updated_at: string;
+}
+
+interface FacturaDailySummary { fecha: string; total_dia: number; cantidad: number }
+
+// Helper — parsea pagos_detalle de JSON a array; retorna [] si falla o si raw es null
+export function parsePagosDetalle(raw: string | null): PagoDetalle[]
+
+// Constantes de métodos de pago seleccionables por el usuario.
+// "mixto" NO está en ninguna de las dos — se asigna automáticamente por lógica
+// cuando hay 2+ filas de pago. Ambas constantes son idénticas (misma referencia).
+export const METODOS_PAGO:              { value: MetodoPago; label: string }[]  // 6 items: efectivo, tarjeta_credito, tarjeta_debito, transferencia, mercado_pago, otros
+export const METODOS_PAGO_SELECCIONABLES: { value: MetodoPago; label: string }[] // = METODOS_PAGO (misma referencia, sin distinción real)
+
+export function useFacturacion() {
+  const [facturas, setFacturas]   = useState<Factura[]>([]);
+  const [summary, setSummary]     = useState<FacturaDailySummary[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError]         = useState<string | null>(null);
+
+  // Carga facturas del mes. Actualiza error state si falla.
+  const fetchFacturas = async (month: number, year: number) => void;  // GET /api/facturacion?month&year
+
+  // Carga totales diarios para el calendario.
+  // ⚠️ Falla silenciosamente — si el request falla, no actualiza el estado error.
+  // El catch está vacío; summary mantiene su valor anterior.
+  const fetchSummary  = async (month: number, year: number) => void;  // GET /api/facturacion/summary?month&year
+
+  const createFactura = async (input: FacturaInput): Promise<boolean>;  // POST /api/facturacion
+  const updateFactura = async (id: number, input: Partial<FacturaInput>): Promise<boolean>;  // PUT /api/facturacion/:id
+  const deleteFactura = async (id: number): Promise<boolean>;           // DELETE /api/facturacion/:id
+
+  return { facturas, summary, isLoading, error,
+           fetchFacturas, fetchSummary, createFactura, updateFactura, deleteFactura };
 }
 ```
 
@@ -850,6 +929,7 @@ Por página individual.
   <Route path="/sueldos" element={<ProtectedRoute><MainLayout><RestrictedModuleRoute moduleKey="sueldos"><Salaries /></RestrictedModuleRoute></MainLayout></ProtectedRoute>} />
   <Route path="/calendario" element={<ProtectedRoute><MainLayout><RestrictedModuleRoute moduleKey="calendario"><CalendarPage /></RestrictedModuleRoute></MainLayout></ProtectedRoute>} />
   <Route path="/compras" element={<ProtectedRoute><MainLayout><RestrictedModuleRoute moduleKey="compras"><Compras /></RestrictedModuleRoute></MainLayout></ProtectedRoute>} />
+  <Route path="/facturacion" element={<ProtectedRoute><MainLayout><RestrictedModuleRoute moduleKey="facturacion"><Facturacion /></RestrictedModuleRoute></MainLayout></ProtectedRoute>} />
   <Route path="/configuracion" element={<ProtectedRoute><MainLayout><Settings /></MainLayout></ProtectedRoute>} />
   <Route path="/owner" element={<ProtectedRoute><MainLayout><OwnerPanel /></MainLayout></ProtectedRoute>} />
   <Route path="/admin" element={<ProtectedRoute><MainLayout><Admin /></MainLayout></ProtectedRoute>} />

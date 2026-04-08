@@ -8,7 +8,7 @@
 
 ## Esquema General
 
-La base de datos tiene **19 tablas** en 5 grupos funcionales:
+La base de datos tiene **20 tablas** en 5 grupos funcionales:
 
 | Grupo | Tablas |
 |---|---|
@@ -16,7 +16,7 @@ La base de datos tiene **19 tablas** en 5 grupos funcionales:
 | Negocios compartidos | `negocios`, `negocio_members`, `invitations` |
 | Roles y restricciones | `owner_requests`, `negocio_module_restrictions`, `user_module_prefs` |
 | Cuotas | `usage_counters`, `usage_limits` |
-| Datos operativos | `employees`, `job_roles`, `topics`, `notes`, `advances`, `salary_payments`, `events`, `compras` |
+| Datos operativos | `employees`, `job_roles`, `topics`, `notes`, `advances`, `salary_payments`, `events`, `compras`, `facturas` |
 | Logging | `usage_logs` |
 
 ---
@@ -177,8 +177,9 @@ CREATE TABLE usage_limits (
 | `events` | 15 | Crear eventos |
 | `chat` | 20 | Mensajes al chatbot IA |
 | `compras` | *(sin límite por defecto)* | Registrar compras y gastos |
+| `facturacion` | *(sin límite por defecto)* | Crear/editar/eliminar ventas |
 
-`compras` no tiene límite seedeado en la migración — es `NULL` hasta que el admin lo configure desde el panel.
+`compras` y `facturacion` no tienen límite seedeado en la migración — son `NULL` hasta que el admin los configure desde el panel.
 
 Los usuarios con `role = 'usuario_inteligente'` ignoran estos límites.
 
@@ -407,6 +408,55 @@ CREATE TABLE compras (
 
 **Valores válidos de `categoria`:** `carnes`, `verduras`, `bebidas`, `limpieza`, `descartables`, `servicios`, `mantenimiento`, `alquiler`, `otros`
 
+### `facturas`
+
+Ventas del negocio. Sujeto a cuota mensual (tool `facturacion`). Soporta pagos múltiples y agrupación por turno.
+
+```sql
+-- Migración 14
+CREATE TABLE facturas (
+  id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+  negocio_id          INTEGER NOT NULL REFERENCES negocios(id) ON DELETE CASCADE,
+  user_id             TEXT    NOT NULL,
+  fecha               TEXT    NOT NULL,              -- YYYY-MM-DD
+  monto_total         REAL    NOT NULL,              -- > 0, máx 10 000 000
+  metodo_pago         TEXT    NOT NULL,              -- ver enum abajo
+  concepto            TEXT,                          -- máx 200 chars
+  numero_comprobante  TEXT,                          -- máx 50 chars
+  notas               TEXT,                          -- máx 500 chars
+  created_at          TEXT    NOT NULL DEFAULT (datetime('now')),
+  updated_at          TEXT    NOT NULL DEFAULT (datetime('now'))
+);
+
+-- Migración 15 (ALTER TABLE)
+ALTER TABLE facturas ADD COLUMN turno         TEXT;  -- 'mañana' | 'tarde' | NULL
+ALTER TABLE facturas ADD COLUMN pagos_detalle TEXT;  -- JSON | NULL (ver abajo)
+```
+
+> ⚠️ **Inconsistencia entre DB y código:** La columna `metodo_pago` es `NOT NULL` en la migración 14, pero el tipo TypeScript `Factura` la declara como `MetodoPago | null`. El schema Zod de creación también la acepta como `optional().nullable()`. En la práctica, el backend siempre asigna un valor antes del INSERT (calculado desde `pagos_detalle` o recibido del cliente), por lo que el NOT NULL de la DB no suele romperse — pero el contrato entre capas no es consistente.
+
+**Valores válidos de `metodo_pago`:** `efectivo` | `tarjeta_credito` | `tarjeta_debito` | `transferencia` | `mercado_pago` | `mixto` | `otros`
+
+- Si el registro tiene un único método de pago, `metodo_pago` refleja ese método directamente.
+- Si tiene dos o más métodos, el backend lo setea automáticamente a `mixto`. El valor `mixto` no es seleccionable por el usuario — solo se asigna por lógica interna.
+- `pagos_detalle` es `NULL` cuando hay un solo método. Solo se almacena el JSON cuando hay 2 o más métodos de pago.
+
+**Formato de `pagos_detalle`:** JSON string almacenado como TEXT. Solo existe cuando hay pagos múltiples (2 o más métodos).
+
+```json
+[
+  { "metodo_pago": "efectivo",        "monto": 800   },
+  { "metodo_pago": "tarjeta_credito", "monto": 700.5 }
+]
+```
+
+**Índices (migración 14):**
+
+| Índice | Columna(s) |
+|---|---|
+| `idx_facturas_negocio` | `negocio_id` |
+| `idx_facturas_fecha` | `negocio_id, fecha` |
+
 ---
 
 ## Diagrama de Relaciones
@@ -426,6 +476,7 @@ users (Google ID)
   │                                  ├─── events (1:N)
   │                                  ├─── compras (1:N)
   │                                  │       └─── comprador_id ──► employees (FK opcional)
+  │                                  ├─── facturas (1:N)
   │                                  ├─── invitations (1:N)
   │                                  ├─── owner_requests (1:N)
   │                                  ├─── negocio_module_restrictions (1:N)
@@ -449,7 +500,7 @@ admin_emails  (standalone — consultado por isAdmin())
 | Aislamiento de datos | Todas las queries de datos filtran por `negocio_id` |
 | Timestamps | `created_at` + `updated_at` en todas las tablas; `updated_at` se actualiza manualmente |
 | Booleanos | `INTEGER` 0/1 con prefijo `is_` o `has_` |
-| Migraciones | Numeradas `1.sql`–`13.sql`, inmutables en producción |
+| Migraciones | Numeradas `1.sql`–`15.sql`, inmutables en producción |
 
 ---
 
@@ -487,6 +538,8 @@ Las migraciones crean **26 índices explícitos** para optimizar las queries má
 | `compras` | `idx_compras_negocio` | `negocio_id` | Normal | 13 |
 | `compras` | `idx_compras_fecha` | `negocio_id, fecha` | Normal | 13 |
 | `compras` | `idx_compras_comprador` | `comprador_id` | Normal | 13 |
+| `facturas` | `idx_facturas_negocio` | `negocio_id` | Normal | 14 |
+| `facturas` | `idx_facturas_fecha` | `negocio_id, fecha` | Normal | 14 |
 
 ### Índices implícitos (por constraints)
 

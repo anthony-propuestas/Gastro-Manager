@@ -29,9 +29,9 @@ Cobertura actual:
 - `src/worker/validation.test.ts`: verifica schemas Zod y el helper `validateData`.
 - `src/react-app/components/UsageBanner.test.tsx`: verifica cuando el banner no aparece, cuando avisa y cuando marca limite alcanzado.
 - `src/react-app/components/auth/ProtectedRoute.test.tsx`: verifica loading y redirecciones de rutas protegidas.
-- `src/react-app/hooks/useModulePrefs.test.ts`: verifica carga de preferencias, restricciones y update optimista con rollback. Cubre los módulos `calendario`, `personal`, `sueldos` y `compras`.
+- `src/react-app/hooks/useModulePrefs.test.ts`: verifica carga de preferencias, restricciones y update optimista con rollback. Cubre los módulos `calendario`, `personal`, `sueldos`, `compras` y `facturacion`.
 
-> **Atención al agregar un nuevo módulo:** este archivo debe actualizarse manualmente. Los objetos de prefs y restricciones esperados deben incluir la nueva clave, y cualquier mock de respuesta del endpoint `/api/modules/prefs` también debe incluirla — el hook valida que **todos** los módulos registrados en `MODULES` estén presentes en la respuesta, y si falta uno el test fallará silenciosamente (los prefs no se actualizan y se mantiene el valor por defecto).
+> **Atención al agregar un nuevo módulo:** este archivo debe actualizarse manualmente. Los objetos de prefs y restricciones esperados deben incluir la nueva clave, y cualquier mock de respuesta del endpoint `/api/modules/prefs` también debe incluirla — el hook valida que **todos** los módulos registrados en `MODULES` estén presentes en la respuesta, y si falta uno el test fallará silenciosamente (los prefs no se actualizan y se mantiene el valor por defecto). Los módulos actualmente registrados son: `calendario`, `personal`, `sueldos`, `compras` y `facturacion`.
 
 ### 2. Ejecutar tests en modo watch
 
