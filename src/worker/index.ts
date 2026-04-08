@@ -89,7 +89,7 @@ async function sendVerificationEmail(
 ): Promise<void> {
   const resend = new Resend(apiKey);
   await resend.emails.send({
-    from: "Gastro Manager <onboarding@resend.dev>",
+    from: "Gastro Manager <no-reply@lahoja.org>",
     to: toEmail,
     subject: "Verificá tu cuenta en Gastro Manager",
     html: `
