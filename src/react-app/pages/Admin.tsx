@@ -17,6 +17,8 @@ const TOOL_LABELS = [
   { key: "salary_payments", label: "Pagos",      color: "bg-orange-500" },
   { key: "events",          label: "Eventos",    color: "bg-purple-500" },
   { key: "chat",            label: "Chat IA",    color: "bg-pink-500" },
+  { key: "compras",         label: "Gastos",     color: "bg-red-500" },
+  { key: "facturacion",     label: "Facturación", color: "bg-indigo-500" },
 ] as const;
 
 export default function Admin() {
