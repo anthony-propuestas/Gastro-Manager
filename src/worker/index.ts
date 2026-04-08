@@ -2384,6 +2384,14 @@ app.get("/api/admin/stats", authMiddleware, async (c) => {
       .prepare("SELECT COUNT(*) as count FROM usage_logs WHERE entity_type = 'chat'")
       .first() as any;
 
+    const comprasActions = await db
+      .prepare("SELECT COUNT(*) as count FROM usage_logs WHERE entity_type IN ('compras', 'compras_summary')")
+      .first() as any;
+
+    const facturacionActions = await db
+      .prepare("SELECT COUNT(*) as count FROM usage_logs WHERE entity_type = 'factura'")
+      .first() as any;
+
     const usage = {
       employees: employeeActions?.count || 0,
       salaries: salaryActions?.count || 0,
@@ -2392,6 +2400,8 @@ app.get("/api/admin/stats", authMiddleware, async (c) => {
       topics: topicActions?.count || 0,
       notes: noteActions?.count || 0,
       chat: chatActions?.count || 0,
+      compras: comprasActions?.count || 0,
+      facturacion: facturacionActions?.count || 0,
     };
 
     return c.json(apiResponse({ totalUsers, totalNegocios, avgEmployees, avgEvents, usage }), 200);

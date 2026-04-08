@@ -6,7 +6,7 @@ import { Input } from "@/react-app/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/react-app/components/ui/table";
 import { Badge } from "@/react-app/components/ui/badge";
 import { useToast } from "@/react-app/components/ui/toast";
-import { Shield, Users, Mail, TrendingUp, Calendar, Banknote, UserPlus, Trash2, AlertCircle, BarChart3, Settings2, Crown, UserMinus, Search, X } from "lucide-react";
+import { Shield, Users, Mail, TrendingUp, Calendar, UserPlus, Trash2, AlertCircle, BarChart3, Settings2, Crown, UserMinus, Search, X } from "lucide-react";
 
 const TOOL_LABELS = [
   { key: "employees",       label: "Empleados",  color: "bg-green-500" },
@@ -19,6 +19,19 @@ const TOOL_LABELS = [
   { key: "chat",            label: "Chat IA",    color: "bg-pink-500" },
   { key: "compras",         label: "Gastos",     color: "bg-red-500" },
   { key: "facturacion",     label: "Facturación", color: "bg-indigo-500" },
+] as const;
+
+const USAGE_STATS_ITEMS = [
+  { toolKey: "employees",       label: "Empleados",    color: "bg-green-500" },
+  { toolKey: "job_roles",       label: "Roles",        color: "bg-teal-500" },
+  { toolKey: "topics",          label: "Temas",        color: "bg-blue-500" },
+  { toolKey: "notes",           label: "Notas",        color: "bg-sky-500" },
+  { toolKey: "advances",        label: "Anticipos",    color: "bg-amber-500" },
+  { toolKey: "salary_payments", label: "Pagos",        color: "bg-orange-500" },
+  { toolKey: "events",          label: "Eventos",      color: "bg-purple-500" },
+  { toolKey: "chat",            label: "Chat IA",      color: "bg-pink-500" },
+  { toolKey: "compras",         label: "Gastos",       color: "bg-red-500" },
+  { toolKey: "facturacion",     label: "Facturación",  color: "bg-indigo-500" },
 ] as const;
 
 export default function Admin() {
@@ -104,11 +117,16 @@ export default function Admin() {
     );
   }
 
-  const totalActions = stats
-    ? stats.usage.employees + stats.usage.salaries + stats.usage.calendar +
-      (stats.usage.job_roles ?? 0) + (stats.usage.topics ?? 0) +
-      (stats.usage.notes ?? 0) + (stats.usage.chat ?? 0)
-    : 0;
+  const basicUserCount = users.filter(u => u.role === "usuario_basico").length || 1;
+
+  const monthlyUsageByTool: Record<string, number> = {};
+  if (usageData) {
+    for (const row of usageData.rows) {
+      for (const [tool, count] of Object.entries(row.usage)) {
+        monthlyUsageByTool[tool] = (monthlyUsageByTool[tool] || 0) + (count || 0);
+      }
+    }
+  }
 
   return (
     <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-6">
@@ -180,84 +198,34 @@ export default function Admin() {
             Uso del Sistema
           </CardTitle>
           <CardDescription>
-            Estadísticas de actividad por módulo
+            Uso mensual por módulo — {usageData?.period || ""}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Users className="h-4 w-4 text-green-600" />
-                <span className="font-medium">Empleados</span>
-              </div>
-              <div className="text-right">
-                <div className="font-bold text-lg">{stats?.usage.employees || 0}</div>
-                <div className="text-xs text-muted-foreground">
-                  {totalActions > 0
-                    ? `${Math.round(((stats?.usage.employees || 0) / totalActions) * 100)}%`
-                    : "0%"}
-                </div>
-              </div>
-            </div>
-            <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-              <div
-                className="h-full bg-green-500 transition-all"
-                style={{
-                  width: totalActions > 0 ? `${((stats?.usage.employees || 0) / totalActions) * 100}%` : "0%",
-                }}
-              />
-            </div>
-          </div>
+          {USAGE_STATS_ITEMS.map(item => {
+            const used = monthlyUsageByTool[item.toolKey] || 0;
+            const limitPerUser = limits[item.toolKey] || 0;
+            const totalLimit = limitPerUser * basicUserCount;
+            const pct = totalLimit > 0 ? Math.round((used / totalLimit) * 100) : 0;
 
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Banknote className="h-4 w-4 text-amber-600" />
-                <span className="font-medium">Sueldos</span>
-              </div>
-              <div className="text-right">
-                <div className="font-bold text-lg">{stats?.usage.salaries || 0}</div>
-                <div className="text-xs text-muted-foreground">
-                  {totalActions > 0
-                    ? `${Math.round(((stats?.usage.salaries || 0) / totalActions) * 100)}%`
-                    : "0%"}
+            return (
+              <div key={item.toolKey} className="space-y-1">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="font-medium">{item.label}</span>
+                  <div className="text-right">
+                    <span className="font-bold">{used} / {totalLimit}</span>
+                    <span className="text-xs text-muted-foreground ml-2">({pct}%)</span>
+                  </div>
+                </div>
+                <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                  <div
+                    className={`h-full ${item.color} transition-all`}
+                    style={{ width: `${Math.min(pct, 100)}%` }}
+                  />
                 </div>
               </div>
-            </div>
-            <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-              <div
-                className="h-full bg-amber-500 transition-all"
-                style={{
-                  width: totalActions > 0 ? `${((stats?.usage.salaries || 0) / totalActions) * 100}%` : "0%",
-                }}
-              />
-            </div>
-          </div>
-
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Calendar className="h-4 w-4 text-purple-600" />
-                <span className="font-medium">Calendario</span>
-              </div>
-              <div className="text-right">
-                <div className="font-bold text-lg">{stats?.usage.calendar || 0}</div>
-                <div className="text-xs text-muted-foreground">
-                  {totalActions > 0
-                    ? `${Math.round(((stats?.usage.calendar || 0) / totalActions) * 100)}%`
-                    : "0%"}
-                </div>
-              </div>
-            </div>
-            <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-              <div
-                className="h-full bg-purple-500 transition-all"
-                style={{
-                  width: totalActions > 0 ? `${((stats?.usage.calendar || 0) / totalActions) * 100}%` : "0%",
-                }}
-              />
-            </div>
-          </div>
+            );
+          })}
         </CardContent>
       </Card>
 

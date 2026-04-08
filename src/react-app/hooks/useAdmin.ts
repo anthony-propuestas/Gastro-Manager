@@ -38,6 +38,8 @@ interface AdminStats {
     topics: number;
     notes: number;
     chat: number;
+    compras: number;
+    facturacion: number;
   };
 }
 
