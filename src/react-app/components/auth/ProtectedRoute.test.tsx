@@ -59,9 +59,35 @@ describe("ProtectedRoute", () => {
     expect(screen.getByText("login page")).toBeInTheDocument();
   });
 
+  it("redirects unverified users to verify-email", () => {
+    mockUseAuth.mockReturnValue({
+      user: { id: "1", email: "user@example.com", email_verified: false },
+      isPending: false,
+      currentNegocio: null,
+    });
+
+    render(
+      <MemoryRouter initialEntries={["/"]}>
+        <Routes>
+          <Route
+            path="/"
+            element={
+              <ProtectedRoute>
+                <div>private page</div>
+              </ProtectedRoute>
+            }
+          />
+          <Route path="/verify-email" element={<div>verify email page</div>} />
+        </Routes>
+      </MemoryRouter>
+    );
+
+    expect(screen.getByText("verify email page")).toBeInTheDocument();
+  });
+
   it("redirects authenticated users without negocio to setup", () => {
     mockUseAuth.mockReturnValue({
-      user: { id: "1", email: "user@example.com" },
+      user: { id: "1", email: "user@example.com", email_verified: true },
       isPending: false,
       currentNegocio: null,
     });
@@ -87,7 +113,7 @@ describe("ProtectedRoute", () => {
 
   it("allows the setup route without an active negocio", () => {
     mockUseAuth.mockReturnValue({
-      user: { id: "1", email: "user@example.com" },
+      user: { id: "1", email: "user@example.com", email_verified: true },
       isPending: false,
       currentNegocio: null,
     });
@@ -112,7 +138,7 @@ describe("ProtectedRoute", () => {
 
   it("renders protected content when auth and negocio are available", () => {
     mockUseAuth.mockReturnValue({
-      user: { id: "1", email: "user@example.com" },
+      user: { id: "1", email: "user@example.com", email_verified: true },
       isPending: false,
       currentNegocio: { id: 9, name: "Local", my_role: "owner" },
     });

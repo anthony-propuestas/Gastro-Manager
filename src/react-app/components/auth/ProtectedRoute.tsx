@@ -29,6 +29,10 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
     return <Navigate to="/login" replace />;
   }
 
+  if (!user.email_verified) {
+    return <Navigate to="/verify-email" replace />;
+  }
+
   // User is authenticated but has no active negocio — send to setup
   // (Allow /negocio/setup and /invite/* to pass through without this check)
   const isSetupRoute = location.pathname === "/negocio/setup";

@@ -7,6 +7,7 @@ interface AuthUser {
   name: string;
   picture: string;
   role: string;
+  email_verified: boolean;
 }
 
 interface AuthContextValue {

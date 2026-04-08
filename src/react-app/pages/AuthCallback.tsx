@@ -19,8 +19,14 @@ export default function AuthCallback() {
           body: JSON.stringify({ code }),
         });
 
-        if (!res.ok) {
-          const data = await res.json() as { error?: { message?: string } };
+        const data = await res.json() as { success: boolean; error?: { code?: string; message?: string } };
+
+        if (data.error?.code === "PENDING_VERIFICATION") {
+          navigate("/verify-email", { replace: true });
+          return;
+        }
+
+        if (!res.ok || !data.success) {
           throw new Error(data.error?.message ?? "Error de autenticación");
         }
 

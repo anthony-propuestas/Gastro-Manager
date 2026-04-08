@@ -2,6 +2,7 @@
 import { Hono, type MiddlewareHandler } from "hono";
 import { getCookie } from "hono/cookie";
 import { SignJWT, jwtVerify } from "jose";
+import { Resend } from "resend";
 import {
   validateData,
   createEmployeeSchema,
@@ -29,6 +30,7 @@ type Env = {
   GOOGLE_CLIENT_ID: string;
   GOOGLE_CLIENT_SECRET: string;
   JWT_SECRET: string;
+  RESEND_API_KEY: string;
   INITIAL_ADMIN_EMAIL?: string;
   GEMINI_API_KEY?: string;
 };
@@ -76,6 +78,36 @@ async function hashToken(token: string): Promise<string> {
 }
 
 // ============================================
+// Email verification helper
+// ============================================
+
+async function sendVerificationEmail(
+  apiKey: string,
+  toEmail: string,
+  toName: string,
+  verifyUrl: string
+): Promise<void> {
+  const resend = new Resend(apiKey);
+  await resend.emails.send({
+    from: "Gastro Manager <onboarding@resend.dev>",
+    to: toEmail,
+    subject: "Verificá tu cuenta en Gastro Manager",
+    html: `
+      <p>Hola ${toName},</p>
+      <p>Hacé clic en el botón para verificar tu dirección de email:</p>
+      <p>
+        <a href="${verifyUrl}"
+           style="background:#2563eb;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;display:inline-block">
+          Verificar email
+        </a>
+      </p>
+      <p>Este enlace expira en 24 horas.</p>
+      <p>Si no creaste una cuenta, ignorá este mensaje.</p>
+    `,
+  });
+}
+
+// ============================================
 // Middlewares
 // ============================================
 
@@ -86,12 +118,13 @@ const authMiddleware: MiddlewareHandler<{ Bindings: Env; Variables: Variables }>
   }
   try {
     const user = await verifySession(token, c.env.JWT_SECRET);
-    // Always read role from DB so admin changes take effect immediately (no stale JWT)
+    // Always read role and email_verified from DB so admin changes take effect immediately (no stale JWT)
     const dbUser = await c.env.DB
-      .prepare("SELECT role FROM users WHERE id = ?")
+      .prepare("SELECT role, email_verified FROM users WHERE id = ?")
       .bind(user.id)
-      .first<{ role: string }>();
+      .first<{ role: string; email_verified: number }>();
     user.role = dbUser?.role ?? "usuario_basico";
+    (user as any).email_verified = dbUser?.email_verified === 1;
     c.set("user", user);
     await next();
   } catch {
@@ -299,7 +332,13 @@ app.post("/api/sessions", async (c) => {
     });
     const googleUser = await userRes.json() as { id: string; email: string; name: string; picture: string };
 
-    // Persist user in DB (UPSERT) — role is never overwritten to preserve promotions
+    // Check if user exists and their verification status before UPSERT
+    const existingUser = await c.env.DB
+      .prepare("SELECT id, email_verified FROM users WHERE id = ?")
+      .bind(googleUser.id)
+      .first<{ id: string; email_verified: number }>();
+
+    // UPSERT — email_verified is intentionally excluded from DO UPDATE to preserve it
     await c.env.DB
       .prepare(
         `INSERT INTO users (id, email, name, picture, role, created_at, updated_at)
@@ -312,6 +351,39 @@ app.post("/api/sessions", async (c) => {
       )
       .bind(googleUser.id, googleUser.email, googleUser.name, googleUser.picture ?? "")
       .run();
+
+    const isVerified = existingUser?.email_verified === 1;
+
+    if (!isVerified) {
+      // New or unverified user — send verification email, do not create session
+      // Invalidate any previous unused tokens for this user
+      await c.env.DB
+        .prepare("UPDATE email_verification_tokens SET used_at = datetime('now') WHERE user_id = ? AND used_at IS NULL")
+        .bind(googleUser.id)
+        .run();
+
+      const plainToken = await generateToken();
+      const tokenHash = await hashToken(plainToken);
+      const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+
+      await c.env.DB
+        .prepare(
+          `INSERT INTO email_verification_tokens (user_id, token_hash, expires_at)
+           VALUES (?, ?, ?)`
+        )
+        .bind(googleUser.id, tokenHash, expiresAt)
+        .run();
+
+      const origin = new URL(c.req.url).origin;
+      const verifyUrl = `${origin}/api/auth/verify-email?token=${plainToken}`;
+
+      await sendVerificationEmail(c.env.RESEND_API_KEY, googleUser.email, googleUser.name, verifyUrl);
+
+      return c.json(
+        { success: false, error: { code: "PENDING_VERIFICATION", message: `Revisá tu email. Te enviamos un correo a ${googleUser.email}` } },
+        200
+      );
+    }
 
     const dbUser = await c.env.DB
       .prepare("SELECT role FROM users WHERE id = ?")
@@ -331,6 +403,47 @@ app.post("/api/sessions", async (c) => {
       { success: false, error: { code: "AUTH_ERROR", message: "Error al procesar la autenticación" } },
       500
     );
+  }
+});
+
+app.get("/api/auth/verify-email", async (c) => {
+  const token = c.req.query("token");
+  if (!token) return c.redirect("/login?error=invalid_token");
+
+  try {
+    const tokenHash = await hashToken(token);
+
+    const row = await c.env.DB
+      .prepare(
+        `SELECT evt.id, evt.user_id, evt.expires_at, evt.used_at,
+                u.email, u.name, u.picture, u.role
+         FROM email_verification_tokens evt
+         JOIN users u ON u.id = evt.user_id
+         WHERE evt.token_hash = ?`
+      )
+      .bind(tokenHash)
+      .first<{ id: number; user_id: string; expires_at: string; used_at: string | null; email: string; name: string; picture: string; role: string }>();
+
+    if (!row) return c.redirect("/login?error=invalid_token");
+    if (row.used_at !== null) return c.redirect("/verify-email?error=token_used");
+    if (new Date(row.expires_at) < new Date()) return c.redirect("/verify-email?error=token_expired");
+
+    // Mark token as used and user as verified atomically
+    await c.env.DB.batch([
+      c.env.DB.prepare("UPDATE email_verification_tokens SET used_at = datetime('now') WHERE id = ?").bind(row.id),
+      c.env.DB.prepare("UPDATE users SET email_verified = 1, updated_at = datetime('now') WHERE id = ?").bind(row.user_id),
+    ]);
+
+    const jwt = await createSession(
+      { id: row.user_id, email: row.email, name: row.name, picture: row.picture, role: row.role },
+      c.env.JWT_SECRET
+    );
+
+    c.header("Set-Cookie", `${COOKIE_NAME}=${jwt}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=604800`);
+    return c.redirect("/", 302);
+  } catch (error) {
+    console.error("Error verifying email:", error);
+    return c.redirect("/login?error=invalid_token");
   }
 });
 

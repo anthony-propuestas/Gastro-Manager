@@ -18,6 +18,7 @@ import Admin from "@/react-app/pages/Admin";
 import OwnerPanel from "@/react-app/pages/OwnerPanel";
 import Login from "@/react-app/pages/Login";
 import AuthCallback from "@/react-app/pages/AuthCallback";
+import VerifyEmailPage from "@/react-app/pages/VerifyEmailPage";
 import NegocioSetup from "@/react-app/pages/NegocioSetup";
 import InvitePage from "@/react-app/pages/InvitePage";
 
@@ -34,6 +35,7 @@ export default function App() {
           {/* Public routes */}
           <Route path="/login" element={<Login />} />
           <Route path="/auth/callback" element={<AuthCallback />} />
+          <Route path="/verify-email" element={<VerifyEmailPage />} />
           <Route path="/invite/:token" element={<InvitePage />} />
 
           {/* Negocio setup (auth required, no negocio required) */}
