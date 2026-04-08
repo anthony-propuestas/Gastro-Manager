@@ -10,8 +10,8 @@ Nivel del Sistema (email-based)
         • Gestión global de usuarios, límites y estadísticas
 
 Nivel Global de Usuario (users.role)
-  ├── usuario_inteligente  → Sin cuotas, puede solicitar ser owner
-  └── usuario_basico       → Cuotas mensuales, no puede ser owner
+  ├── usuario_inteligente  → Sin cuotas
+  └── usuario_basico       → Cuotas mensuales
 
 Nivel de Negocio (negocio_members.negocio_role)
   ├── owner    → Control total del negocio, restringe módulos a gerentes
@@ -78,7 +78,7 @@ CREATE TABLE admin_emails (
 
 ### Definición
 
-Almacenados en la columna `users.role` (Migration 9). Controlan las **cuotas de uso** y la **capacidad de solicitar ser owner**.
+Almacenados en la columna `users.role` (Migration 9). Controlan las **cuotas de uso**. En el código actual, **no** determinan si un usuario puede solicitar ser `owner`: esa validación depende de que el usuario sea miembro del negocio y de la aprobación de un `owner` existente.
 
 ```sql
 -- Migration 9
@@ -99,7 +99,7 @@ CREATE TABLE users (
 |----------------|-------------------|-----------------------|
 | Rol por defecto | ✅ Sí | ❌ No (requiere promoción por admin) |
 | Cuotas mensuales | ✅ Sí, limitadas | ❌ Sin límite (bypass) |
-| Solicitar ser owner | ✅ Permitido | ✅ Permitido |
+| Puede solicitar ser owner si pertenece al negocio | ✅ Sí | ✅ Sí |
 | Promoción | — | Vía `POST /api/admin/users/:userId/promote` |
 | Degradación | — | Vía `POST /api/admin/users/:userId/demote` |
 
@@ -216,6 +216,8 @@ El middleware `createModuleRestrictionMiddleware(moduleKey)` verifica:
 ## 4. Flujo de Owner Request
 
 Cualquier miembro de un negocio puede solicitar ser `owner`. El creador del negocio es automáticamente el primer owner.
+
+Este flujo usa el rol por negocio (`negocio_members.negocio_role`), no el rol global (`users.role`).
 
 ```
 1. Miembro del negocio (cualquier rol global)

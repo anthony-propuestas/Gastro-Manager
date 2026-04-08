@@ -103,7 +103,7 @@ CREATE TABLE negocio_members (
 
 - El creador del negocio es automáticamente `owner`.
 - Los invitados ingresan como `gerente` por defecto.
-- Un gerente puede solicitar ser owner via `POST /api/negocios/:id/request-owner`.
+- Cualquier miembro del negocio puede solicitar ser owner via `POST /api/negocios/:id/request-owner`.
 
 ---
 
