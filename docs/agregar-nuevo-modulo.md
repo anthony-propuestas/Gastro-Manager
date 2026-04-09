@@ -715,6 +715,12 @@ Un usuario puede agotar su cuota en el Negocio A y tener cuota fresca en el Nego
 - ≥ 100%: banner rojo con mensaje de upgrade a Usuario Inteligente
 - `limit === null` (usuario inteligente): no se muestra
 
+**Modal global de upgrade:**
+- Si el usuario intenta ejecutar una acción adicional y el backend responde `429 USAGE_LIMIT_EXCEEDED`, se abre un modal global de upgrade a Usuario Inteligente
+- El modal se dispara desde `apiFetch()` por medio del evento `USAGE_LIMIT_EVENT`
+- El modal muestra el nombre del módulo, el mensaje del backend y un botón `Subir a inteligente` (actualmente sin acción real)
+- El banner y el modal cumplen roles distintos: el banner avisa antes o en el límite; el modal aparece cuando la acción ya fue bloqueada
+
 ---
 
 ## Cómo configurar límites desde el Admin Panel

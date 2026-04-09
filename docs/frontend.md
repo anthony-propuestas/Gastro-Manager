@@ -226,6 +226,7 @@ Registro y gestión de compras y gastos del negocio.
 - Modal para crear/editar compras
 - Filtros y ordenamiento por fecha
 - Banner de cuota cuando se acerca o alcanza el límite mensual (tool `compras`)
+- Si una acción de escritura falla por `429 USAGE_LIMIT_EXCEEDED`, se abre el modal global de upgrade a Usuario Inteligente
 - Módulo restringible por el owner desde `/owner`
 
 **Componentes usados:**
@@ -244,6 +245,7 @@ Registro y seguimiento de ventas del negocio, con vista de calendario mensual.
 - Click en día con ventas abre `DayDetailModal`
 - Botón "Nueva Venta" abre `FacturaModal` en modo creación
 - Botón "Historial" abre `FacturasHistoryModal` con tabla completa filtrable
+- Si una acción de escritura falla por `429 USAGE_LIMIT_EXCEEDED`, se abre el modal global de upgrade a Usuario Inteligente
 - Módulo restringible por el owner desde `/owner`
 
 **Hooks usados:**
@@ -654,6 +656,8 @@ export function useMyUsage() {
 
 Usado por `ChatWidget` para mostrar `UsageBanner` del tool "chat".
 
+Cuando una operación protegida por cuota falla con `429 USAGE_LIMIT_EXCEEDED`, el frontend también puede abrir el modal global de upgrade a Usuario Inteligente usando el evento `USAGE_LIMIT_EVENT`.
+
 ### useOwnerPanel
 
 Gestión del panel de owner (restricciones de módulos y solicitudes de owner).
@@ -804,6 +808,25 @@ Banner de advertencia de cuota mensual. Se integra en componentes que consumen h
 - **80-99%:** Banner ámbar — "Acercándote al límite mensual"
 - **100%+:** Banner rojo — "Límite mensual alcanzado. Actualiza a Usuario Inteligente para continuar"
 
+El banner es preventivo e informativo. No bloquea acciones por sí mismo.
+
+### Modal global de upgrade por límite (`context/UsageLimitModalContext.tsx`)
+
+Modal global que aparece cuando una acción con cuota falla por `429 USAGE_LIMIT_EXCEEDED`.
+
+**Flujo:**
+- `apiFetch()` detecta la respuesta `429`
+- `notifyUsageLimitExceeded()` valida `error.code === "USAGE_LIMIT_EXCEEDED"`
+- Se dispara el evento global `USAGE_LIMIT_EVENT`
+- `UsageLimitModalProvider` escucha el evento y renderiza el modal
+
+**Comportamiento:**
+- Se abre solo cuando la operación fue rechazada por el backend, no al llegar al último uso válido
+- Muestra el nombre amigable del módulo/herramienta, el mensaje del backend y el límite actual si está disponible
+- Se puede cerrar con `Escape`, click en el backdrop, botón `X` o botón `Ahora no`
+- Incluye CTA `Subir a inteligente`; por ahora es solo visual y no ejecuta ninguna acción real
+- Bloquea temporalmente el scroll del `body` mientras está abierto
+
 ### ChatWidget (Asistente Virtual IA)
 
 Widget flotante para interactuar con el asistente virtual potenciado por Google Gemini.
@@ -814,6 +837,7 @@ Widget flotante para interactuar con el asistente virtual potenciado por Google 
 - Botón flotante en esquina inferior derecha
 - Panel de chat expandible (`w-[380px]`, altura 500px)
 - Integra `UsageBanner` para la herramienta "chat" (via `useMyUsage`)
+- Si el envío de mensaje falla por límite de uso, el modal global de upgrade puede abrirse automáticamente
 - Historial de mensajes en la sesión
 - Animación de carga con puntos rebotando
 - Botón para limpiar historial

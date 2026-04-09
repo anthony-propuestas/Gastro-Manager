@@ -154,6 +154,8 @@ Esto previene condiciones de carrera en solicitudes concurrentes.
 ### En el frontend
 
 - El componente `UsageBanner` muestra el uso actual vs. límite en páginas de módulos.
+- Si una acción falla por `429 USAGE_LIMIT_EXCEEDED`, el frontend abre un modal global de upgrade a `usuario_inteligente`.
+- El modal se dispara a través del evento global `USAGE_LIMIT_EVENT` desde `apiFetch()` y puede cerrarse con `Escape`, backdrop o botones de cierre.
 - El rol se lee del contexto de autenticación (`AuthContext`).
 
 ---

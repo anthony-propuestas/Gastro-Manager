@@ -812,7 +812,7 @@ El contexto enviado a Gemini incluye: empleados activos, sueldos del mes, antici
 | `FORBIDDEN` | 403 | Sin permisos para esta acción |
 | `NOT_FOUND` | 404 | Recurso no encontrado |
 | `VALIDATION_ERROR` | 400 | Datos inválidos (detalle en `message`) |
-| `USAGE_LIMIT_EXCEEDED` | 429 | Cuota mensual alcanzada |
+| `USAGE_LIMIT_EXCEEDED` | 429 | Cuota mensual alcanzada. En el frontend este caso puede abrir el modal global de upgrade a Usuario Inteligente |
 | `DUPLICATE_EMAIL` | 409 | Email de admin ya registrado |
 | `DATABASE_ERROR` | 500 | Error interno de base de datos |
 | `OAUTH_ERROR` | 400 | Error en autenticación OAuth |
