@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { describe, expect, it } from "vitest";
 import {
   createEmployeeSchema,
@@ -7,7 +8,10 @@ import {
   createNegocioSchema,
   createTopicSchema,
   updateTopicSchema,
+  updateEmployeeSchema,
+  updateEventSchema,
   createNoteSchema,
+  updateNoteSchema,
   createAdvanceSchema,
   markSalaryPaidSchema,
   createCompraSchema,
@@ -37,6 +41,30 @@ describe("createEmployeeSchema", () => {
 
     expect(result.success).toBe(false);
   });
+
+  it("rejects hire_date outside the reasonable range", () => {
+    const result = createEmployeeSchema.safeParse({
+      name: "Ana",
+      role: "Chef",
+      hire_date: "2200-01-01",
+    });
+
+    expect(result.success).toBe(false);
+  });
+});
+
+describe("updateEmployeeSchema", () => {
+  it("accepts a partial employee update", () => {
+    const result = updateEmployeeSchema.safeParse({ is_active: false });
+
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects invalid hire_date on partial updates", () => {
+    const result = updateEmployeeSchema.safeParse({ hire_date: "1800-01-01" });
+
+    expect(result.success).toBe(false);
+  });
 });
 
 describe("validateData", () => {
@@ -61,6 +89,32 @@ describe("validateData", () => {
 
     expect(result.success).toBe(false);
     expect(result.error).toBe("Título es requerido");
+  });
+
+  it("falls back to a generic zod message when there are no issues", () => {
+    const emptyZodErrorSchema = {
+      parse: () => {
+        throw new z.ZodError([]);
+      },
+    } as unknown as z.ZodSchema<{ ok: boolean }>;
+
+    const result = validateData(emptyZodErrorSchema, { ok: true });
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBe("Datos inválidos");
+  });
+
+  it("returns a generic error when parsing throws a non-zod error", () => {
+    const explodingSchema = {
+      parse: () => {
+        throw new Error("boom");
+      },
+    } as unknown as z.ZodSchema<{ ok: boolean }>;
+
+    const result = validateData(explodingSchema, { ok: true });
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBe("Error de validación");
   });
 });
 
@@ -118,6 +172,14 @@ describe("createTopicSchema", () => {
     });
     expect(result.success).toBe(false);
   });
+
+  it("rejects due_date outside the reasonable range", () => {
+    const result = createTopicSchema.safeParse({
+      title: "Tarea",
+      due_date: "2200-01-01",
+    });
+    expect(result.success).toBe(false);
+  });
 });
 
 describe("updateTopicSchema", () => {
@@ -128,6 +190,11 @@ describe("updateTopicSchema", () => {
 
   it("rejects invalid due_time even in a partial update", () => {
     const result = updateTopicSchema.safeParse({ due_time: "99:99" });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects invalid due_date even in a partial update", () => {
+    const result = updateTopicSchema.safeParse({ due_date: "1800-01-01" });
     expect(result.success).toBe(false);
   });
 });
@@ -145,6 +212,78 @@ describe("createNoteSchema", () => {
 
   it("rejects content exceeding 1000 characters", () => {
     const result = createNoteSchema.safeParse({ content: "x".repeat(1001) });
+    expect(result.success).toBe(false);
+  });
+});
+
+describe("updateNoteSchema", () => {
+  it("accepts valid note content", () => {
+    const result = updateNoteSchema.safeParse({ content: "Nota actualizada" });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects empty content", () => {
+    const result = updateNoteSchema.safeParse({ content: "" });
+    expect(result.success).toBe(false);
+  });
+});
+
+describe("createEventSchema", () => {
+  it("accepts valid event data with optional times", () => {
+    const result = createEventSchema.safeParse({
+      title: "Capacitacion",
+      event_date: "2026-04-08",
+      start_time: "09:00",
+      end_time: "11:30",
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects event_date outside the reasonable range", () => {
+    const result = createEventSchema.safeParse({
+      title: "Capacitacion",
+      event_date: "1800-01-01",
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects invalid start_time format", () => {
+    const result = createEventSchema.safeParse({
+      title: "Capacitacion",
+      event_date: "2026-04-08",
+      start_time: "99:99",
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects invalid end_time format", () => {
+    const result = createEventSchema.safeParse({
+      title: "Capacitacion",
+      event_date: "2026-04-08",
+      end_time: "25:00",
+    });
+    expect(result.success).toBe(false);
+  });
+});
+
+describe("updateEventSchema", () => {
+  it("accepts an empty object", () => {
+    const result = updateEventSchema.safeParse({});
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects invalid event_date on partial updates", () => {
+    const result = updateEventSchema.safeParse({ event_date: "2200-01-01" });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects invalid start_time on partial updates", () => {
+    const result = updateEventSchema.safeParse({ start_time: "ab:cd" });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects invalid end_time on partial updates", () => {
+    const result = updateEventSchema.safeParse({ end_time: "24:61" });
     expect(result.success).toBe(false);
   });
 });
@@ -167,6 +306,24 @@ describe("createAdvanceSchema", () => {
     const result = createAdvanceSchema.safeParse({ amount: -100 });
     expect(result.success).toBe(false);
   });
+
+  it("rejects advance_date outside the reasonable range", () => {
+    const result = createAdvanceSchema.safeParse({
+      amount: 500,
+      advance_date: "2200-01-01",
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects period_month outside 1 to 12", () => {
+    const result = createAdvanceSchema.safeParse({ amount: 500, period_month: 13 });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects period_year outside the allowed range", () => {
+    const result = createAdvanceSchema.safeParse({ amount: 500, period_year: 1999 });
+    expect(result.success).toBe(false);
+  });
 });
 
 describe("markSalaryPaidSchema", () => {
@@ -178,6 +335,11 @@ describe("markSalaryPaidSchema", () => {
   it("accepts a valid paid_date", () => {
     const result = markSalaryPaidSchema.safeParse({ paid_date: "2026-04-30" });
     expect(result.success).toBe(true);
+  });
+
+  it("rejects an invalid paid_date", () => {
+    const result = markSalaryPaidSchema.safeParse({ paid_date: "2200-01-01" });
+    expect(result.success).toBe(false);
   });
 });
 
@@ -207,6 +369,16 @@ describe("createCompraSchema", () => {
 
   it("rejects an invalid tipo", () => {
     const result = createCompraSchema.safeParse({ ...base, tipo: "regalo" });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects an invalid fecha", () => {
+    const result = createCompraSchema.safeParse({ ...base, fecha: "1800-01-01" });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects comprador_id when it is not positive", () => {
+    const result = createCompraSchema.safeParse({ ...base, comprador_id: 0 });
     expect(result.success).toBe(false);
   });
 });

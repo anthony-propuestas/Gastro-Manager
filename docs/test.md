@@ -26,7 +26,7 @@ Que verifica:
 
 Cobertura actual:
 - `src/react-app/lib/api.test.ts`: verifica que `apiFetch` agregue `X-Negocio-ID` cuando corresponde.
-- `src/worker/validation.test.ts`: verifica schemas Zod y el helper `validateData`. Cubre los schemas de creación y actualización de todas las entidades: empleados, job roles, negocios, tópicos, notas, adelantos, pagos de sueldo, compras y facturación. Valida tipos enum, rangos de monto, formatos de fecha y hora, y campos requeridos.
+- `src/worker/validation.test.ts`: verifica schemas Zod y el helper `validateData`. Cubre los schemas de creación y actualización de todas las entidades: empleados, job roles, negocios, tópicos, notas, adelantos, pagos de sueldo, compras y facturación. Valida tipos enum, rangos de monto, formatos de fecha y hora, campos requeridos y fallbacks de error. Actualmente deja `src/worker/validation.ts` con cobertura completa.
 - `src/react-app/components/UsageBanner.test.tsx`: verifica cuando el banner no aparece, cuando avisa y cuando marca limite alcanzado.
 - `src/react-app/components/ErrorBoundary.test.tsx`: verifica que renderiza hijos sin error, muestra UI de error por defecto o fallback personalizado al capturar excepciones, y que el botón "Intentar de nuevo" restaura el estado limpio.
 - `src/react-app/hooks/useSidebar.test.tsx`: verifica estado inicial, toggles de isOpen e isCollapsed, cierre del menú mobile al hacer resize a ≥1024px, y error al usar el hook fuera del Provider.
@@ -54,6 +54,11 @@ npm run test:coverage
 Que verifica:
 - Ejecuta la suite de Vitest y genera reporte de cobertura.
 - Sirve para ver que partes del codigo ya estan cubiertas y cuales faltan.
+
+Estado actual:
+- Con `npm install`, este comando ya funciona sin instalar dependencias adicionales manualmente.
+- La cobertura actual verificada del repo es 96.34% en statements y 92.3% en branches.
+- `src/worker/validation.ts` quedo en 100% de statements, branches, funciones y lineas.
 
 ### 4. Ejecutar el linter
 

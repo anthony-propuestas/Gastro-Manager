@@ -1,0 +1,205 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<coverage generated="1775714712967" clover="3.2.0">
+  <project timestamp="1775714712967" name="All files">
+    <metrics statements="154" coveredstatements="148" conditionals="104" coveredconditionals="96" methods="55" coveredmethods="52" elements="313" coveredelements="296" complexity="0" loc="154" ncloc="154" packages="6" files="9" classes="9"/>
+    <package name="react-app.components">
+      <metrics statements="20" coveredstatements="17" conditionals="17" coveredconditionals="15" methods="9" coveredmethods="7"/>
+      <file name="ErrorBoundary.tsx" path="C:\Users\dell\Desktop\PPORGAMACION\proyectos de prueva\Gastro Manager\src\react-app\components\ErrorBoundary.tsx">
+        <metrics statements="15" coveredstatements="12" conditionals="7" coveredconditionals="5" methods="8" coveredmethods="6"/>
+        <line num="17" count="10" type="stmt"/>
+        <line num="18" count="10" type="stmt"/>
+        <line num="22" count="8" type="stmt"/>
+        <line num="26" count="4" type="stmt"/>
+        <line num="29" count="1" type="stmt"/>
+        <line num="30" count="1" type="stmt"/>
+        <line num="33" count="0" type="stmt"/>
+        <line num="34" count="0" type="stmt"/>
+        <line num="38" count="18" type="cond" truecount="2" falsecount="0"/>
+        <line num="39" count="8" type="cond" truecount="2" falsecount="0"/>
+        <line num="40" count="4" type="stmt"/>
+        <line num="43" count="4" type="stmt"/>
+        <line num="81" count="10" type="stmt"/>
+        <line num="87" count="3" type="stmt"/>
+        <line num="100" count="0" type="stmt"/>
+      </file>
+      <file name="UsageBanner.tsx" path="C:\Users\dell\Desktop\PPORGAMACION\proyectos de prueva\Gastro Manager\src\react-app\components\UsageBanner.tsx">
+        <metrics statements="5" coveredstatements="5" conditionals="10" coveredconditionals="10" methods="1" coveredmethods="1"/>
+        <line num="10" count="4" type="cond" truecount="4" falsecount="0"/>
+        <line num="11" count="3" type="stmt"/>
+        <line num="12" count="3" type="cond" truecount="2" falsecount="0"/>
+        <line num="14" count="2" type="stmt"/>
+        <line num="15" count="2" type="stmt"/>
+      </file>
+    </package>
+    <package name="react-app.components.auth">
+      <metrics statements="17" coveredstatements="17" conditionals="15" coveredconditionals="15" methods="2" coveredmethods="2"/>
+      <file name="ProtectedRoute.tsx" path="C:\Users\dell\Desktop\PPORGAMACION\proyectos de prueva\Gastro Manager\src\react-app\components\auth\ProtectedRoute.tsx">
+        <metrics statements="17" coveredstatements="17" conditionals="15" coveredconditionals="15" methods="2" coveredmethods="2"/>
+        <line num="13" count="6" type="stmt"/>
+        <line num="14" count="6" type="stmt"/>
+        <line num="16" count="6" type="cond" truecount="2" falsecount="0"/>
+        <line num="17" count="1" type="stmt"/>
+        <line num="28" count="5" type="cond" truecount="2" falsecount="0"/>
+        <line num="29" count="1" type="stmt"/>
+        <line num="32" count="4" type="cond" truecount="2" falsecount="0"/>
+        <line num="33" count="1" type="stmt"/>
+        <line num="38" count="3" type="stmt"/>
+        <line num="39" count="3" type="stmt"/>
+        <line num="41" count="3" type="cond" truecount="5" falsecount="0"/>
+        <line num="42" count="1" type="stmt"/>
+        <line num="45" count="2" type="stmt"/>
+        <line num="54" count="2" type="stmt"/>
+        <line num="56" count="2" type="cond" truecount="4" falsecount="0"/>
+        <line num="57" count="1" type="stmt"/>
+        <line num="60" count="1" type="stmt"/>
+      </file>
+    </package>
+    <package name="react-app.components.ui">
+      <metrics statements="3" coveredstatements="3" conditionals="5" coveredconditionals="4" methods="1" coveredmethods="1"/>
+      <file name="button.tsx" path="C:\Users\dell\Desktop\PPORGAMACION\proyectos de prueva\Gastro Manager\src\react-app\components\ui\button.tsx">
+        <metrics statements="3" coveredstatements="3" conditionals="5" coveredconditionals="4" methods="1" coveredmethods="1"/>
+        <line num="7" count="1" type="stmt"/>
+        <line num="47" count="10" type="cond" truecount="1" falsecount="1"/>
+        <line num="49" count="10" type="stmt"/>
+      </file>
+    </package>
+    <package name="react-app.hooks">
+      <metrics statements="62" coveredstatements="59" conditionals="32" coveredconditionals="27" methods="23" coveredmethods="22"/>
+      <file name="useModulePrefs.ts" path="C:\Users\dell\Desktop\PPORGAMACION\proyectos de prueva\Gastro Manager\src\react-app\hooks\useModulePrefs.ts">
+        <metrics statements="46" coveredstatements="43" conditionals="28" coveredconditionals="24" methods="16" coveredmethods="15"/>
+        <line num="6" count="1" type="stmt"/>
+        <line num="16" count="1" type="stmt"/>
+        <line num="34" count="5" type="cond" truecount="2" falsecount="0"/>
+        <line num="38" count="2" type="cond" truecount="4" falsecount="0"/>
+        <line num="39" count="1" type="stmt"/>
+        <line num="42" count="1" type="stmt"/>
+        <line num="43" count="1" type="cond" truecount="1" falsecount="1"/>
+        <line num="44" count="0" type="stmt"/>
+        <line num="47" count="5" type="stmt"/>
+        <line num="51" count="2" type="cond" truecount="2" falsecount="0"/>
+        <line num="54" count="1" type="stmt"/>
+        <line num="63" count="8" type="stmt"/>
+        <line num="64" count="8" type="stmt"/>
+        <line num="65" count="8" type="stmt"/>
+        <line num="66" count="8" type="stmt"/>
+        <line num="68" count="8" type="stmt"/>
+        <line num="69" count="5" type="cond" truecount="2" falsecount="0"/>
+        <line num="71" count="2" type="stmt"/>
+        <line num="72" count="2" type="stmt"/>
+        <line num="74" count="2" type="cond" truecount="2" falsecount="0"/>
+        <line num="75" count="1" type="stmt"/>
+        <line num="78" count="1" type="cond" truecount="1" falsecount="1"/>
+        <line num="79" count="1" type="stmt"/>
+        <line num="82" count="1" type="stmt"/>
+        <line num="85" count="8" type="stmt"/>
+        <line num="87" count="8" type="stmt"/>
+        <line num="88" count="5" type="cond" truecount="4" falsecount="0"/>
+        <line num="89" count="4" type="stmt"/>
+        <line num="90" count="4" type="stmt"/>
+        <line num="93" count="1" type="stmt"/>
+        <line num="94" count="1" type="stmt"/>
+        <line num="96" count="1" type="cond" truecount="3" falsecount="1"/>
+        <line num="97" count="1" type="stmt"/>
+        <line num="100" count="0" type="stmt"/>
+        <line num="103" count="8" type="stmt"/>
+        <line num="104" count="2" type="stmt"/>
+        <line num="107" count="2" type="stmt"/>
+        <line num="109" count="2" type="stmt"/>
+        <line num="110" count="2" type="stmt"/>
+        <line num="115" count="2" type="stmt"/>
+        <line num="116" count="2" type="cond" truecount="1" falsecount="1"/>
+        <line num="117" count="0" type="stmt"/>
+        <line num="120" count="2" type="cond" truecount="2" falsecount="0"/>
+        <line num="123" count="1" type="stmt"/>
+        <line num="124" count="1" type="stmt"/>
+        <line num="128" count="8" type="stmt"/>
+      </file>
+      <file name="useSidebar.tsx" path="C:\Users\dell\Desktop\PPORGAMACION\proyectos de prueva\Gastro Manager\src\react-app\hooks\useSidebar.tsx">
+        <metrics statements="16" coveredstatements="16" conditionals="4" coveredconditionals="3" methods="7" coveredmethods="7"/>
+        <line num="12" count="1" type="stmt"/>
+        <line num="15" count="9" type="stmt"/>
+        <line num="16" count="9" type="stmt"/>
+        <line num="19" count="9" type="stmt"/>
+        <line num="20" count="4" type="stmt"/>
+        <line num="21" count="1" type="cond" truecount="1" falsecount="1"/>
+        <line num="22" count="1" type="stmt"/>
+        <line num="26" count="4" type="stmt"/>
+        <line num="27" count="4" type="stmt"/>
+        <line num="30" count="9" type="stmt"/>
+        <line num="31" count="9" type="stmt"/>
+        <line num="33" count="9" type="stmt"/>
+        <line num="50" count="11" type="stmt"/>
+        <line num="51" count="11" type="cond" truecount="2" falsecount="0"/>
+        <line num="52" count="2" type="stmt"/>
+        <line num="54" count="9" type="stmt"/>
+      </file>
+    </package>
+    <package name="react-app.lib">
+      <metrics statements="5" coveredstatements="5" conditionals="3" coveredconditionals="3" methods="2" coveredmethods="2"/>
+      <file name="api.ts" path="C:\Users\dell\Desktop\PPORGAMACION\proyectos de prueva\Gastro Manager\src\react-app\lib\api.ts">
+        <metrics statements="4" coveredstatements="4" conditionals="3" coveredconditionals="3" methods="1" coveredmethods="1"/>
+        <line num="11" count="2" type="stmt"/>
+        <line num="16" count="2" type="cond" truecount="2" falsecount="0"/>
+        <line num="17" count="1" type="stmt"/>
+        <line num="20" count="2" type="stmt"/>
+      </file>
+      <file name="utils.ts" path="C:\Users\dell\Desktop\PPORGAMACION\proyectos de prueva\Gastro Manager\src\react-app\lib\utils.ts">
+        <metrics statements="1" coveredstatements="1" conditionals="0" coveredconditionals="0" methods="1" coveredmethods="1"/>
+        <line num="5" count="10" type="stmt"/>
+      </file>
+    </package>
+    <package name="worker">
+      <metrics statements="47" coveredstatements="47" conditionals="32" coveredconditionals="32" methods="18" coveredmethods="18"/>
+      <file name="validation.ts" path="C:\Users\dell\Desktop\PPORGAMACION\proyectos de prueva\Gastro Manager\src\worker\validation.ts">
+        <metrics statements="47" coveredstatements="47" conditionals="32" coveredconditionals="32" methods="18" coveredmethods="18"/>
+        <line num="4" count="1" type="stmt"/>
+        <line num="5" count="22" type="stmt"/>
+        <line num="6" count="22" type="stmt"/>
+        <line num="7" count="22" type="stmt"/>
+        <line num="8" count="22" type="stmt"/>
+        <line num="9" count="22" type="cond" truecount="2" falsecount="0"/>
+        <line num="12" count="1" type="stmt"/>
+        <line num="13" count="10" type="stmt"/>
+        <line num="17" count="1" type="stmt"/>
+        <line num="24" count="1" type="cond" truecount="2" falsecount="0"/>
+        <line num="35" count="1" type="stmt"/>
+        <line num="42" count="1" type="cond" truecount="2" falsecount="0"/>
+        <line num="50" count="1" type="stmt"/>
+        <line num="55" count="1" type="stmt"/>
+        <line num="59" count="2" type="cond" truecount="2" falsecount="0"/>
+        <line num="64" count="3" type="cond" truecount="2" falsecount="0"/>
+        <line num="69" count="1" type="stmt"/>
+        <line num="74" count="1" type="cond" truecount="2" falsecount="0"/>
+        <line num="79" count="1" type="cond" truecount="2" falsecount="0"/>
+        <line num="85" count="1" type="stmt"/>
+        <line num="89" count="1" type="stmt"/>
+        <line num="94" count="1" type="stmt"/>
+        <line num="99" count="6" type="stmt"/>
+        <line num="102" count="2" type="cond" truecount="2" falsecount="0"/>
+        <line num="107" count="2" type="cond" truecount="2" falsecount="0"/>
+        <line num="114" count="1" type="stmt"/>
+        <line num="119" count="1" type="cond" truecount="2" falsecount="0"/>
+        <line num="123" count="1" type="cond" truecount="2" falsecount="0"/>
+        <line num="128" count="1" type="cond" truecount="2" falsecount="0"/>
+        <line num="136" count="1" type="stmt"/>
+        <line num="142" count="2" type="cond" truecount="2" falsecount="0"/>
+        <line num="148" count="1" type="stmt"/>
+        <line num="151" count="2" type="cond" truecount="2" falsecount="0"/>
+        <line num="156" count="1" type="stmt"/>
+        <line num="162" count="1" type="stmt"/>
+        <line num="167" count="1" type="stmt"/>
+        <line num="168" count="6" type="stmt"/>
+        <line num="178" count="1" type="stmt"/>
+        <line num="181" count="1" type="stmt"/>
+        <line num="192" count="1" type="stmt"/>
+        <line num="200" count="4" type="stmt"/>
+        <line num="201" count="4" type="stmt"/>
+        <line num="202" count="4" type="stmt"/>
+        <line num="204" count="3" type="cond" truecount="2" falsecount="0"/>
+        <line num="205" count="2" type="stmt"/>
+        <line num="206" count="2" type="stmt"/>
+        <line num="211" count="1" type="stmt"/>
+      </file>
+    </package>
+  </project>
+</coverage>
