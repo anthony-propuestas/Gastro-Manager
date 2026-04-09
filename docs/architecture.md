@@ -88,6 +88,13 @@ Ejecuta antes de los 9 endpoints de escritura con cuota.
 3. Si newCount <= limit: continuar con el handler
 ```
 
+**Efecto en frontend cuando hay exceso de cuota:**
+
+1. El backend responde `429 USAGE_LIMIT_EXCEEDED`
+2. `apiFetch()` detecta la respuesta y dispara `USAGE_LIMIT_EVENT`
+3. `UsageLimitModalProvider` muestra un modal global de upgrade a Usuario Inteligente
+4. El usuario puede cerrarlo; la acción original permanece rechazada
+
 Omite todo si `user.role === 'usuario_inteligente'`.
 
 ### `createModuleRestrictionMiddleware(moduleKey)`
@@ -215,7 +222,8 @@ gastro-manager/
 │   └── react-app/
 │       ├── context/
 │       │   ├── AuthContext.tsx        # user, role, currentNegocio
-│       │   └── ModulePrefsContext.tsx # preferencias de módulos
+│       │   ├── ModulePrefsContext.tsx # preferencias de módulos
+│       │   └── UsageLimitModalContext.tsx # modal global de upgrade por cuota
 │       ├── hooks/
 │       │   ├── useAdmin.ts        # Panel de admin (14+ funciones)
 │       │   ├── useMyUsage.ts      # Cuotas propias
@@ -223,6 +231,9 @@ gastro-manager/
 │       │   ├── useNegocios.ts     # Multi-tenancy: CRUD negocios
 │       │   ├── useChat.ts         # Chatbot
 │       │   └── use*.ts            # Hooks por módulo
+│       ├── lib/
+│       │   ├── api.ts             # fetch helper + detección de 429 de cuota
+│       │   └── usageLimitModal.ts # evento global USAGE_LIMIT_EVENT y payload
 │       ├── components/
 │       │   ├── UsageBanner.tsx    # Banner de advertencia de cuota
 │       │   ├── ChatWidget.tsx     # Widget flotante del chatbot
