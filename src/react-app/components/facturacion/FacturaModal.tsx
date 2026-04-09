@@ -7,7 +7,7 @@ import { Textarea } from "@/react-app/components/ui/textarea";
 import { useToast } from "@/react-app/components/ui/toast";
 import {
   useFacturacion,
-  METODOS_PAGO_SELECCIONABLES,
+  METODOS_PAGO,
   parsePagosDetalle,
   type Factura,
   type FacturaInput,
@@ -226,7 +226,7 @@ export default function FacturaModal({ isOpen, onClose, onSaved, factura }: Fact
                     onChange={(e) => updateRow(idx, "metodo_pago", e.target.value)}
                     className="flex-1 h-10 rounded-md border border-input bg-background px-3 text-sm"
                   >
-                    {METODOS_PAGO_SELECCIONABLES.map((m) => (
+                    {METODOS_PAGO.map((m) => (
                       <option key={m.value} value={m.value}>{m.label}</option>
                     ))}
                   </select>

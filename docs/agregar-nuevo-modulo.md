@@ -10,7 +10,7 @@ Un módulo es una herramienta para el usuario (ej: Calendario, Personal, Sueldos
 **Límites de uso:**
 - Los endpoints de escritura (POST/PUT/DELETE) se contabilizan por usuario + negocio + mes
 - Los usuarios `usuario_basico` tienen un límite mensual configurable desde el panel admin
-- Los usuarios `usuario_inteligente` tienen acceso ilimitado y no se les cuenta
+- Los usuarios `usuario_inteligente` tienen acceso ilimitado; el código actual no los bloquea por cuota, pero sí registra contador de uso
 
 ---
 
@@ -594,7 +594,7 @@ app.post("/api/mi-modulo",
 
 | Rol del usuario | Resultado |
 |----------------|-----------|
-| `usuario_inteligente` | Pasa sin contar — acceso ilimitado |
+| `usuario_inteligente` | Pasa sin bloqueo de cuota; el código actual incrementa `usage_counters` en segundo plano |
 | `usuario_basico` dentro del límite | Incrementa contador y pasa |
 | `usuario_basico` que superó el límite | 429 `USAGE_LIMIT_EXCEEDED` con mensaje de upgrade |
 
@@ -699,7 +699,7 @@ const visibleNavItems = navItems.filter((item) => {
 ```
 POST /api/mi-modulo
   └─> createUsageLimitMiddleware("mi_modulo_action")
-        ├─> usuario_inteligente → next() sin contar
+    ├─> usuario_inteligente → incrementa contador de forma silenciosa y next() sin bloqueo
         └─> usuario_basico
               ├─> INSERT ... ON CONFLICT DO UPDATE count = count + 1 RETURNING count
               ├─> count <= limit → next()
@@ -727,7 +727,7 @@ Desde `/admin` (solo usuarios con rol admin de la plataforma):
 - Endpoint: `PUT /api/admin/usage-limits` con body `{ "mi_modulo_action": 50 }`
 
 **Sección "Usuarios":**
-- **Promover a `usuario_inteligente`**: acceso ilimitado (saltea todos los contadores)
+- **Promover a `usuario_inteligente`**: acceso ilimitado; no se aplica bloqueo por cuota, aunque el código actual sigue registrando contadores
 - **Degradar a `usuario_basico`**: vuelven a aplicarse los límites configurados
 - Endpoints: `POST /api/admin/users/:userId/promote` y `/demote`
 

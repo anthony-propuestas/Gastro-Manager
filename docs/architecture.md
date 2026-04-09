@@ -78,6 +78,8 @@ Ejecuta antes de los 9 endpoints de escritura con cuota.
 
 **Patrón atómico (increment-then-revert) para evitar TOCTOU:**
 
+- Si `user.role === 'usuario_inteligente'`, no hay bloqueo por cuota. El código actual igualmente intenta registrar `count + 1` en `usage_counters` y luego deja pasar la request.
+
 ```
 1. INSERT usage_counters ... count = count + 1 RETURNING count
 2. Si newCount > limit:
@@ -132,7 +134,7 @@ El cambio de negocio se dispara desde el dropdown del sidebar. Al seleccionar ot
 | Rol | Descripción |
 |---|---|
 | `usuario_basico` | Sujeto a cuotas mensuales configurables |
-| `usuario_inteligente` | Sin cuotas; acceso ilimitado |
+| `usuario_inteligente` | Sin bloqueo por cuotas; acceso ilimitado. El código actual sigue registrando uso en `usage_counters` |
 
 El rol se almacena en `users.role` y es gestionado por el admin vía `/api/admin/users/:id/promote|demote`. Los cambios son **inmediatos** porque el `authMiddleware` lo lee de DB en cada request.
 

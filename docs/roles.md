@@ -98,12 +98,12 @@ CREATE TABLE users (
 | Característica | `usuario_basico` | `usuario_inteligente` |
 |----------------|-------------------|-----------------------|
 | Rol por defecto | ✅ Sí | ❌ No (requiere promoción por admin) |
-| Cuotas mensuales | ✅ Sí, limitadas | ❌ Sin límite (bypass) |
+| Cuotas mensuales | ✅ Sí, limitadas | ❌ Sin bloqueo por límite; el uso sigue registrándose en `usage_counters` |
 | Puede solicitar ser owner si pertenece al negocio | ✅ Sí | ✅ Sí |
 | Promoción | — | Vía `POST /api/admin/users/:userId/promote` |
 | Degradación | — | Vía `POST /api/admin/users/:userId/demote` |
 
-### Cuotas mensuales (solo `usuario_basico`)
+### Cuotas mensuales (bloqueo solo para `usuario_basico`)
 
 Las cuotas se aplican por **combinación (usuario, negocio, herramienta, mes)**:
 
@@ -142,6 +142,8 @@ CREATE TABLE usage_limits (
 ### Verificación atómica de cuotas
 
 El middleware `createUsageLimitMiddleware(tool)` implementa un patrón atómico:
+
+- Para `usuario_inteligente`, el middleware no bloquea la operación. En el código actual, igualmente se registra el uso en `usage_counters` y luego continúa.
 
 1. **Incrementar** el contador (`INSERT ... ON CONFLICT DO UPDATE count = count + 1`)
 2. **Verificar** si el nuevo conteo supera el límite

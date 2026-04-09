@@ -6,6 +6,7 @@ import { ToastProvider } from "@/react-app/components/ui/toast";
 import { ErrorBoundary, PageErrorBoundary } from "@/react-app/components/ErrorBoundary";
 import { SidebarProvider } from "@/react-app/hooks/useSidebar";
 import { ModulePrefsProvider } from "@/react-app/context/ModulePrefsContext";
+import { UsageLimitModalProvider } from "@/react-app/context/UsageLimitModalContext";
 import { ChatWidget } from "@/react-app/components/ChatWidget";
 import Dashboard from "@/react-app/pages/Dashboard";
 import Employees from "@/react-app/pages/modulos/Employees";
@@ -27,11 +28,12 @@ export default function App() {
     <ErrorBoundary>
       <AuthProvider>
         <ToastProvider>
-          <Router>
-            <ModulePrefsProvider>
-            <SidebarProvider>
-            <ChatWidget />
-            <Routes>
+          <UsageLimitModalProvider>
+            <Router>
+              <ModulePrefsProvider>
+              <SidebarProvider>
+              <ChatWidget />
+              <Routes>
           {/* Public routes */}
           <Route path="/login" element={<Login />} />
           <Route path="/auth/callback" element={<AuthCallback />} />
@@ -168,9 +170,10 @@ export default function App() {
                 }
               />
             </Routes>
-            </SidebarProvider>
-            </ModulePrefsProvider>
-          </Router>
+              </SidebarProvider>
+              </ModulePrefsProvider>
+            </Router>
+          </UsageLimitModalProvider>
         </ToastProvider>
       </AuthProvider>
     </ErrorBoundary>

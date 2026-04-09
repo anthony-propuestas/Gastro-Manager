@@ -22,8 +22,6 @@ export const METODOS_PAGO: { value: MetodoPago; label: string }[] = [
   { value: "otros",           label: "Otros" },
 ];
 
-export const METODOS_PAGO_SELECCIONABLES = METODOS_PAGO; // sin "mixto" — se calcula automáticamente
-
 export interface PagoDetalle {
   metodo_pago: MetodoPago;
   monto: number;
@@ -56,7 +54,7 @@ export interface FacturaInput {
   pagos_detalle?: string | null;
 }
 
-export interface FacturaDailySummary {
+interface FacturaDailySummary {
   fecha: string;
   total_dia: number;
   cantidad: number;

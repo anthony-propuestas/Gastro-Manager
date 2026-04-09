@@ -30,7 +30,7 @@ export interface CompraInput {
   comprobante_key?: string | null;
 }
 
-export interface DailySummary {
+interface DailySummary {
   fecha: string;
   total_dia: number;
   total_productos: number;

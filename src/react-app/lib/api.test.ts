@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { apiFetch } from "@/react-app/lib/api";
+import { USAGE_LIMIT_EVENT } from "@/react-app/lib/usageLimitModal";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -39,5 +40,38 @@ describe("apiFetch", () => {
         }),
       })
     );
+  });
+
+  it("dispatches a usage-limit event when the API returns USAGE_LIMIT_EXCEEDED", async () => {
+    const listener = vi.fn();
+    const payload = {
+      success: false,
+      error: {
+        code: "USAGE_LIMIT_EXCEEDED",
+        message: "Límite mensual alcanzado (20). Actualiza a Usuario Inteligente para continuar.",
+      },
+    };
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify(payload), {
+        status: 429,
+        headers: { "Content-Type": "application/json" },
+      })
+    );
+
+    vi.stubGlobal("fetch", fetchMock);
+    window.addEventListener(USAGE_LIMIT_EVENT, listener as EventListener);
+
+    await apiFetch("/api/chat", { method: "POST" }, 3);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(listener).toHaveBeenCalledTimes(1);
+    expect((listener.mock.calls[0]?.[0] as CustomEvent).detail).toMatchObject({
+      endpoint: "/api/chat",
+      moduleLabel: "Chat IA",
+      limit: 20,
+    });
+
+    window.removeEventListener(USAGE_LIMIT_EVENT, listener as EventListener);
   });
 });

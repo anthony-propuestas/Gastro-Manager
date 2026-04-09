@@ -3,6 +3,8 @@
  * All hooks should use this instead of calling fetch() directly for API requests
  * that require a negocio context.
  */
+import { notifyUsageLimitExceeded } from "@/react-app/lib/usageLimitModal";
+
 export function apiFetch(
   url: string,
   options: RequestInit = {},
@@ -17,5 +19,8 @@ export function apiFetch(
     headers["X-Negocio-ID"] = String(negocioId);
   }
 
-  return fetch(url, { ...options, headers });
+  return fetch(url, { ...options, headers }).then((response) => {
+    void notifyUsageLimitExceeded(response, url);
+    return response;
+  });
 }
