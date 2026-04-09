@@ -17,6 +17,7 @@ Sistema de gestión de restaurantes multi-usuario desplegado en Cloudflare Worke
 | Asistente Virtual IA | Chatbot contextual sobre los datos del negocio (Google Gemini) |
 | Panel de Admin | Estadísticas globales, gestión de cuotas, roles de usuario |
 | Panel Owner | Restricciones de módulos para gerentes, gestión de solicitudes de owner |
+| Modal de upgrade | Modal global al exceder cuota: informa herramienta bloqueada y sugiere upgrade |
 
 ---
 
@@ -24,7 +25,7 @@ Sistema de gestión de restaurantes multi-usuario desplegado en Cloudflare Worke
 
 | Capa | Tecnología |
 |---|---|
-| Frontend | React 19 + React Router 7 + Tailwind CSS + shadcn/ui |
+| Frontend | React 19 + React Router 7 + Tailwind CSS v4 + shadcn/ui |
 | Backend | Hono (Cloudflare Workers) |
 | Base de datos | Cloudflare D1 (SQLite serverless) |
 | Almacenamiento | Cloudflare R2 (comprobantes de compras) |
@@ -96,6 +97,8 @@ Las cuotas son **por usuario por negocio** y se reinician mensualmente. Los lím
 *El límite de compras es `null` hasta que el admin lo configure desde el panel.
 
 El middleware de cuotas usa un patrón **increment-then-revert atómico** para evitar condiciones de carrera (TOCTOU).
+
+Cuando el backend responde `429 USAGE_LIMIT_EXCEEDED`, `apiFetch` emite un evento global `USAGE_LIMIT_EVENT` que dispara el **modal de upgrade** (`UsageLimitModalContext`). El modal muestra la herramienta bloqueada y puede cerrarse con `Escape` o click en el backdrop.
 
 ---
 
@@ -183,12 +186,15 @@ npm run check
 ## Comandos NPM
 
 ```bash
-npm run dev          # Servidor de desarrollo
-npm run build        # Compilar para producción
-npm run check        # Verificar build y configuración
-npm run lint         # Ejecutar linter
-npm run knip         # Detectar código sin usar
-npm run cf-typegen   # Generar tipos de Cloudflare
+npm run dev             # Servidor de desarrollo
+npm run build           # Compilar para producción
+npm run check           # Verificar build y configuración
+npm run lint            # Ejecutar linter
+npm test                # Ejecutar suite de tests (Vitest)
+npm run test:watch      # Tests en modo interactivo
+npm run test:coverage   # Tests con reporte de cobertura
+npm run knip            # Detectar código sin usar
+npm run cf-typegen      # Generar tipos de Cloudflare
 ```
 
 ---
@@ -230,4 +236,4 @@ npm run cf-typegen   # Generar tipos de Cloudflare
 
 ---
 
-**Versión**: 2.0.0 · **Plataforma**: Cloudflare Workers · **Última actualización**: 2026-04-06
+**Versión**: 2.1.0 · **Plataforma**: Cloudflare Workers · **Última actualización**: 2026-04-09
