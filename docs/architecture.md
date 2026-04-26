@@ -2,23 +2,26 @@
 
 ## Visión General
 
-Gastro Manager es una aplicación full-stack donde el Worker de Cloudflare sirve tanto el frontend estático (React SPA) como la API REST, conectada a una base de datos D1 (SQLite) y servicios externos.
+Gastro Manager es una aplicación full-stack con frontend desplegado en **Cloudflare Pages** y API REST en un **Cloudflare Worker** (Hono), conectada a una base de datos D1 (SQLite) y servicios externos.
 
 ```
 Navegador
    │
    │  HTTPS
    ▼
-Cloudflare Worker (Hono)
-   ├── Sirve React SPA (archivos estáticos)
-   └── API REST /api/*
-         ├── authMiddleware           → lee rol fresco de D1
-         ├── negocioMiddleware        → valida X-Negocio-ID
-         ├── moduleRestrictionMiddleware → bloquea gerentes de módulos restringidos
-         ├── usageLimitMiddleware     → cuotas atómicas
-         └── Route handlers → D1 (SQLite)
-                              ├── R2 producción (comprobantes)
-                              └── Google Gemini API (chatbot)
+Cloudflare Pages (React SPA — archivos estáticos)
+   │  public/_redirects → index.html para SPA routing
+   └── /api/* → functions/[[route]].ts (Pages Function)
+                    │
+                    ▼
+               Hono Worker (src/worker/index.ts)
+                    ├── authMiddleware           → lee rol fresco de D1
+                    ├── negocioMiddleware        → valida X-Negocio-ID
+                    ├── moduleRestrictionMiddleware → bloquea gerentes de módulos restringidos
+                    ├── usageLimitMiddleware     → cuotas atómicas
+                    └── Route handlers → D1 (SQLite)
+                                         ├── R2 producción (comprobantes)
+                                         └── Google Gemini API (chatbot)
 
 Google OAuth (accounts.google.com) ← intercambio de código en POST /api/sessions
 
@@ -149,11 +152,11 @@ El rol se almacena en `users.role` y es gestionado por el admin vía `/api/admin
 
 Las cuotas son **por usuario por negocio por mes** (`UNIQUE(user_id, negocio_id, tool, period)`).
 
-- **9 herramientas** sujetas a cuota: `employees`, `job_roles`, `topics`, `notes`, `advances`, `salary_payments`, `events`, `chat`, `compras`.
+- **10 herramientas** sujetas a cuota: `employees`, `job_roles`, `topics`, `notes`, `advances`, `salary_payments`, `events`, `chat`, `compras`, `facturacion`.
 - Los límites son globales (una fila por tool en `usage_limits`) y editables desde el panel de admin.
 - El endpoint `mark-all-paid` consume **N usos** (uno por empleado marcado), con lógica inline (no usa el middleware estándar).
-- El endpoint `PUT /api/compras/:id` **también consume cuota**, a diferencia de PUT en otros módulos donde solo POST consume.
-- `compras` no tiene límite seedeado en la migración — es `NULL` hasta que el admin lo configure.
+- Los endpoints `PUT /api/compras/:id` y `PUT /api/facturacion/:id` **también consumen cuota**, a diferencia de PUT en otros módulos donde solo POST consume.
+- `compras` y `facturacion` tienen límite default de 50 seedeado en migración 16.
 
 ---
 
@@ -212,8 +215,12 @@ POST /api/chat { message }
 
 ```
 gastro-manager/
-├── migrations/           # 13 migraciones SQL (inmutables)
+├── migrations/           # 17 migraciones SQL (inmutables)
 ├── docs/                 # Documentación
+├── functions/
+│   └── [[route]].ts      # Pages Function: rutas /api/* → Hono Worker; demás → ASSETS
+├── public/
+│   └── _redirects        # Requerido para SPA routing en Cloudflare Pages
 ├── src/
 │   ├── worker/
 │   │   ├── index.ts      # Todos los endpoints y middlewares
@@ -247,11 +254,11 @@ gastro-manager/
 │           │   ├── Employees.tsx
 │           │   ├── Salaries.tsx
 │           │   ├── CalendarPage.tsx
-│           │   └── Compras.tsx
+│           │   ├── Compras.tsx
+│           │   └── facturacion/   # Módulo de facturación (calendario + CRUD)
 │           ├── NegocioSetup.tsx   # Selección/creación de negocio
 │           ├── InvitePage.tsx     # Flujo de invitación
 │           └── ...
-└── public/
 ```
 
 ---

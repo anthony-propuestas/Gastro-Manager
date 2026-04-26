@@ -4,7 +4,9 @@ Guía para configurar variables de entorno y desplegar la aplicación en Cloudfl
 
 ## Plataforma
 
-**Cloudflare Workers** — Runtime serverless edge. El Worker sirve tanto el frontend React (SPA) como la API REST desde el mismo proceso. La base de datos es Cloudflare D1 (SQLite serverless).
+**Cloudflare Pages** — Sirve el frontend React (SPA estático). El archivo `public/_redirects` redirige todas las rutas al `index.html` para SPA routing. Las peticiones a `/api/*` son interceptadas por `functions/[[route]].ts` (Pages Function) que las delega al Worker Hono.
+
+**Cloudflare Workers** — Sirve exclusivamente la API REST (`src/worker/index.ts`). La base de datos es Cloudflare D1 (SQLite serverless).
 
 ---
 
@@ -77,10 +79,12 @@ wrangler secret put INITIAL_ADMIN_EMAIL
 
 ```json
 {
+  "$schema": "node_modules/wrangler/config-schema.json",
   "name": "gastro-manager",
-  "main": "./src/worker/index.ts",
+  "pages_build_output_dir": "./dist",
   "compatibility_date": "2025-06-17",
   "compatibility_flags": ["nodejs_compat"],
+  "observability": { "enabled": true },
   "d1_databases": [
     {
       "binding": "DB",
@@ -210,10 +214,10 @@ Verifica que todo compile y hace un dry-run de Wrangler para detectar errores de
 ### Deploy
 
 ```bash
-wrangler deploy
+npm run deploy
 ```
 
-O via Cloudflare Dashboard: Workers & Pages → seleccionar worker → Deploy.
+Esto ejecuta `wrangler pages deploy` que publica el build en Cloudflare Pages (frontend + Pages Functions). También puede hacerse via Cloudflare Dashboard: Workers & Pages → seleccionar el proyecto `gastro-manager` → Deploy.
 
 ---
 
@@ -222,7 +226,7 @@ O via Cloudflare Dashboard: Workers & Pages → seleccionar worker → Deploy.
 | Ambiente | URL | Base de datos |
 |---|---|---|
 | Development | `http://localhost:5173` | D1 local (`.wrangler/`) |
-| Production | `https://<worker>.workers.dev` | D1 producción |
+| Production | `https://<proyecto>.pages.dev` | D1 producción |
 
 ---
 
@@ -249,7 +253,7 @@ Para que el login con Google funcione, la app debe estar registrada en Google Cl
 wrangler tail
 ```
 
-O via Cloudflare Dashboard: Workers & Pages → seleccionar worker → Logs.
+O via Cloudflare Dashboard: Workers & Pages → seleccionar el proyecto `gastro-manager` → Logs.
 
 ### Métricas
 
