@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl -I https://lahoja.org/assets/index-fRqt76YR.js)",
+      "Bash(curl -Ik https://lahoja.org/assets/index-fRqt76YR.js)",
+      "Bash(curl -Ik https://lahoja.org/assets/index-CVPWO1t9.css)",
+      "Bash(curl -Ik https://lahoja.org/)"
+    ]
+  }
+}

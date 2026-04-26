@@ -7,6 +7,11 @@ export const onRequest: PagesFunction<{ ASSETS: Fetcher }> = async (context) => 
     return app.fetch(context.request, context.env as never, context.waitUntil.bind(context));
   }
 
+  // Assets must never fall back to index.html — return 404 directly if missing
+  if (url.pathname.startsWith('/assets/')) {
+    return context.env.ASSETS.fetch(context.request);
+  }
+
   // Serve the static asset if it exists, otherwise serve index.html for SPA routing
   const assetResponse = await context.env.ASSETS.fetch(context.request);
   if (assetResponse.status === 404) {
