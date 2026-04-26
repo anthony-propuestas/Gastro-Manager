@@ -12,6 +12,7 @@ Sistema de gestión de restaurantes multi-usuario desplegado en Cloudflare Worke
 | Sueldos | Registro de salarios, adelantos, pagos individuales y por lote |
 | Calendario | Eventos propios + tópicos con fecha límite integrados visualmente |
 | Compras | Registro de compras y gastos del negocio por categoría, con upload de comprobantes |
+| Facturación | Registro de ventas/facturas con vista de calendario mensual, totales y promedios |
 | Seguimiento | Tópicos y notas por empleado con deadlines y alertas de vencimiento |
 | Negocios compartidos | Múltiples usuarios pueden colaborar en el mismo negocio |
 | Asistente Virtual IA | Chatbot contextual sobre los datos del negocio (Google Gemini) |
@@ -93,6 +94,7 @@ Las cuotas son **por usuario por negocio** y se reinician mensualmente. Los lím
 | Eventos | 15 / mes |
 | Chat IA | 20 / mes |
 | Compras | sin límite por defecto* |
+| Facturación | sin límite por defecto* |
 
 *El límite de compras es `null` hasta que el admin lo configure desde el panel.
 
@@ -133,6 +135,14 @@ Cuando el backend responde `429 USAGE_LIMIT_EXCEEDED`, `apiFetch` emite un event
 - Filtro por mes/año con totales del período
 - Campos: ítem, monto, fecha, tipo (`producto` / `servicio`), categoría, comprador (empleado opcional)
 - Sujeto a cuota mensual configurable (`compras`)
+- Restringible por el owner desde `/owner`
+
+### Facturación
+- Registro de ventas/facturas del negocio
+- Vista de calendario mensual con totales por día
+- Estadísticas del período: total del mes, cantidad de ventas, promedio por venta
+- CRUD completo de facturas con historial
+- Sujeto a cuota mensual configurable (`facturacion`)
 - Restringible por el owner desde `/owner`
 
 ### Asistente Virtual (Chatbot IA)
@@ -189,6 +199,7 @@ npm run check
 npm run dev             # Servidor de desarrollo
 npm run build           # Compilar para producción
 npm run check           # Verificar build y configuración
+npm run deploy          # Compilar y desplegar a Cloudflare Workers
 npm run lint            # Ejecutar linter
 npm test                # Ejecutar suite de tests (Vitest)
 npm run test:watch      # Tests en modo interactivo
@@ -236,4 +247,4 @@ npm run cf-typegen      # Generar tipos de Cloudflare
 
 ---
 
-**Versión**: 2.1.0 · **Plataforma**: Cloudflare Workers · **Última actualización**: 2026-04-09
+**Versión**: 2.2.0 · **Plataforma**: Cloudflare Workers · **Última actualización**: 2026-04-26
