@@ -33,17 +33,18 @@ Sistema de gestión de restaurantes multi-usuario desplegado en Cloudflare Worke
 | Autenticación | Google OAuth nativo + JWT (jose) |
 | Validación | Zod |
 | IA | Google Gemini 2.5 Flash |
-| Hosting | Cloudflare Workers (edge global) |
+| Hosting Frontend | Cloudflare Pages |
+| Hosting Backend | Cloudflare Workers (edge global) |
 
 ---
 
 ## Arquitectura en una línea
 
 ```
-React SPA → Hono Worker (auth + quota middleware) → D1 (SQLite) + Gemini API
+Cloudflare Pages (React SPA) → Hono Worker (auth + quota middleware) → D1 (SQLite) + Gemini API
 ```
 
-El Worker sirve tanto el frontend estático como la API REST. No hay servidores separados.
+El frontend estático se despliega en Cloudflare Pages (`public/_redirects` requerido para SPA routing). El Worker sirve exclusivamente la API REST.
 
 ---
 
