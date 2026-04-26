@@ -48,9 +48,10 @@
   "scripts": {
     "build": "tsc -b --noEmit && vite build",
     "cf-typegen": "wrangler types",
-    "check": "tsc && vite build && wrangler deploy --dry-run",
-    "deploy": "vite build && wrangler deploy",
+    "check": "tsc && vite build && wrangler pages deploy dist --dry-run",
+    "deploy": "vite build && wrangler pages deploy dist",
     "dev": "vite",
+    "dev:pages": "wrangler pages dev dist --proxy 5173",
     "knip": "knip",
     "lint": "eslint .",
     "test": "vitest run",

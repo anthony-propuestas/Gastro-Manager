@@ -1,17 +1,13 @@
 {
 	"$schema": "node_modules/wrangler/config-schema.json",
 	"name": "gastro-manager",
-	"main": "./src/worker/index.ts",
+	"pages_build_output_dir": "./dist",
 	"compatibility_date": "2025-06-17",
 	"compatibility_flags": [
 		"nodejs_compat"
 	],
 	"observability": {
 		"enabled": true
-	},
-	"upload_source_maps": true,
-	"assets": {
-		"not_found_handling": "single-page-application"
 	},
 	"d1_databases": [
 		{
