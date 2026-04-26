@@ -48,6 +48,7 @@ export default function Admin() {
   const [filterRole, setFilterRole] = useState<"all" | "usuario_basico" | "usuario_inteligente">("all");
   const [filterNegocio, setFilterNegocio] = useState("all");
   const [filterTool, setFilterTool] = useState("all");
+  const [usagePage, setUsagePage] = useState(0);
 
   useEffect(() => {
     if (isAdmin) {
@@ -276,6 +277,9 @@ export default function Admin() {
           if (usageSearchEmail && !r.email.toLowerCase().includes(usageSearchEmail.toLowerCase())) return false;
           return true;
         });
+        const PAGE_SIZE = 50;
+        const totalPages = Math.ceil(filteredRows.length / PAGE_SIZE);
+        const pageRows = filteredRows.slice(usagePage * PAGE_SIZE, (usagePage + 1) * PAGE_SIZE);
         const hasFilters = filterRole !== "all" || filterNegocio !== "all" || filterTool !== "all" || usageSearchEmail !== "";
         return (
           <Card>
@@ -294,13 +298,13 @@ export default function Admin() {
                     type="text"
                     placeholder="Buscar email..."
                     value={usageSearchEmail}
-                    onChange={e => setUsageSearchEmail(e.target.value)}
+                    onChange={e => { setUsageSearchEmail(e.target.value); setUsagePage(0); }}
                     className="w-full pl-8 pr-3 py-2 text-sm border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring"
                   />
                 </div>
                 <select
                   value={filterRole}
-                  onChange={e => setFilterRole(e.target.value as typeof filterRole)}
+                  onChange={e => { setFilterRole(e.target.value as typeof filterRole); setUsagePage(0); }}
                   className="px-3 py-2 text-sm border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring"
                 >
                   <option value="all">Todos los roles</option>
@@ -309,7 +313,7 @@ export default function Admin() {
                 </select>
                 <select
                   value={filterNegocio}
-                  onChange={e => setFilterNegocio(e.target.value)}
+                  onChange={e => { setFilterNegocio(e.target.value); setUsagePage(0); }}
                   className="px-3 py-2 text-sm border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring"
                 >
                   <option value="all">Todos los negocios</option>
@@ -317,7 +321,7 @@ export default function Admin() {
                 </select>
                 <select
                   value={filterTool}
-                  onChange={e => setFilterTool(e.target.value)}
+                  onChange={e => { setFilterTool(e.target.value); setUsagePage(0); }}
                   className="px-3 py-2 text-sm border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring"
                 >
                   <option value="all">Todas las herramientas</option>
@@ -325,7 +329,7 @@ export default function Admin() {
                 </select>
                 {hasFilters && (
                   <button
-                    onClick={() => { setUsageSearchEmail(""); setFilterRole("all"); setFilterNegocio("all"); setFilterTool("all"); }}
+                    onClick={() => { setUsageSearchEmail(""); setFilterRole("all"); setFilterNegocio("all"); setFilterTool("all"); setUsagePage(0); }}
                     className="flex items-center gap-1 px-3 py-2 text-sm text-muted-foreground hover:text-foreground border rounded-md hover:bg-accent transition-colors"
                   >
                     <X className="h-3.5 w-3.5" />
@@ -365,7 +369,7 @@ export default function Admin() {
                           Sin resultados con los filtros actuales
                         </TableCell>
                       </TableRow>
-                    ) : filteredRows.map(u => {
+                    ) : pageRows.map(u => {
                       const isInteligente = u.role === "usuario_inteligente";
                       return (
                         <TableRow
@@ -401,6 +405,21 @@ export default function Admin() {
                   </TableBody>
                 </Table>
               </div>
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between pt-2">
+                  <span className="text-xs text-muted-foreground">
+                    Página {usagePage + 1} de {totalPages} · {filteredRows.length} filas
+                  </span>
+                  <div className="flex gap-2">
+                    <Button variant="outline" size="sm" onClick={() => setUsagePage(p => p - 1)} disabled={usagePage === 0}>
+                      Anterior
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => setUsagePage(p => p + 1)} disabled={usagePage >= totalPages - 1}>
+                      Siguiente
+                    </Button>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         );

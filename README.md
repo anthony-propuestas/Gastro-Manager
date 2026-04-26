@@ -223,6 +223,7 @@ npm run cf-typegen      # Generar tipos de Cloudflare
 | [Validación](docs/validation.md) | Reglas y esquemas Zod |
 | [Roles y Permisos](docs/roles.md) | Sistema de roles, cuotas y permisos |
 | [Tests](docs/test.md) | Guía de ejecución y cobertura de tests |
+| [Seguridad](docs/security.md) | Autenticación, autorización, cuotas, validación y superficie de ataque |
 | [Agregar un módulo](docs/agregar-nuevo-modulo.md) | Checklist paso a paso para nuevos módulos |
 | [Despliegue](docs/deployment.md) | Configuración y variables de entorno |
 | [Sistema de Backup](docs/backup.md) | Copias de seguridad automáticas de base de datos y archivos |

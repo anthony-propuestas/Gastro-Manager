@@ -33,6 +33,7 @@ Cobertura actual:
 - `src/react-app/hooks/useSidebar.test.tsx`: verifica estado inicial, toggles de isOpen e isCollapsed, cierre del menú mobile al hacer resize a ≥1024px, y error al usar el hook fuera del Provider.
 - `src/react-app/components/auth/ProtectedRoute.test.tsx`: verifica loading y redirecciones de rutas protegidas.
 - `src/react-app/hooks/useModulePrefs.test.ts`: verifica carga de preferencias, restricciones y update optimista con rollback. Cubre los módulos `calendario`, `personal`, `sueldos`, `compras` y `facturacion`.
+- `src/react-app/pages/Admin.test.tsx`: verifica la paginación de la tabla "Uso por Usuario" en el panel de administración. Cubre: ausencia de controles con ≤50 filas, aparición de controles con >50 filas, estado disabled de "Anterior" en página 1 y "Siguiente" en la última, visibilidad correcta de filas por página, navegación hacia adelante y hacia atrás, indicador "Página X de Y", y reset a página 1 al filtrar por email o al limpiar filtros.
 
 > **Atención al agregar un nuevo módulo:** este archivo debe actualizarse manualmente. Los objetos de prefs y restricciones esperados deben incluir la nueva clave, y cualquier mock de respuesta del endpoint `/api/modules/prefs` también debe incluirla — el hook valida que **todos** los módulos registrados en `MODULES` estén presentes en la respuesta, y si falta uno el test fallará silenciosamente (los prefs no se actualizan y se mantiene el valor por defecto). Los módulos actualmente registrados son: `calendario`, `personal`, `sueldos`, `compras` y `facturacion`.
 
