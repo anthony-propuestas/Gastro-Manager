@@ -49,6 +49,7 @@
     "build": "tsc -b --noEmit && vite build",
     "cf-typegen": "wrangler types",
     "check": "tsc && vite build && wrangler deploy --dry-run",
+    "deploy": "vite build && wrangler deploy",
     "dev": "vite",
     "knip": "knip",
     "lint": "eslint .",
