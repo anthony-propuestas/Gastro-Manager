@@ -53,6 +53,16 @@ Los usuarios con rol `usuario_inteligente` se excluyen deliberadamente del denom
 
 Esta lógica es la misma que aplica el middleware de cuotas en el backend: solo los usuarios básicos consumen cuota, por lo que el denominador en la visualización debe reflejar únicamente ese grupo.
 
+### Conteo de usuarios registrados
+
+El endpoint `/api/admin/stats` obtiene el total de usuarios con:
+
+```sql
+SELECT COUNT(*) FROM users
+```
+
+La tabla `users` tiene una restricción `UNIQUE` sobre `email` y almacena exactamente una fila por usuario autenticado, independientemente de cuántos negocios integre. Esto garantiza que el conteo no se infle por membresías múltiples. La consulta anterior usaba `negocio_members`, que puede contener múltiples filas por usuario (una por negocio), y producía un recuento mayor al real — lo que podría haber sido interpretado como mayor base de usuarios de la existente. El cambio a `users` hace que el dato mostrado en el panel refleje únicamente identidades únicas autenticadas.
+
 ---
 
 ## Chatbot (IA)

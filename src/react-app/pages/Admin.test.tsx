@@ -393,3 +393,31 @@ describe("Uso del Sistema", () => {
     expect(screen.getByText("150%")).toBeInTheDocument();
   });
 });
+
+// ─── Tarjeta de Usuarios Registrados ─────────────────────────────────────────
+
+describe("Tarjeta de Usuarios Registrados", () => {
+  it("muestra 0 cuando stats es null", () => {
+    mockUseAdmin.mockReturnValue({ ...BASE_MOCK, stats: null });
+    render(<Admin />);
+    expect(screen.getByText("Usuarios Registrados")).toBeInTheDocument();
+    expect(screen.getByText("0")).toBeInTheDocument();
+  });
+
+  it("muestra el totalUsers que devuelve stats", () => {
+    mockUseAdmin.mockReturnValue({
+      ...BASE_MOCK,
+      stats: { totalUsers: 42, usage: { employees: 0, salaries: 0, calendar: 0, job_roles: 0, topics: 0, notes: 0, chat: 0, compras: 0, facturacion: 0 } },
+    });
+    render(<Admin />);
+    expect(screen.getByText("42")).toBeInTheDocument();
+  });
+
+  it("no muestra las tarjetas antiguas eliminadas", () => {
+    mockUseAdmin.mockReturnValue({ ...BASE_MOCK, stats: null });
+    render(<Admin />);
+    expect(screen.queryByText("Correos Registrados")).toBeNull();
+    expect(screen.queryByText("Promedio Empleados")).toBeNull();
+    expect(screen.queryByText("Promedio Eventos")).toBeNull();
+  });
+});

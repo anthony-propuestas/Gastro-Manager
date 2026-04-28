@@ -6,7 +6,7 @@ import { Input } from "@/react-app/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/react-app/components/ui/table";
 import { Badge } from "@/react-app/components/ui/badge";
 import { useToast } from "@/react-app/components/ui/toast";
-import { Shield, Users, Mail, TrendingUp, Calendar, UserPlus, Trash2, AlertCircle, Settings2, Crown, UserMinus, Search, X, RefreshCw } from "lucide-react";
+import { Shield, Users, Mail, TrendingUp, UserPlus, Trash2, AlertCircle, Settings2, Crown, UserMinus, Search, X, RefreshCw } from "lucide-react";
 
 const TOOL_LABELS = [
   { key: "employees",       label: "Empleados",  color: "bg-green-500" },
@@ -142,52 +142,16 @@ export default function Admin() {
       </div>
 
       {/* Statistics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="border-green-200 bg-gradient-to-br from-green-50 to-white">
+      <div className="flex">
+        <Card className="border-green-200 bg-gradient-to-br from-green-50 to-white w-64">
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
               <Users className="h-4 w-4" />
-              Total Usuarios
+              Usuarios Registrados
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold text-green-700">{stats?.totalUsers || 0}</div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-blue-200 bg-gradient-to-br from-blue-50 to-white">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-              <Mail className="h-4 w-4" />
-              Correos Registrados
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-blue-700">{stats?.registeredEmails || 0}</div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-amber-200 bg-gradient-to-br from-amber-50 to-white">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-              <UserPlus className="h-4 w-4" />
-              Promedio Empleados
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-amber-700">{stats?.avgEmployees || 0}</div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-purple-200 bg-gradient-to-br from-purple-50 to-white">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-              <Calendar className="h-4 w-4" />
-              Promedio Eventos
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-purple-700">{stats?.avgEvents || 0}</div>
           </CardContent>
         </Card>
       </div>

@@ -27,9 +27,6 @@ interface AdminUser {
 
 interface AdminStats {
   totalUsers: number;
-  registeredEmails: number;
-  avgEmployees: number;
-  avgEvents: number;
   usage: {
     employees: number;
     salaries: number;

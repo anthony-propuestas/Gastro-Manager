@@ -2436,38 +2436,9 @@ app.get("/api/admin/stats", authMiddleware, async (c) => {
     }
 
     const usersResult = await db
-      .prepare("SELECT COUNT(*) as count FROM negocio_members")
+      .prepare("SELECT COUNT(*) as count FROM users")
       .first() as any;
     const totalUsers = usersResult?.count || 0;
-
-    const negociosResult = await db
-      .prepare("SELECT COUNT(*) as count FROM negocios")
-      .first() as any;
-    const totalNegocios = negociosResult?.count || 0;
-
-    const avgEmployeesResult = await db
-      .prepare(`
-        SELECT AVG(emp_count) as avg_count
-        FROM (
-          SELECT negocio_id, COUNT(*) as emp_count
-          FROM employees
-          GROUP BY negocio_id
-        )
-      `)
-      .first() as any;
-    const avgEmployees = Math.round(avgEmployeesResult?.avg_count || 0);
-
-    const avgEventsResult = await db
-      .prepare(`
-        SELECT AVG(event_count) as avg_count
-        FROM (
-          SELECT negocio_id, COUNT(*) as event_count
-          FROM events
-          GROUP BY negocio_id
-        )
-      `)
-      .first() as any;
-    const avgEvents = Math.round(avgEventsResult?.avg_count || 0);
 
     const employeeActions = await db
       .prepare("SELECT COUNT(*) as count FROM usage_logs WHERE entity_type = 'employee'")
@@ -2517,7 +2488,7 @@ app.get("/api/admin/stats", authMiddleware, async (c) => {
       facturacion: facturacionActions?.count || 0,
     };
 
-    return c.json(apiResponse({ totalUsers, totalNegocios, avgEmployees, avgEvents, usage }), 200);
+    return c.json(apiResponse({ totalUsers, usage }), 200);
   } catch (error) {
     console.error("Error getting admin stats:", error);
     return c.json(apiError("STATS_ERROR", "Error al obtener estadísticas"), 500);
