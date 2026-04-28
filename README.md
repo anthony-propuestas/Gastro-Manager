@@ -30,7 +30,7 @@ Sistema de gestión de restaurantes multi-usuario desplegado en Cloudflare Worke
 | Backend | Hono (Cloudflare Workers) |
 | Base de datos | Cloudflare D1 (SQLite serverless) |
 | Almacenamiento | Cloudflare R2 (comprobantes de compras) |
-| Autenticación | Google OAuth nativo + JWT (jose) |
+| Autenticación | Google OAuth nativo + JWT (jose) + verificación por email (Resend) |
 | Validación | Zod |
 | IA | Google Gemini 2.5 Flash |
 | Hosting Frontend | Cloudflare Pages |
@@ -94,10 +94,8 @@ Las cuotas son **por usuario por negocio** y se reinician mensualmente. Los lím
 | Pagos de sueldo | 10 / mes |
 | Eventos | 15 / mes |
 | Chat IA | 20 / mes |
-| Compras | sin límite por defecto* |
-| Facturación | sin límite por defecto* |
-
-*El límite de compras es `null` hasta que el admin lo configure desde el panel.
+| Compras | 50 / mes |
+| Facturación | 50 / mes |
 
 El middleware de cuotas usa un patrón **increment-then-revert atómico** para evitar condiciones de carrera (TOCTOU).
 
@@ -193,6 +191,7 @@ npm run check
 | `GOOGLE_CLIENT_SECRET` | Client Secret de Google OAuth |
 | `JWT_SECRET` | Clave secreta para firmar sesiones JWT |
 | `GEMINI_API_KEY` | API key de Google Gemini (chatbot, opcional) |
+| `RESEND_API_KEY` | API key de Resend para emails de verificación |
 | `INITIAL_ADMIN_EMAIL` | Email del primer administrador del sistema |
 
 ---
@@ -230,12 +229,14 @@ npm run cf-typegen      # Generar tipos de Cloudflare
 | [Agregar un módulo](docs/agregar-nuevo-modulo.md) | Checklist paso a paso para nuevos módulos |
 | [Despliegue](docs/deployment.md) | Configuración y variables de entorno |
 | [Sistema de Backup](docs/backup.md) | Copias de seguridad automáticas de base de datos y archivos |
+| [Auditoría de Backup](docs/backup-auditoria.md) | Registro histórico de auditoría del sistema de backup |
+| [Workflow de Documentación](docs/workflow-documentacion.md) | Checklist post-cambio para mantener la documentación sincronizada |
 
 ---
 
 ## Seguridad
 
-- Autenticación Google OAuth (sin manejo de contraseñas)
+- Autenticación Google OAuth con verificación de email obligatoria (Resend)
 - Rol leído de DB en cada request (inmune a tokens JWT desactualizados)
 - Aislamiento de datos por negocio en todas las queries
 - Validación Zod en servidor para todas las entradas, incluyendo tipo y longitud de cada ítem del historial del chatbot

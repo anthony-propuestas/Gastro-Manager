@@ -125,6 +125,7 @@ Ninguna variable sensible se incluye en el build del frontend (Vite). El Worker 
 - `src/react-app/context/UsageLimitModalContext.test.tsx`: verifica que el modal de upgrade se active ante el evento global y no pueda ser ignorado.
 - `src/react-app/components/auth/ProtectedRoute.test.tsx`: verifica redirecciones para usuarios no autenticados.
 - `src/worker/validation.test.ts`: verifica que los schemas Zod rechacen entradas inválidas en todos los módulos. Incluye 8 casos para `chatHistoryItemSchema` y `chatHistoryArraySchema`: acepta roles válidos (`user`/`model`) y content dentro del límite; rechaza roles arbitrarios, content vacío y content > 2000 chars.
+- `src/react-app/pages/Admin.test.tsx`: verifica que la tarjeta "Usuarios Registrados" muestre `totalUsers` correctamente y que las tarjetas eliminadas (`registeredEmails`, `avgEmployees`, `avgEvents`) ya no estén presentes en el DOM.
 
 ---
 
@@ -136,7 +137,7 @@ Ninguna variable sensible se incluye en el build del frontend (Vite). El Worker 
 | Acceso cruzado entre negocios | `negocio_id` validado en el servidor contra membresía del usuario |
 | Exceder cuotas con requests concurrentes | Incremento atómico en D1 con RETURNING count |
 | Inyección SQL | D1 con prepared statements en todos los endpoints |
-| Prompt injection via `history` del chat | Autocontenido (solo afecta al atacante); contexto del negocio es server-controlled; pendiente validar ítems individuales |
+| Prompt injection via `history` del chat | Autocontenido (solo afecta al atacante); contexto del negocio es server-controlled; ítems validados con `chatHistoryArraySchema` (role + longitud) |
 | Agotamiento de tokens de Gemini vía history largo | `history` cortado a 20 ítems server-side; cada ítem validado (role + longitud) |
 | Rate limiting en endpoints de auth (`/api/auth/*`) | No implementado — pendiente agregar a nivel IP en el Worker |
 | Datos de negocio en caché tras expulsión de miembro | Caché expira en 30 min; acceso a la API ya bloqueado por `negocioMiddleware` desde el momento de la expulsión |

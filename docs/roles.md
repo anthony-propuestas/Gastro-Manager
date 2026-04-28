@@ -117,7 +117,8 @@ Las cuotas se aplican por **combinación (usuario, negocio, herramienta, mes)**:
 | `salary_payments` | 10 |
 | `events` | 15 |
 | `chat` | 20 |
-| `compras` | *(sin límite por defecto — configurable desde el admin)* |
+| `compras` | 50 (default, configurable desde el admin) |
+| `facturacion` | 50 (default, configurable desde el admin) |
 
 ```sql
 -- Migration 10
@@ -148,6 +149,8 @@ El middleware `createUsageLimitMiddleware(tool)` implementa un patrón atómico:
 1. **Incrementar** el contador (`INSERT ... ON CONFLICT DO UPDATE count = count + 1`)
 2. **Verificar** si el nuevo conteo supera el límite
 3. **Revertir** (decrementar) si se excedió → responder con HTTP 429
+
+> **Nota**: `compras` y `facturacion` consumen cuota también en `PUT` y `DELETE` (no solo en `POST`), a diferencia del resto de módulos.
 
 Esto previene condiciones de carrera en solicitudes concurrentes.
 
@@ -192,12 +195,13 @@ El owner puede ocultar módulos específicos a los gerentes de su negocio:
 | Personal | `personal` | `/empleados` |
 | Sueldos | `sueldos` | `/sueldos` |
 | Compras | `compras` | `/compras` |
+| Facturación | `facturacion` | `/facturacion` |
 
 ```sql
 -- Migration 12
 CREATE TABLE negocio_module_restrictions (
   negocio_id    INTEGER NOT NULL REFERENCES negocios(id) ON DELETE CASCADE,
-  module_key    TEXT    NOT NULL, -- 'calendario' | 'personal' | 'sueldos' | 'compras'
+  module_key    TEXT    NOT NULL, -- 'calendario' | 'personal' | 'sueldos' | 'compras' | 'facturacion'
   is_restricted INTEGER NOT NULL DEFAULT 0,
   updated_at    TEXT    NOT NULL DEFAULT (datetime('now')),
   PRIMARY KEY (negocio_id, module_key)
@@ -342,7 +346,7 @@ El worker define 4 niveles de middleware que se aplican en cadena:
 | `authMiddleware` | `src/worker/index.ts` | Valida JWT, lee `users.role` fresco de la DB |
 | `negocioMiddleware` | `src/worker/index.ts` | Verifica membresía al negocio, establece `negocio_role` |
 | `createUsageLimitMiddleware(tool)` | `src/worker/index.ts` | Verifica cuotas (skip si `usuario_inteligente`) |
-| `createModuleRestrictionMiddleware(moduleKey)` | `src/worker/index.ts` | Bloquea gerentes de módulos restringidos |
+| `createModuleRestrictionMiddleware(moduleKey)` | `src/worker/index.ts` | Bloquea gerentes de módulos restringidos (`calendario` \| `personal` \| `sueldos` \| `compras` \| `facturacion`) |
 
 **Detalle importante**: el rol del usuario se **lee de la base de datos en cada request**, no se confía en el valor cacheado en el JWT. Esto garantiza que cambios de rol surtan efecto de inmediato.
 
@@ -365,6 +369,7 @@ Calendario       → Oculto si: prefs.calendario = false O (isGerente Y restricc
 Personal         → Oculto si: prefs.personal = false O (isGerente Y restricción activa)
 Sueldos          → Oculto si: prefs.sueldos = false O (isGerente Y restricción activa)
 Compras          → Oculto si: prefs.compras = false O (isGerente Y restricción activa)
+Facturación      → Oculto si: prefs.facturacion = false O (isGerente Y restricción activa)
 Configuración    → Siempre visible
 Admin            → Solo si isAdmin
 Panel Owner      → Solo si negocio_role = 'owner'
@@ -393,6 +398,8 @@ CREATE TABLE user_module_prefs (
 ```
 
 Un módulo es visible si: `user_module_prefs.is_active = 1` **Y** (es `owner` **O** `negocio_module_restrictions.is_restricted = 0`).
+
+Los 5 módulos con preferencia y restricción son: `calendario`, `personal`, `sueldos`, `compras`, `facturacion`.
 
 ---
 

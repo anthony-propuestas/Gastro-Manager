@@ -3,6 +3,7 @@
 Comparación entre lo que describe `docs/backup.md` y lo que ejecuta `.github/workflows/backup.yml`. Objetivo: detectar inconsistencias, comportamientos no documentados y riesgos.
 
 **Fecha de auditoría:** 2026-04-07
+**Última actualización:** 2026-04-28
 **Archivos analizados:**
 - Documentación: `docs/backup.md`
 - Código: `.github/workflows/backup.yml`
@@ -13,13 +14,16 @@ Comparación entre lo que describe `docs/backup.md` y lo que ejecuta `.github/wo
 
 | Severidad | Cantidad | Descripción |
 |---|---|---|
-| 🟡 Menor | 4 | Hallazgos vigentes de contexto operativo |
+| ✅ Resuelto | 5 | Todos los hallazgos corregidos en `backup.md` |
 
 ## Estado actual
 
-`docs/backup.md` fue corregido después de esta auditoría inicial y hoy ya describe correctamente el comportamiento de `rclone sync`, incluida la propagación de borrados.
+**2026-04-28 — Auditoría cerrada.** Todos los hallazgos detectados el 2026-04-07 han sido corregidos en `docs/backup.md`:
 
-Este documento se conserva como registro histórico del desajuste detectado el 2026-04-07, pero la diferencia crítica original entre `backup.md` y `.github/workflows/backup.yml` ya no aplica al estado actual del repositorio.
+- El hallazgo crítico original (propagación de borrados) fue el primero en resolverse.
+- Los cuatro hallazgos menores (flags no documentados, mapeo de secrets, instalación de rclone, versión de Node.js) también están documentados en `backup.md` en la sección "Detalles de Implementación" y en la tabla de secrets.
+
+Este documento se conserva como registro histórico completo de la auditoría.
 
 ---
 
@@ -62,85 +66,35 @@ La opción B fue la adoptada posteriormente en la documentación principal: hoy 
 
 ---
 
-## 🟡 Diferencias Menores
+## Hallazgos menores — todos resueltos
 
-### 2. Flag `--s3-no-check-bucket` no documentado
+### 2. Flag `--s3-no-check-bucket` no documentado ✅ Resuelto
 
-**En el código:**
-```yaml
---s3-no-check-bucket
-```
-
-**En la documentación actual:** ya mencionado en `backup.md`.
-
-**Por qué importa:** Fue un detalle faltante al momento de la auditoría original. Hoy la documentación principal ya aclara que este flag evita verificaciones de bucket que requerirían permisos más altos que Object Read & Write.
+Documentado en `backup.md` (sección "Componente 2 — Archivos (R2) → Permisos requeridos").
 
 ---
 
-### 3. Flag `--verbose` en rclone no documentado
+### 3. Flag `--verbose` en rclone no documentado ✅ Resuelto
 
-**En el código:**
-```yaml
---verbose
-```
-
-**En la documentación:** no mencionado.
-
-**Por qué importa:** `--verbose` imprime una línea de log por cada archivo sincronizado. Si el bucket de producción tiene cientos o miles de comprobantes, los logs del job pueden volverse muy extensos, dificultando la detección de errores reales entre el ruido. No es un problema de comportamiento, pero sí afecta la operabilidad del sistema.
+Documentado en `backup.md` (sección "Detalles de Implementación → Logs de rclone"), incluyendo la recomendación de usar `--stats-one-line` para reducir verbosidad.
 
 ---
 
-### 4. Distinción entre nombre de secret y variable de entorno de wrangler
+### 4. Distinción entre nombre de secret y variable de entorno de wrangler ✅ Resuelto
 
-**En el código:**
-```yaml
-env:
-  CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
-  CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
-```
-
-**En la documentación:** solo se mencionan los nombres de los secrets de GitHub (`CF_API_TOKEN`, `CF_ACCOUNT_ID`), sin explicar que wrangler los consume bajo nombres de variable de entorno distintos (`CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`).
-
-**Por qué importa:** Si alguien quiere depurar un fallo de autenticación de wrangler, buscará la variable `CLOUDFLARE_API_TOKEN` en los logs pero en la documentación solo verá `CF_API_TOKEN`. La tabla de secrets en `backup.md` es correcta para el repositorio de GitHub, pero incompleta para entender cómo el workflow los consume internamente.
+Documentado en `backup.md` (tabla de "Secrets de GitHub Actions" con columna "Variable de entorno usada internamente" y nota de implementación sobre el mapeo).
 
 ---
 
-### 5. Instalación de rclone vía script externo no auditado
+### 5. Instalación de rclone vía script externo no auditado ✅ Resuelto
 
-**En el código:**
-```yaml
-run: curl https://rclone.org/install.sh | sudo bash
-```
-
-**En la documentación:** no mencionado.
-
-**Por qué importa:** Este patrón (`curl | bash`) descarga y ejecuta con privilegios de superusuario un script de internet sin verificación de integridad (sin checksum ni firma). Es una práctica con implicaciones de seguridad en entornos CI/CD: si el servidor de rclone fuera comprometido o si hubiera un ataque de tipo man-in-the-middle, el script podría ejecutar código arbitrario en el runner.
-
-Alternativa más segura documentada por GitHub Actions: usar una action oficial de rclone o instalar desde una release específica con checksum verificado.
-
-Riesgo actual: bajo (Cloudflare Workers runners son efímeros y desechados tras cada job), pero vale la pena documentarlo como decisión consciente.
+Documentado en `backup.md` (sección "Detalles de Implementación → Instalación de rclone") como decisión consciente de simplicidad sobre verificación de integridad.
 
 ---
 
-### 6. Node.js 20 con advertencia de deprecación activa
+### 6. Node.js 20 con advertencia de deprecación activa ✅ Resuelto
 
-**En el código:**
-```yaml
-- name: Setup Node.js
-  uses: actions/setup-node@v4
-  with:
-    node-version: '20'
-```
-
-**En la documentación:** no mencionado.
-
-**Contexto:** GitHub Actions ha emitido una advertencia oficial:
-- Node.js 20 se eliminará de los runners el **16 de septiembre de 2026**.
-- A partir del **2 de junio de 2026**, Node.js 24 será el runtime predeterminado.
-
-**Impacto:** El workflow seguirá funcionando hasta septiembre de 2026, pero emitirá advertencias en cada ejecución desde junio. Después de esa fecha fallará si no se actualiza la versión.
-
-**Corrección recomendada:** Cambiar `node-version: '20'` a `node-version: '22'` o `'24'` en el workflow, y probarlo antes de la fecha límite.
+Documentado en `backup.md` (sección "Detalles de Implementación → Versión de Node.js") con la fecha límite del 16 de septiembre de 2026 y la acción requerida.
 
 ---
 
@@ -157,15 +111,17 @@ Riesgo actual: bajo (Cloudflare Workers runners son efímeros y desechados tras 
 | 4 secrets requeridos | 4 variables referenciadas | ✅ Correcto |
 | Ejecución manual disponible | `workflow_dispatch` | ✅ Correcto |
 | Flag `--s3-no-check-bucket` | Presente en código | ✅ Documentado en `backup.md` |
-| Flag `--verbose` | Presente en código | 🟡 No documentado |
-| Mapeo secret → variable de entorno wrangler | Implícito en el `env:` del step | 🟡 No documentado |
-| Instalación de rclone vía `curl \| bash` | Presente en código | 🟡 No documentado |
-| Versión Node.js con deprecación próxima | `node-version: '20'` | 🟡 No documentado |
+| Flag `--verbose` | Presente en código | ✅ Documentado en `backup.md` |
+| Mapeo secret → variable de entorno wrangler | Implícito en el `env:` del step | ✅ Documentado en `backup.md` |
+| Instalación de rclone vía `curl \| bash` | Presente en código | ✅ Documentado en `backup.md` |
+| Versión Node.js con deprecación próxima | `node-version: '20'` | ✅ Documentado en `backup.md` |
 
 ---
 
-## Acciones Recomendadas
+## Acciones completadas
 
-1. Actualizar `node-version` de `'20'` a `'22'` o superior en el workflow antes de septiembre de 2026.
-2. Agregar en `backup.md` una nota sobre el mapeo `CF_API_TOKEN` → `CLOUDFLARE_API_TOKEN` para facilitar debugging de wrangler.
-3. Registrar la decisión de usar `curl | bash` para instalar rclone como decisión consciente, o reemplazarlo por una alternativa con verificación de integridad.
+| Acción | Estado |
+|---|---|
+| Actualizar `node-version: '20'` → `'22'` o superior antes de septiembre 2026 | ⏳ Pendiente en código (documentado en `backup.md`) |
+| Agregar en `backup.md` nota sobre mapeo `CF_API_TOKEN` → `CLOUDFLARE_API_TOKEN` | ✅ Hecho |
+| Registrar decisión de `curl \| bash` como elección consciente en `backup.md` | ✅ Hecho |

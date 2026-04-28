@@ -8,7 +8,12 @@ Ejecutar después de **cualquier** cambio de código antes de cerrar la tarea.
 
 - [ ] `docs/test.md` refleja el estado actual de tests
 - [ ] `docs/security.md` documenta el impacto (o la ausencia de impacto) del cambio
+- [ ] `docs/api.md` refleja endpoints nuevos, modificados o eliminados
+- [ ] `docs/architecture.md` refleja cambios en middlewares, cuotas, módulos o flujos internos
+- [ ] `docs/authentication.md` refleja cambios en el flujo de auth o sesiones
 - [ ] `README.md` describe con precisión el estado actual del sistema
+
+> Solo marcar los que aplican al cambio. Si un archivo no fue afectado, omitirlo.
 
 ---
 
@@ -56,7 +61,49 @@ Después del análisis:
 
 ---
 
-## Paso 3 — README (`README.md`)
+## Paso 3 — API (`docs/api.md`)
+
+Actualizar solo si hubo cambios en endpoints:
+
+| Situación | Acción |
+|---|---|
+| Endpoint nuevo | Agregar sección con método, ruta, auth, body y respuesta |
+| Endpoint eliminado | Eliminar la sección y decrementar el total en "Notas Generales" |
+| Cambio en request/response | Actualizar campos y ejemplos |
+| Solo cambio de lógica interna (sin cambio de contrato) | No aplica |
+
+Actualizar el contador `Total de endpoints` en la sección "Notas Generales" si cambió la cantidad.
+
+---
+
+## Paso 4 — Arquitectura (`docs/architecture.md`)
+
+Actualizar si cambió alguno de estos elementos:
+
+- **Middlewares** — nuevo middleware, nueva excepción, cambio en orden de ejecución
+- **Módulos restringibles** — se agregó o quitó un módulo de `createModuleRestrictionMiddleware`
+- **Sistema de cuotas** — nuevo endpoint que consume cuota, cambio en cuándo se consume (PUT/DELETE que antes no consumían)
+- **Flujo de auth** — cambio en el diagrama de sesiones/JWT
+- **Excepciones conocidas** — nuevo caso documentado en la tabla de excepciones de módulos
+
+Si no cambió nada de lo anterior, no tocar el archivo.
+
+---
+
+## Paso 5 — Autenticación (`docs/authentication.md`)
+
+Actualizar solo si cambió el flujo de autenticación:
+
+- Nuevo paso en el diagrama de OAuth (login, verificación, logout)
+- Cambio en cómo se genera o valida la cookie/JWT
+- Cambio en cómo responde el backend en cada rama (verificado / no verificado)
+- Nuevo endpoint de auth
+
+Si el cambio fue solo en lógica de negocio (no en auth), no tocar el archivo.
+
+---
+
+## Paso 6 — README (`README.md`)
 
 Actualizar solo las secciones afectadas:
 

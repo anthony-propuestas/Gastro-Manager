@@ -142,6 +142,7 @@ Las migraciones SQL están en `migrations/` (archivos `1.sql` a `17.sql`). Son *
 | `15.sql` | Columnas `turno` y `pagos_detalle` en `facturas` |
 | `16.sql` | Seeds de `usage_limits` para `compras` y `facturacion` |
 | `17.sql` | Columna `email_verified` en `users` y tabla `email_verification_tokens` |
+| `18.sql` | Tabla `chat_context_cache` para caché del contexto del chat IA |
 
 ### Aplicar en desarrollo
 

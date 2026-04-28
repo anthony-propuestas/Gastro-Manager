@@ -823,7 +823,7 @@ El contexto enviado a Gemini incluye: empleados activos, sueldos del mes, antici
 
 ## Notas Generales
 
-- **Total de endpoints**: 75 rutas registradas en el Worker (GET, POST, PUT, DELETE).
+- **Total de endpoints**: 76 rutas registradas en el Worker (GET, POST, PUT, DELETE).
 - **Sin paginación**: todos los listados retornan el conjunto completo. Filtrado se realiza en cliente.
 - **Sin rate limiting propio**: Cloudflare Workers aplica 100,000 req/día en Free tier.
 - **CORS**: no configurado explícitamente; funciona por same-origin (SPA y API servidos por el mismo Worker via `not_found_handling: single-page-application`).

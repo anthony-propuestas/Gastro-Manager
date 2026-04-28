@@ -238,7 +238,27 @@ export const createEventSchema = z.object({
 
 #### Actualizar Evento
 
-Similar pero todos los campos opcionales.
+```typescript
+export const updateEventSchema = z.object({
+  title: z.string().min(1).max(200).optional(),
+  description: z.string().max(1000).optional().nullable(),
+  event_date: z.string()
+    .refine((date) => !date || isReasonableDate(date), "Fecha de evento inválida")
+    .optional(),
+  start_time: z.string()
+    .refine((time) => !time || isValidTime(time), "Hora de inicio inválida")
+    .optional()
+    .nullable(),
+  end_time: z.string()
+    .refine((time) => !time || isValidTime(time), "Hora de fin inválida")
+    .optional()
+    .nullable(),
+  event_type: z.string().max(50).optional(),
+  location: z.string().max(200).optional().nullable(),
+});
+```
+
+Todos los campos opcionales (permite actualización parcial).
 
 ### Adelantos
 
@@ -364,6 +384,80 @@ export const updateCompraSchema = createCompraSchema.partial();
 ```
 
 Todos los campos opcionales (permite actualización parcial).
+
+### Facturación
+
+#### Crear Factura
+
+```typescript
+export const createFacturaSchema = z.object({
+  fecha: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Fecha inválida"),
+
+  monto_total: z.number()
+    .positive("El monto debe ser positivo")
+    .max(10000000, "Monto muy alto"),
+
+  metodo_pago: z.enum([
+    "efectivo", "tarjeta_credito", "tarjeta_debito",
+    "transferencia", "mercado_pago", "mixto", "otros"
+  ]).optional().nullable(),
+
+  concepto: z.string()
+    .max(200, "Concepto muy largo")
+    .optional()
+    .nullable(),
+
+  numero_comprobante: z.string()
+    .max(50, "Número de comprobante muy largo")
+    .optional()
+    .nullable(),
+
+  notas: z.string()
+    .max(500, "Notas muy largas")
+    .optional()
+    .nullable(),
+
+  turno: z.enum(["mañana", "tarde"]).optional().nullable(),
+
+  pagos_detalle: z.string()
+    .max(2000, "Pagos detalle muy largo")
+    .optional()
+    .nullable(),
+});
+```
+
+**Reglas:**
+- `fecha`: formato `YYYY-MM-DD`, requerida
+- `monto_total`: positivo, máx 10,000,000, requerido
+- `metodo_pago`: uno de `efectivo`, `tarjeta_credito`, `tarjeta_debito`, `transferencia`, `mercado_pago`, `mixto`, `otros` — opcional
+- `concepto`: máx 200 caracteres, opcional
+- `numero_comprobante`: máx 50 caracteres, opcional
+- `notas`: máx 500 caracteres, opcional
+- `turno`: `"mañana"` | `"tarde"`, opcional
+- `pagos_detalle`: máx 2000 caracteres, opcional (JSON serializado con el desglose de métodos de pago mixto)
+
+#### Actualizar Factura
+
+```typescript
+export const updateFacturaSchema = createFacturaSchema.partial();
+```
+
+Todos los campos opcionales (permite actualización parcial).
+
+### Chat
+
+```typescript
+export const chatHistoryItemSchema = z.object({
+  role: z.enum(["user", "model"]),
+  content: z.string().min(1).max(2000),
+});
+
+export const chatHistoryArraySchema = z.array(chatHistoryItemSchema);
+```
+
+**Reglas:**
+- `role`: `"user"` | `"model"`, requerido
+- `content`: 1-2000 caracteres, requerido
 
 ## Uso en Backend
 

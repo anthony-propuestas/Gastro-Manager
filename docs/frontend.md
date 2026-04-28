@@ -27,7 +27,7 @@ src/react-app/
 │   ├── modulos/         # Módulos operativos (personal, sueldos, calendario, compras, facturacion)
 │   └── ...
 ├── hooks/               # Custom hooks
-├── lib/                 # Utilidades
+├── lib/                 # Utilidades (api, utils, usageLimitModal)
 ├── index.css            # Estilos globales y tema
 └── main.tsx             # Entry point
 ```
@@ -47,6 +47,8 @@ Todos en `components/ui/`, basados en Radix UI (shadcn/ui):
 - **Table** (`table.tsx`): Tablas de datos
 - **Toast** (`toast.tsx`): Notificaciones temporales (success, error, info, warning)
 - **Switch** (`switch.tsx`): Toggle switches para activar/desactivar opciones
+- **Dialog** (`dialog.tsx`): Modales con overlay (basado en Radix UI)
+- **Popover** (`popover.tsx`): Dropdowns y tooltips (basado en Radix UI)
 
 **Uso:**
 ```tsx
@@ -325,6 +327,17 @@ Callback de OAuth.
 2. Intercambia por token de sesión
 3. Guarda token en cookie
 4. Redirige a Dashboard
+
+### VerifyEmailPage (`pages/VerifyEmailPage.tsx`)
+
+Página de verificación de email mediante token.
+
+**Características:**
+- Usa `BroadcastChannel` (channel: `email-verification`) para sincronización entre tabs
+- Si hay token en query params: verifica via `GET /api/auth/verify-email?token=...`
+- Si no hay token: muestra formulario de reenvío
+- Redirección automática al dashboard tras verificación exitosa
+- Manejo de errores: token_used, token_expired, invalid_token
 
 ## Custom Hooks
 
@@ -654,9 +667,9 @@ export function useMyUsage() {
 }
 ```
 
-Usado por `ChatWidget` para mostrar `UsageBanner` del tool "chat".
+Usado por `ChatWidget` y módulos (Compras, Facturación) para mostrar `UsageBanner` cuando se acerca al límite.
 
-Cuando una operación protegida por cuota falla con `429 USAGE_LIMIT_EXCEEDED`, el frontend también puede abrir el modal global de upgrade a Usuario Inteligente usando el evento `USAGE_LIMIT_EVENT`.
+Cuando una operación protegida por cuota falla con `429 USAGE_LIMIT_EXCEEDED`, el frontend también puede abrir el modal global de upgrade a Usuario Inteligente usando el evento `USAGE_LIMIT_EVENT` (implementado en `lib/usageLimitModal.ts`).
 
 ### useOwnerPanel
 

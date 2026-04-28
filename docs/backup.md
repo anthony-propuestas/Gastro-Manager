@@ -10,7 +10,7 @@ El sistema tiene dos componentes independientes que se respaldan por separado:
 
 | Componente | Qué contiene | Tecnología de backup |
 |---|---|---|
-| Base de datos (D1) | 19 tablas: usuarios, negocios, empleados, sueldos, compras, etc. | `wrangler d1 export` → SQL |
+| Base de datos (D1) | 20 tablas: usuarios, negocios, empleados, sueldos, compras, facturas, etc. | `wrangler d1 export` → SQL |
 | Archivos (R2) | Imágenes de comprobantes de compras | `rclone sync` → bucket de backup |
 
 **Frecuencia:** Diaria, automática, a las 03:00 UTC.
@@ -146,7 +146,7 @@ wrangler r2 object get [bucket-produccion]/backups/d1/YYYY-MM-DD/[nombre-db].sql
 # 2. Verificar integridad del archivo antes de restaurar
 sqlite3 test-restore.db < backup-restaurar.sql
 sqlite3 test-restore.db ".tables"
-# Debe mostrar las 19 tablas del sistema
+# Debe mostrar las 20 tablas del sistema
 
 # 3. Aplicar en producción (⚠️ sobreescribe datos actuales)
 wrangler d1 execute [nombre-db] --remote --file backup-restaurar.sql
@@ -211,7 +211,7 @@ Este patrón descarga y ejecuta un script externo sin verificación de checksum.
 
 ### Versión de Node.js
 
-El job `backup-d1` usa Node.js 20 para ejecutar wrangler. GitHub Actions eliminará Node.js 20 de sus runners el **16 de septiembre de 2026** (advertencias activas desde junio 2026). Antes de esa fecha se debe actualizar `node-version: '20'` a `'22'` o superior en el workflow.
+El job `backup-d1` usa Node.js 20 para ejecutar wrangler. GitHub Actions eliminará Node.js 20 de sus runners el **16 de septiembre de 2026**. **Acción requerida:** actualizar `node-version: '20'` a `'22'` o superior en el workflow antes de esa fecha.
 
 ---
 

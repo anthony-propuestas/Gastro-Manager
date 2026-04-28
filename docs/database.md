@@ -8,7 +8,7 @@
 
 ## Esquema General
 
-La base de datos tiene **21 tablas** en 6 grupos funcionales:
+La base de datos tiene **22 tablas** en 7 grupos funcionales:
 
 | Grupo | Tablas |
 |---|---|
@@ -16,7 +16,7 @@ La base de datos tiene **21 tablas** en 6 grupos funcionales:
 | Negocios compartidos | `negocios`, `negocio_members`, `invitations` |
 | Roles y restricciones | `owner_requests`, `negocio_module_restrictions`, `user_module_prefs` |
 | Cuotas | `usage_counters`, `usage_limits` |
-| Datos operativos | `employees`, `job_roles`, `topics`, `notes`, `advances`, `salary_payments`, `events`, `compras`, `facturas` |
+| Datos operativos | `employees`, `job_roles`, `topics`, `notes`, `advances`, `salary_payments`, `events`, `compras`, `facturas`, `chat_context_cache` |
 | Logging | `usage_logs` |
 
 ---
@@ -29,14 +29,14 @@ Persiste usuarios de Google OAuth con su rol de plan. Se llena por UPSERT en `PO
 
 ```sql
 CREATE TABLE users (
-  id         TEXT PRIMARY KEY,               -- Google ID (claim "sub")
-  email      TEXT NOT NULL UNIQUE,
-  name       TEXT NOT NULL,
-  picture    TEXT NOT NULL DEFAULT '',
-  role       TEXT NOT NULL DEFAULT 'usuario_basico',
-  email_verified INTEGER NOT NULL DEFAULT 0,
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  id              TEXT PRIMARY KEY,               -- Google ID (claim "sub")
+  email           TEXT NOT NULL UNIQUE,
+  name            TEXT NOT NULL,
+  picture         TEXT NOT NULL DEFAULT '',
+  role            TEXT NOT NULL DEFAULT 'usuario_basico',
+  email_verified  INTEGER NOT NULL DEFAULT 0,     -- migración 17: 0=pendiente, 1=verificado
+  created_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at      DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 ```
 
@@ -51,12 +51,12 @@ CREATE TABLE users (
 
 ### `email_verification_tokens`
 
-Tokens de verificación de email para usuarios pendientes. El token plano nunca se guarda; solo se persiste su hash SHA-256. Cada token expira a las 24 horas.
+Tokens de verificación de email para usuarios pendientes. Creada en **migración 17**. El token plano nunca se guarda; solo se persiste su hash SHA-256. Cada token expira a las 24 horas.
 
 ```sql
 CREATE TABLE email_verification_tokens (
   id         INTEGER PRIMARY KEY AUTOINCREMENT,
-  user_id    TEXT NOT NULL,
+  user_id    TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   token_hash TEXT NOT NULL UNIQUE,
   expires_at TEXT NOT NULL,
   used_at    TEXT,
@@ -67,6 +67,10 @@ CREATE TABLE email_verification_tokens (
 **Comportamiento crítico:**
 - `POST /api/sessions` invalida tokens previos sin usar y genera uno nuevo para usuarios no verificados.
 - `GET /api/auth/verify-email` marca el token como usado y actualiza `users.email_verified = 1`.
+
+**Índices:**
+- `idx_evtokens_user_id` en `user_id`
+- `idx_evtokens_token_hash` en `token_hash`
 
 ---
 
@@ -487,6 +491,8 @@ ALTER TABLE facturas ADD COLUMN pagos_detalle TEXT;  -- JSON | NULL (ver abajo)
 ```
 users (Google ID)
   │
+  ├─── email_verification_tokens (1:N) ──► tokens de verificación de email
+  │
   ├─── negocio_members (N:M) ──► negocios
   │                                  │
   │                                  ├─── employees (1:N)
@@ -507,9 +513,11 @@ users (Google ID)
   │
   ├─── user_module_prefs (1:N, por módulo)
   │
-  └─── usage_counters (scope: user_id + negocio_id)
-              │
-              └── usage_limits (límites globales por tool)
+  ├─── usage_counters (scope: user_id + negocio_id)
+  │       │
+  │       └── usage_limits (límites globales por tool)
+  │
+  └─── chat_context_cache (scope: user_id + negocio_id)
 
 admin_emails  (standalone — consultado por isAdmin())
 ```
@@ -523,7 +531,7 @@ admin_emails  (standalone — consultado por isAdmin())
 | Aislamiento de datos | Todas las queries de datos filtran por `negocio_id` |
 | Timestamps | `created_at` + `updated_at` en todas las tablas; `updated_at` se actualiza manualmente |
 | Booleanos | `INTEGER` 0/1 con prefijo `is_` o `has_` |
-| Migraciones | Numeradas `1.sql`–`16.sql`, inmutables en producción |
+| Migraciones | Numeradas `1.sql`–`18.sql`, inmutables en producción |
 
 ---
 
@@ -563,6 +571,8 @@ Las migraciones crean **28 índices explícitos** para optimizar las queries má
 | `compras` | `idx_compras_comprador` | `comprador_id` | Normal | 13 |
 | `facturas` | `idx_facturas_negocio` | `negocio_id` | Normal | 14 |
 | `facturas` | `idx_facturas_fecha` | `negocio_id, fecha` | Normal | 14 |
+| `email_verification_tokens` | `idx_evtokens_user_id` | `user_id` | Normal | 17 |
+| `email_verification_tokens` | `idx_evtokens_token_hash` | `token_hash` | Normal | 17 |
 
 ### Índices implícitos (por constraints)
 
@@ -590,6 +600,22 @@ INSERT OR IGNORE INTO usage_limits (tool, "limit") VALUES ('compras', 50), ('fac
 ```
 
 Adicionalmente, el endpoint `PUT /api/admin/usage-limits` fue actualizado para usar **upsert** en lugar de `UPDATE`, eliminando el riesgo de falla silenciosa para cualquier herramienta futura que falte en la tabla.
+
+---
+
+### `chat_context_cache`
+
+Caché de contexto para el chatbot IA. Almacena el contexto de conversación por usuario y negocio para reducir llamadas a la API de IA. Creada en **migración 18**.
+
+```sql
+CREATE TABLE chat_context_cache (
+  user_id      TEXT NOT NULL,
+  negocio_id   TEXT NOT NULL,
+  context_text TEXT NOT NULL,
+  fetched_at   TEXT NOT NULL,
+  PRIMARY KEY (user_id, negocio_id)
+);
+```
 
 ---
 

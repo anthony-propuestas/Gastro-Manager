@@ -102,7 +102,7 @@ Omite todo si `user.role === 'usuario_inteligente'`.
 
 ### `createModuleRestrictionMiddleware(moduleKey)`
 
-Ejecuta en endpoints de módulos restringibles (`calendario`, `personal`, `sueldos`, `compras`).
+Ejecuta en endpoints de módulos restringibles (`calendario`, `personal`, `sueldos`, `compras`, `facturacion`).
 
 - Si el usuario es `owner` del negocio → acceso permitido siempre.
 - Si el usuario es `gerente` y el módulo está marcado como restringido en `negocio_module_restrictions` → devuelve 403 FORBIDDEN.
@@ -113,6 +113,7 @@ Ejecuta en endpoints de módulos restringibles (`calendario`, `personal`, `sueld
 |---|---|
 | `POST /api/chat` | El chatbot no pertenece a ningún módulo. No es restringible por el owner. Además, el contexto enviado a Gemini incluye datos de **todos** los módulos (empleados, eventos, tópicos, anticipos, pagos) independientemente de restricciones. Un gerente con módulos restringidos puede acceder a esa información indirectamente via el chatbot. |
 | `GET /api/compras/files/*` | Solo requiere `auth + negocio`. Un gerente con `compras` restringido podría acceder a imágenes de comprobantes si conoce la URL directa (el key de R2). Se valida que el key pertenezca al negocio activo, pero no se verifica la restricción del módulo. |
+| `GET /api/auth/verify-email` | Endpoint de verificación de email. No requiere sesión activa ni negocio; solo valida el token de verificación. |
 
 ---
 
@@ -155,7 +156,7 @@ Las cuotas son **por usuario por negocio por mes** (`UNIQUE(user_id, negocio_id,
 - **10 herramientas** sujetas a cuota: `employees`, `job_roles`, `topics`, `notes`, `advances`, `salary_payments`, `events`, `chat`, `compras`, `facturacion`.
 - Los límites son globales (una fila por tool en `usage_limits`) y editables desde el panel de admin.
 - El endpoint `mark-all-paid` consume **N usos** (uno por empleado marcado), con lógica inline (no usa el middleware estándar).
-- Los endpoints `PUT /api/compras/:id` y `PUT /api/facturacion/:id` **también consumen cuota**, a diferencia de PUT en otros módulos donde solo POST consume.
+- Los endpoints `PUT /api/compras/:id`, `PUT /api/facturacion/:id` y `DELETE /api/facturacion/:id` **también consumen cuota**, a diferencia de otros módulos donde solo POST consume.
 - `compras` y `facturacion` tienen límite default de 50 seedeado en migración 16.
 
 ---
@@ -172,8 +173,15 @@ Las cuotas son **por usuario por negocio por mes** (`UNIQUE(user_id, negocio_id,
 5. Worker intercambia code con Google (oauth2.googleapis.com/token)
 6. Worker obtiene datos del usuario (googleapis.com/oauth2/v2/userinfo)
 7. Worker hace UPSERT en users (sin sobrescribir role)
-8. Cookie session_token seteada (httpOnly, JWT firmado con JWT_SECRET)
+8a. Si usuario NO verificado → genera token de verificación, envía email,
+    responde { error: { code: "PENDING_VERIFICATION" } } (sin cookie)
+8b. Si usuario verificado → Cookie session_token seteada (httpOnly, JWT firmado con JWT_SECRET)
 9. Redirección a dashboard
+
+── Rama verificación de email ──
+GET /api/auth/verify-email?token=<token_plano>
+   → Valida token → marca usuario como verificado
+   → Crea cookie session_token → responde éxito
 ```
 
 ### Operación con cuota (ejemplo: crear empleado)
