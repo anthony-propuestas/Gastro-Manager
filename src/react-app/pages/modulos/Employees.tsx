@@ -282,6 +282,24 @@ export default function Employees() {
                     Desde {formatDate(employee.hire_date)}
                   </span>
                 </div>
+
+                {employee.is_active === 0 && (employee.ausencia_desde || employee.informo === 1 || employee.sueldo_pendiente > 0) && (
+                  <div className="mt-3 pt-3 border-t border-border space-y-1">
+                    {employee.ausencia_desde && (
+                      <p className="text-xs text-muted-foreground">
+                        Ausente desde: <span className="text-foreground">{formatDate(employee.ausencia_desde)}</span>
+                      </p>
+                    )}
+                    <p className="text-xs text-muted-foreground">
+                      Informó: <span className="text-foreground">{employee.informo === 1 ? `Sí${employee.cuando_informo ? ` (${formatDate(employee.cuando_informo)})` : ""}` : "No"}</span>
+                    </p>
+                    {employee.sueldo_pendiente > 0 && (
+                      <p className="text-xs text-muted-foreground">
+                        Sueldo pendiente: <span className="text-foreground font-medium">${employee.sueldo_pendiente.toLocaleString()}</span>
+                      </p>
+                    )}
+                  </div>
+                )}
               </CardContent>
             </Card>
           ))}

@@ -1324,6 +1324,10 @@ app.put("/api/employees/:id", authMiddleware, negocioMiddleware, createModuleRes
           hire_date = ?,
           is_active = COALESCE(?, is_active),
           monthly_salary = COALESCE(?, monthly_salary),
+          ausencia_desde = ?,
+          informo = ?,
+          cuando_informo = ?,
+          sueldo_pendiente = ?,
           updated_at = ?
          WHERE id = ? AND negocio_id = ?`
       )
@@ -1335,6 +1339,10 @@ app.put("/api/employees/:id", authMiddleware, negocioMiddleware, createModuleRes
         validData.hire_date || null,
         validData.is_active !== undefined ? (validData.is_active ? 1 : 0) : null,
         validData.monthly_salary !== undefined ? validData.monthly_salary : null,
+        validData.ausencia_desde || null,
+        validData.informo !== undefined ? (validData.informo ? 1 : 0) : 0,
+        validData.cuando_informo || null,
+        validData.sueldo_pendiente ?? 0,
         now,
         employeeId,
         negocio.id

@@ -30,6 +30,10 @@ export const createEmployeeSchema = z.object({
     .min(0, "Salario no puede ser negativo")
     .max(1000000, "Salario muy alto")
     .optional(),
+  ausencia_desde: z.string().optional().nullable(),
+  informo: z.boolean().optional(),
+  cuando_informo: z.string().optional().nullable(),
+  sueldo_pendiente: z.number().min(0).optional().nullable(),
 });
 
 export const updateEmployeeSchema = z.object({
@@ -44,6 +48,10 @@ export const updateEmployeeSchema = z.object({
     .nullable(),
   is_active: z.boolean().optional(),
   monthly_salary: z.number().min(0).max(1000000).optional(),
+  ausencia_desde: z.string().optional().nullable(),
+  informo: z.boolean().optional(),
+  cuando_informo: z.string().optional().nullable(),
+  sueldo_pendiente: z.number().min(0).optional().nullable(),
 });
 
 // Job Role validation

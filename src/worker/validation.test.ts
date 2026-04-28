@@ -53,6 +53,44 @@ describe("createEmployeeSchema", () => {
 
     expect(result.success).toBe(false);
   });
+
+  it("accepts exit info fields for an inactive employee", () => {
+    const result = createEmployeeSchema.safeParse({
+      name: "Carlos",
+      role: "Mesero/a",
+      is_active: false,
+      ausencia_desde: "2026-04-01",
+      informo: true,
+      cuando_informo: "2026-04-02",
+      sueldo_pendiente: 2500,
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  it("accepts exit info fields as null", () => {
+    const result = createEmployeeSchema.safeParse({
+      name: "Carlos",
+      role: "Mesero/a",
+      is_active: false,
+      ausencia_desde: null,
+      informo: false,
+      cuando_informo: null,
+      sueldo_pendiente: null,
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects negative sueldo_pendiente", () => {
+    const result = createEmployeeSchema.safeParse({
+      name: "Carlos",
+      role: "Mesero/a",
+      sueldo_pendiente: -100,
+    });
+
+    expect(result.success).toBe(false);
+  });
 });
 
 describe("updateEmployeeSchema", () => {
@@ -64,6 +102,34 @@ describe("updateEmployeeSchema", () => {
 
   it("rejects invalid hire_date on partial updates", () => {
     const result = updateEmployeeSchema.safeParse({ hire_date: "1800-01-01" });
+
+    expect(result.success).toBe(false);
+  });
+
+  it("accepts exit info fields in a partial update", () => {
+    const result = updateEmployeeSchema.safeParse({
+      is_active: false,
+      ausencia_desde: "2026-04-10",
+      informo: false,
+      cuando_informo: null,
+      sueldo_pendiente: 1800,
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  it("accepts exit info fields as null in a partial update", () => {
+    const result = updateEmployeeSchema.safeParse({
+      ausencia_desde: null,
+      cuando_informo: null,
+      sueldo_pendiente: null,
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects negative sueldo_pendiente on partial updates", () => {
+    const result = updateEmployeeSchema.safeParse({ sueldo_pendiente: -50 });
 
     expect(result.success).toBe(false);
   });

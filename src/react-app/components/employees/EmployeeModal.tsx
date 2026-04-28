@@ -42,6 +42,10 @@ export default function EmployeeModal({
     hire_date: "",
     is_active: true,
     monthly_salary: 0,
+    ausencia_desde: "",
+    informo: false,
+    cuando_informo: "",
+    sueldo_pendiente: 0,
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -59,6 +63,10 @@ export default function EmployeeModal({
         hire_date: employee.hire_date || "",
         is_active: employee.is_active === 1,
         monthly_salary: employee.monthly_salary || 0,
+        ausencia_desde: employee.ausencia_desde || "",
+        informo: employee.informo === 1,
+        cuando_informo: employee.cuando_informo || "",
+        sueldo_pendiente: employee.sueldo_pendiente || 0,
       });
     } else {
       setFormData({
@@ -69,6 +77,10 @@ export default function EmployeeModal({
         hire_date: "",
         is_active: true,
         monthly_salary: 0,
+        ausencia_desde: "",
+        informo: false,
+        cuando_informo: "",
+        sueldo_pendiente: 0,
       });
     }
     setError(null);
@@ -283,6 +295,68 @@ export default function EmployeeModal({
               Empleado activo
             </Label>
           </div>
+
+          {!formData.is_active && (
+            <div className="rounded-xl border border-border bg-muted/40 p-4 space-y-4">
+              <p className="text-sm font-medium text-muted-foreground">Información de salida</p>
+
+              <div className="space-y-2">
+                <Label htmlFor="ausencia_desde">¿Desde cuándo no se presenta?</Label>
+                <Input
+                  id="ausencia_desde"
+                  type="date"
+                  value={formData.ausencia_desde}
+                  onChange={(e) =>
+                    setFormData({ ...formData, ausencia_desde: e.target.value })
+                  }
+                />
+              </div>
+
+              <div className="flex items-center gap-3">
+                <input
+                  type="checkbox"
+                  id="informo"
+                  checked={formData.informo}
+                  onChange={(e) =>
+                    setFormData({ ...formData, informo: e.target.checked, cuando_informo: e.target.checked ? formData.cuando_informo : "" })
+                  }
+                  className="h-4 w-4 rounded border-input"
+                />
+                <Label htmlFor="informo" className="cursor-pointer">
+                  ¿Informó su salida?
+                </Label>
+              </div>
+
+              {formData.informo && (
+                <div className="space-y-2">
+                  <Label htmlFor="cuando_informo">¿Cuándo informó?</Label>
+                  <Input
+                    id="cuando_informo"
+                    type="date"
+                    value={formData.cuando_informo}
+                    onChange={(e) =>
+                      setFormData({ ...formData, cuando_informo: e.target.value })
+                    }
+                  />
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <Label htmlFor="sueldo_pendiente">¿Cuánto falta de su sueldo del mes?</Label>
+                <Input
+                  id="sueldo_pendiente"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={formData.sueldo_pendiente}
+                  onChange={(e) =>
+                    setFormData({ ...formData, sueldo_pendiente: parseFloat(e.target.value) || 0 })
+                  }
+                  placeholder="0.00"
+                />
+              </div>
+            </div>
+          )}
 
           {/* Actions */}
           <div className="flex gap-3 pt-4">

@@ -124,7 +124,8 @@ Ninguna variable sensible se incluye en el build del frontend (Vite). El Worker 
 - `src/react-app/lib/api.test.ts`: verifica que `apiFetch` emita `USAGE_LIMIT_EVENT` ante `429 USAGE_LIMIT_EXCEEDED` y que agregue `X-Negocio-ID` correctamente.
 - `src/react-app/context/UsageLimitModalContext.test.tsx`: verifica que el modal de upgrade se active ante el evento global y no pueda ser ignorado.
 - `src/react-app/components/auth/ProtectedRoute.test.tsx`: verifica redirecciones para usuarios no autenticados.
-- `src/worker/validation.test.ts`: verifica que los schemas Zod rechacen entradas inválidas en todos los módulos. Incluye 8 casos para `chatHistoryItemSchema` y `chatHistoryArraySchema`: acepta roles válidos (`user`/`model`) y content dentro del límite; rechaza roles arbitrarios, content vacío y content > 2000 chars.
+- `src/worker/validation.test.ts`: verifica que los schemas Zod rechacen entradas inválidas en todos los módulos. Incluye 8 casos para `chatHistoryItemSchema` y `chatHistoryArraySchema`: acepta roles válidos (`user`/`model`) y content dentro del límite; rechaza roles arbitrarios, content vacío y content > 2000 chars. Incluye 5 casos para los nuevos campos de salida del empleado: acepta valores válidos y null; rechaza `sueldo_pendiente` negativo tanto en create como en update.
+- `src/react-app/components/employees/EmployeeModal.test.tsx`: verifica que los campos de salida solo se muestran cuando el empleado está inactivo y que se pre-rellenan correctamente al editar.
 - `src/react-app/pages/Admin.test.tsx`: verifica que la tarjeta "Usuarios Registrados" muestre `totalUsers` correctamente y que las tarjetas eliminadas (`registeredEmails`, `avgEmployees`, `avgEvents`) ya no estén presentes en el DOM.
 
 ---
@@ -137,6 +138,7 @@ Ninguna variable sensible se incluye en el build del frontend (Vite). El Worker 
 | Acceso cruzado entre negocios | `negocio_id` validado en el servidor contra membresía del usuario |
 | Exceder cuotas con requests concurrentes | Incremento atómico en D1 con RETURNING count |
 | Inyección SQL | D1 con prepared statements en todos los endpoints |
+| Campos de salida del empleado (`ausencia_desde`, `informo`, `cuando_informo`, `sueldo_pendiente`) | Solo modificables vía `PUT /api/employees/:id`, protegido por `authMiddleware` + `negocioMiddleware` + `createModuleRestrictionMiddleware('personal')`. El query sigue usando `WHERE id = ? AND negocio_id = ?` — no hay acceso cross-negocio. Los 4 campos se validan con Zod: tipos, rango de `sueldo_pendiente ≥ 0`, nullable permitido. |
 | Prompt injection via `history` del chat | Autocontenido (solo afecta al atacante); contexto del negocio es server-controlled; ítems validados con `chatHistoryArraySchema` (role + longitud) |
 | Agotamiento de tokens de Gemini vía history largo | `history` cortado a 20 ítems server-side; cada ítem validado (role + longitud) |
 | Rate limiting en endpoints de auth (`/api/auth/*`) | No implementado — pendiente agregar a nivel IP en el Worker |

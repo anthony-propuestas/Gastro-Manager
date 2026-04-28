@@ -259,7 +259,26 @@ Crea un empleado.
 ```
 
 #### `PUT /api/employees/:id`
-Actualiza un empleado (todos los campos opcionales).
+Actualiza un empleado (todos los campos opcionales). Incluye campos de salida que se activan cuando el empleado pasa a inactivo (`is_active: false`).
+
+```json
+// Request (campos opcionales)
+{
+  "name": "María García",
+  "role": "Mesera",
+  "phone": "5551234567",
+  "email": "maria@example.com",
+  "hire_date": "2026-01-15",
+  "is_active": false,
+  "monthly_salary": 8000,
+  "ausencia_desde": "2026-04-15",
+  "informo": true,
+  "cuando_informo": "2026-04-16",
+  "sueldo_pendiente": 3200
+}
+```
+
+Los campos de salida son independientes del campo `is_active` a nivel de API — el backend los almacena sin importar el estado. La UI los muestra condicionalmente solo cuando `is_active` es `false`. `sueldo_pendiente` debe ser `≥ 0`; `ausencia_desde` y `cuando_informo` aceptan `null`.
 
 #### `DELETE /api/employees/:id`
 Elimina un empleado.

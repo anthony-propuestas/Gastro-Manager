@@ -14,6 +14,10 @@ export interface Employee {
   is_active: number;
   monthly_salary?: number;
   topics_count?: number;
+  ausencia_desde: string | null;
+  informo: number;
+  cuando_informo: string | null;
+  sueldo_pendiente: number;
   created_at: string;
   updated_at: string;
 }
@@ -26,6 +30,10 @@ export interface EmployeeInput {
   hire_date?: string;
   is_active?: boolean;
   monthly_salary?: number;
+  ausencia_desde?: string;
+  informo?: boolean;
+  cuando_informo?: string;
+  sueldo_pendiente?: number;
 }
 
 export function useEmployees() {
