@@ -1,4 +1,4 @@
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
 import { vi, describe, it, expect, beforeEach } from "vitest";
 import Admin from "./Admin";
 
@@ -31,11 +31,12 @@ const BASE_MOCK = {
   fetchEmails: vi.fn(),
   addEmail: vi.fn(),
   deleteEmail: vi.fn(),
-  limits: {},
+  usageData: null as { period: string; rows: ReturnType<typeof makeRows> } | null,
+  limits: {} as Record<string, number>,
   fetchUsage: vi.fn(),
   fetchLimits: vi.fn(),
   updateLimits: vi.fn(),
-  users: [],
+  users: [] as { id: string; email: string; name: string; role: string; created_at: string }[],
   fetchUsers: vi.fn(),
   promoteUser: vi.fn(),
   demoteUser: vi.fn(),
@@ -44,6 +45,8 @@ const BASE_MOCK = {
 beforeEach(() => {
   vi.clearAllMocks();
 });
+
+// ─── Paginación de uso por usuario ────────────────────────────────────────────
 
 describe("Paginación de uso por usuario", () => {
   it("no muestra controles de paginación con 50 filas o menos", () => {
@@ -159,11 +162,9 @@ describe("Paginación de uso por usuario", () => {
 
     render(<Admin />);
 
-    // ir a página 2
     fireEvent.click(screen.getByText("Siguiente"));
     expect(screen.getByText("user50@test.com")).toBeInTheDocument();
 
-    // filtrar → resetea a página 1
     const searchInput = screen.getByPlaceholderText("Buscar email...");
     fireEvent.change(searchInput, { target: { value: "user0" } });
 
@@ -179,18 +180,216 @@ describe("Paginación de uso por usuario", () => {
 
     render(<Admin />);
 
-    // filtrar con término que sigue coincidiendo con todas las filas → aparece Limpiar
     const searchInput = screen.getByPlaceholderText("Buscar email...");
     fireEvent.change(searchInput, { target: { value: "user" } });
 
-    // ir a página 2
     fireEvent.click(screen.getByText("Siguiente"));
     expect(screen.getByText("user50@test.com")).toBeInTheDocument();
 
-    // limpiar → resetea a página 1
     fireEvent.click(screen.getByText("Limpiar"));
 
     expect(screen.getByText("user0@test.com")).toBeInTheDocument();
     expect(screen.queryByText("user50@test.com")).toBeNull();
+  });
+});
+
+// ─── Uso del Sistema ──────────────────────────────────────────────────────────
+
+describe("Uso del Sistema", () => {
+  it("muestra spinner mientras fetchUsage está pendiente", async () => {
+    mockUseAdmin.mockReturnValue({
+      ...BASE_MOCK,
+      fetchUsage: vi.fn(() => new Promise(() => {})),
+    });
+
+    render(<Admin />);
+
+    expect(await screen.findByText("Cargando datos de uso...")).toBeInTheDocument();
+  });
+
+  it("muestra mensaje de error cuando fetchUsage falla", async () => {
+    mockUseAdmin.mockReturnValue({
+      ...BASE_MOCK,
+      fetchUsage: vi.fn(() => Promise.reject(new Error("network error"))),
+    });
+
+    render(<Admin />);
+
+    expect(await screen.findByText("No se pudo cargar el uso del sistema.")).toBeInTheDocument();
+  });
+
+  it("muestra el botón Reintentar en estado de error", async () => {
+    mockUseAdmin.mockReturnValue({
+      ...BASE_MOCK,
+      fetchUsage: vi.fn(() => Promise.reject(new Error("fail"))),
+    });
+
+    render(<Admin />);
+
+    await screen.findByText("No se pudo cargar el uso del sistema.");
+    expect(screen.getByText("Reintentar")).toBeInTheDocument();
+  });
+
+  it("el botón Reintentar vuelve a llamar a fetchUsage y fetchLimits", async () => {
+    const fetchUsageMock = vi.fn(() => Promise.reject(new Error("fail")));
+    const fetchLimitsMock = vi.fn();
+
+    mockUseAdmin.mockReturnValue({
+      ...BASE_MOCK,
+      fetchUsage: fetchUsageMock,
+      fetchLimits: fetchLimitsMock,
+    });
+
+    render(<Admin />);
+    await screen.findByText("Reintentar");
+
+    await act(async () => {
+      fireEvent.click(screen.getByText("Reintentar"));
+    });
+
+    await waitFor(() => {
+      expect(fetchUsageMock).toHaveBeenCalledTimes(2);
+      expect(fetchLimitsMock).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  it("muestra mensaje cuando usageData es null tras la carga", async () => {
+    mockUseAdmin.mockReturnValue({
+      ...BASE_MOCK,
+      usageData: null,
+    });
+
+    render(<Admin />);
+
+    expect(await screen.findByText("Sin datos para este período.")).toBeInTheDocument();
+  });
+
+  it("muestra el período en la descripción de la tarjeta", async () => {
+    mockUseAdmin.mockReturnValue({
+      ...BASE_MOCK,
+      usageData: { period: "2026-04", rows: [] },
+    });
+
+    render(<Admin />);
+
+    expect(await screen.findByText(/2026-04/)).toBeInTheDocument();
+  });
+
+  it("muestra el número de usuarios básicos en la descripción", async () => {
+    mockUseAdmin.mockReturnValue({
+      ...BASE_MOCK,
+      usageData: { period: "2026-04", rows: [] },
+      users: [
+        { id: "1", email: "a@t.com", name: "A", role: "usuario_basico", created_at: "" },
+        { id: "2", email: "b@t.com", name: "B", role: "usuario_basico", created_at: "" },
+      ],
+    });
+
+    render(<Admin />);
+
+    expect(await screen.findByText(/2 usuarios básicos/)).toBeInTheDocument();
+  });
+
+  it("calcula usado y límite total correctamente para un usuario básico", async () => {
+    mockUseAdmin.mockReturnValue({
+      ...BASE_MOCK,
+      usageData: {
+        period: "2026-04",
+        rows: [
+          { user_id: "u1", email: "a@t.com", role: "usuario_basico", negocio_id: 1, negocio_name: "N", usage: { chat: 30 } },
+        ],
+      },
+      limits: { chat: 100 },
+      users: [{ id: "u1", email: "a@t.com", name: "A", role: "usuario_basico", created_at: "" }],
+    });
+
+    render(<Admin />);
+
+    // basicUserCount=1, totalLimit=100, used=30, pct=30%
+    expect(await screen.findByText("30")).toBeInTheDocument();
+    expect(screen.getByText(/\/ 100/)).toBeInTheDocument();
+    expect(screen.getByText("30%")).toBeInTheDocument();
+  });
+
+  it("el límite total se multiplica por el número de usuarios básicos", async () => {
+    mockUseAdmin.mockReturnValue({
+      ...BASE_MOCK,
+      usageData: {
+        period: "2026-04",
+        rows: [
+          { user_id: "u1", email: "a@t.com", role: "usuario_basico", negocio_id: 1, negocio_name: "N1", usage: { chat: 40 } },
+          { user_id: "u2", email: "b@t.com", role: "usuario_basico", negocio_id: 2, negocio_name: "N2", usage: { chat: 20 } },
+        ],
+      },
+      limits: { chat: 100 },
+      users: [
+        { id: "u1", email: "a@t.com", name: "A", role: "usuario_basico", created_at: "" },
+        { id: "u2", email: "b@t.com", name: "B", role: "usuario_basico", created_at: "" },
+      ],
+    });
+
+    render(<Admin />);
+
+    // basicUserCount=2, totalLimit=200, used=60, pct=30%
+    expect(await screen.findByText("60")).toBeInTheDocument();
+    expect(screen.getByText(/\/ 200/)).toBeInTheDocument();
+    expect(screen.getByText("30%")).toBeInTheDocument();
+  });
+
+  it("muestra el límite por usuario en el subtexto de cada herramienta", async () => {
+    mockUseAdmin.mockReturnValue({
+      ...BASE_MOCK,
+      usageData: { period: "2026-04", rows: [] },
+      limits: { employees: 75 },
+    });
+
+    render(<Admin />);
+
+    expect(await screen.findByText("Límite: 75/usuario")).toBeInTheDocument();
+  });
+
+  it("muestra 0% cuando no hay límite configurado para una herramienta", async () => {
+    mockUseAdmin.mockReturnValue({
+      ...BASE_MOCK,
+      usageData: {
+        period: "2026-04",
+        rows: [
+          { user_id: "u1", email: "a@t.com", role: "usuario_basico", negocio_id: 1, negocio_name: "N", usage: { chat: 50 } },
+        ],
+      },
+      limits: {},
+    });
+
+    render(<Admin />);
+
+    // Con limits vacío, totalLimit=0 → pct=0 para todos
+    const percentages = await screen.findAllByText("0%");
+    expect(percentages.length).toBe(10);
+  });
+
+  it("no cuenta usuarios inteligentes en el denominador del límite", async () => {
+    mockUseAdmin.mockReturnValue({
+      ...BASE_MOCK,
+      usageData: {
+        period: "2026-04",
+        rows: [
+          { user_id: "u1", email: "a@t.com", role: "usuario_basico",     negocio_id: 1, negocio_name: "N", usage: { chat: 50 } },
+          { user_id: "u2", email: "b@t.com", role: "usuario_inteligente", negocio_id: 1, negocio_name: "N", usage: { chat: 100 } },
+        ],
+      },
+      limits: { chat: 100 },
+      users: [
+        { id: "u1", email: "a@t.com", name: "A", role: "usuario_basico", created_at: "" },
+        { id: "u2", email: "b@t.com", name: "B", role: "usuario_inteligente", created_at: "" },
+      ],
+    });
+
+    render(<Admin />);
+
+    // basicUserCount=1 (solo básicos), totalLimit=100, used=150, pct=150
+    // La barra se clampea a 100% pero el texto muestra 150%
+    expect(await screen.findByText("150")).toBeInTheDocument();
+    expect(screen.getByText(/\/ 100/)).toBeInTheDocument();
+    expect(screen.getByText("150%")).toBeInTheDocument();
   });
 });

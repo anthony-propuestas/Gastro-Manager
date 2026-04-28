@@ -40,6 +40,19 @@ Dentro de cada negocio los miembros tienen un rol de negocio (`owner` / `gerente
 - El middleware de cuotas usa un patrón **increment-then-revert atómico** sobre D1 (`INSERT … ON CONFLICT DO UPDATE … RETURNING count`). Esto garantiza que dos requests concurrentes no puedan exceder el límite simultáneamente (sin condición de carrera TOCTOU).
 - Cuando el backend responde `429 USAGE_LIMIT_EXCEEDED`, `apiFetch` emite un evento global `USAGE_LIMIT_EVENT` que abre el modal de upgrade. El usuario nunca puede evadir el límite manipulando el cliente.
 
+### Visualización de cuotas en el panel de administración
+
+El panel de administración calcula el uso total del sistema con la fórmula:
+
+```
+límite_total = límite_por_usuario × cantidad_de_usuarios_básicos
+porcentaje   = uso_total / límite_total
+```
+
+Los usuarios con rol `usuario_inteligente` se excluyen deliberadamente del denominador porque no están sujetos a cuotas. Incluirlos inflaría artificialmente el límite total y haría que el panel subestimara el agotamiento real de cuota para los usuarios básicos.
+
+Esta lógica es la misma que aplica el middleware de cuotas en el backend: solo los usuarios básicos consumen cuota, por lo que el denominador en la visualización debe reflejar únicamente ese grupo.
+
 ---
 
 ## Chatbot (IA)

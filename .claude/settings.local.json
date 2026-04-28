@@ -6,7 +6,9 @@
       "Bash(curl -Ik https://lahoja.org/assets/index-CVPWO1t9.css)",
       "Bash(curl -Ik https://lahoja.org/)",
       "Bash(npx wrangler *)",
-      "Bash(npm test *)"
+      "Bash(npm test *)",
+      "Bash(npx eslint *)",
+      "Bash(npx vitest *)"
     ]
   }
 }

@@ -6,7 +6,7 @@ import { Input } from "@/react-app/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/react-app/components/ui/table";
 import { Badge } from "@/react-app/components/ui/badge";
 import { useToast } from "@/react-app/components/ui/toast";
-import { Shield, Users, Mail, TrendingUp, Calendar, UserPlus, Trash2, AlertCircle, BarChart3, Settings2, Crown, UserMinus, Search, X } from "lucide-react";
+import { Shield, Users, Mail, TrendingUp, Calendar, UserPlus, Trash2, AlertCircle, Settings2, Crown, UserMinus, Search, X, RefreshCw } from "lucide-react";
 
 const TOOL_LABELS = [
   { key: "employees",       label: "Empleados",  color: "bg-green-500" },
@@ -21,18 +21,6 @@ const TOOL_LABELS = [
   { key: "facturacion",     label: "Facturación", color: "bg-indigo-500" },
 ] as const;
 
-const USAGE_STATS_ITEMS = [
-  { toolKey: "employees",       label: "Empleados",    color: "bg-green-500" },
-  { toolKey: "job_roles",       label: "Roles",        color: "bg-teal-500" },
-  { toolKey: "topics",          label: "Temas",        color: "bg-blue-500" },
-  { toolKey: "notes",           label: "Notas",        color: "bg-sky-500" },
-  { toolKey: "advances",        label: "Anticipos",    color: "bg-amber-500" },
-  { toolKey: "salary_payments", label: "Pagos",        color: "bg-orange-500" },
-  { toolKey: "events",          label: "Eventos",      color: "bg-purple-500" },
-  { toolKey: "chat",            label: "Chat IA",      color: "bg-pink-500" },
-  { toolKey: "compras",         label: "Gastos",       color: "bg-red-500" },
-  { toolKey: "facturacion",     label: "Facturación",  color: "bg-indigo-500" },
-] as const;
 
 export default function Admin() {
   const { isAdmin, loading, stats, emails, fetchStats, fetchEmails, addEmail, deleteEmail,
@@ -49,14 +37,27 @@ export default function Admin() {
   const [filterNegocio, setFilterNegocio] = useState("all");
   const [filterTool, setFilterTool] = useState("all");
   const [usagePage, setUsagePage] = useState(0);
+  const [usageError, setUsageError] = useState<string | null>(null);
+  const [usageLoading, setUsageLoading] = useState(false);
+
+  const loadUsage = async () => {
+    setUsageLoading(true);
+    setUsageError(null);
+    try {
+      await Promise.all([fetchUsage(), fetchLimits()]);
+    } catch {
+      setUsageError("No se pudo cargar el uso del sistema.");
+    } finally {
+      setUsageLoading(false);
+    }
+  };
 
   useEffect(() => {
     if (isAdmin) {
       fetchStats();
       fetchEmails();
-      fetchUsage();
-      fetchLimits();
       fetchUsers();
+      loadUsage();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAdmin]);
@@ -191,7 +192,7 @@ export default function Admin() {
         </Card>
       </div>
 
-      {/* Usage Statistics */}
+      {/* Uso del Sistema — sección unificada */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -199,73 +200,61 @@ export default function Admin() {
             Uso del Sistema
           </CardTitle>
           <CardDescription>
-            Uso mensual por módulo — {usageData?.period || ""}
+            {usageData?.period
+              ? `Uso mensual por módulo — ${usageData.period} · ${basicUserCount} usuario${basicUserCount !== 1 ? "s" : ""} básico${basicUserCount !== 1 ? "s" : ""}`
+              : "Uso mensual por módulo"}
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          {USAGE_STATS_ITEMS.map(item => {
-            const used = monthlyUsageByTool[item.toolKey] || 0;
-            const limitPerUser = limits[item.toolKey] || 0;
-            const totalLimit = limitPerUser * basicUserCount;
-            const pct = totalLimit > 0 ? Math.round((used / totalLimit) * 100) : 0;
-
-            return (
-              <div key={item.toolKey} className="space-y-1">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="font-medium">{item.label}</span>
-                  <div className="text-right">
-                    <span className="font-bold">{used} / {totalLimit}</span>
-                    <span className="text-xs text-muted-foreground ml-2">({pct}%)</span>
-                  </div>
-                </div>
-                <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-                  <div
-                    className={`h-full ${item.color} transition-all`}
-                    style={{ width: `${Math.min(pct, 100)}%` }}
-                  />
-                </div>
-              </div>
-            );
-          })}
-        </CardContent>
-      </Card>
-
-      {/* 4.3 — Cuotas usadas este mes */}
-      {usageData && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <BarChart3 className="h-5 w-5" />
-              Cuotas Usadas Este Mes
-            </CardTitle>
-            <CardDescription>
-              Uso acumulado de todos los usuarios en {usageData.period}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {TOOL_LABELS.map(({ key, label, color }) => {
-                const totalCount = usageData.rows.reduce((sum, r) => sum + (r.usage[key] ?? 0), 0);
-                const limit = limits[key] ?? 0;
-                const pairCount = usageData.rows.length;
-                const avgPct = limit > 0 && pairCount > 0
-                  ? Math.min((totalCount / (limit * pairCount)) * 100, 100)
-                  : 0;
+        <CardContent>
+          {usageLoading ? (
+            <div className="flex items-center justify-center py-10 text-muted-foreground gap-2">
+              <RefreshCw className="h-4 w-4 animate-spin" />
+              Cargando datos de uso...
+            </div>
+          ) : usageError ? (
+            <div className="flex flex-col items-center justify-center py-10 gap-3 text-destructive">
+              <AlertCircle className="h-6 w-6" />
+              <p className="text-sm">{usageError}</p>
+              <button
+                onClick={loadUsage}
+                className="flex items-center gap-1 px-3 py-1.5 text-sm border border-destructive/40 rounded-md hover:bg-destructive/5 transition-colors"
+              >
+                <RefreshCw className="h-3.5 w-3.5" />
+                Reintentar
+              </button>
+            </div>
+          ) : !usageData ? (
+            <div className="flex items-center justify-center py-10 text-muted-foreground text-sm">
+              Sin datos para este período.
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+              {TOOL_LABELS.map(t => {
+                const used = monthlyUsageByTool[t.key] || 0;
+                const limitPerUser = limits[t.key] || 0;
+                const totalLimit = limitPerUser * basicUserCount;
+                const pct = totalLimit > 0 ? Math.round((used / totalLimit) * 100) : 0;
+                const barColor = pct >= 90 ? "bg-red-500" : pct >= 70 ? "bg-amber-500" : t.color;
                 return (
-                  <div key={key} className="space-y-1">
-                    <div className="text-sm font-medium">{label}</div>
-                    <div className="text-2xl font-bold">{totalCount}</div>
-                    <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-                      <div className={`h-full ${color} transition-all`} style={{ width: `${avgPct}%` }} />
+                  <div key={t.key} className="space-y-1">
+                    <div className="flex justify-between items-baseline text-sm">
+                      <span className="font-medium truncate">{t.label}</span>
+                      <span className="text-xs text-muted-foreground ml-1 shrink-0">{pct}%</span>
                     </div>
-                    <div className="text-xs text-muted-foreground">Límite: {limit}/usuario</div>
+                    <div className="text-2xl font-bold">{used}
+                      <span className="text-sm font-normal text-muted-foreground"> / {totalLimit}</span>
+                    </div>
+                    <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                      <div className={`h-full ${barColor} transition-all`} style={{ width: `${Math.min(pct, 100)}%` }} />
+                    </div>
+                    <div className="text-xs text-muted-foreground">Límite: {limitPerUser}/usuario</div>
                   </div>
                 );
               })}
             </div>
-          </CardContent>
-        </Card>
-      )}
+          )}
+        </CardContent>
+      </Card>
 
       {/* 4.1 — Tabla de uso por usuario */}
       {usageData && usageData.rows.length > 0 && (() => {

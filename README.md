@@ -159,7 +159,8 @@ Cuando el backend responde `429 USAGE_LIMIT_EXCEEDED`, `apiFetch` emite un event
 Solo visible para usuarios con rol `administrador` (configurado por email).
 
 - **Estadísticas globales**: total de usuarios, promedios de uso
-- **Cuotas del mes**: uso acumulado por herramienta y por usuario+negocio
+- **Uso del Sistema**: tarjeta unificada con uso acumulado por herramienta — muestra `usado / (límite × usuarios_básicos)`, porcentaje, barra de progreso con color dinámico (verde → ámbar ≥70% → rojo ≥90%) y límite por usuario. Los usuarios inteligentes se excluyen del denominador. Incluye estados de carga, error con botón "Reintentar" y sin datos.
+- **Uso por usuario**: tabla detallada por usuario+negocio con filtros por rol, negocio, herramienta y búsqueda por email, paginada a 50 filas
 - **Gestión de límites**: editar cuotas globales para usuarios básicos
 - **Gestión de roles**: promover/degradar usuarios entre básico e inteligente
 - **Gestión de admins**: agregar/eliminar emails de administradores
