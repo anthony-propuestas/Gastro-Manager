@@ -2793,99 +2793,132 @@ app.post("/api/chat", authMiddleware, negocioMiddleware, createUsageLimitMiddlew
     const user = c.get("user");
     const db = c.env.DB;
     const body = await c.req.json();
-    const { message } = body;
+    const { message, history = [] } = body;
 
     if (!message || typeof message !== "string") {
       return c.json(apiError("VALIDATION_ERROR", "Mensaje es requerido"), 400);
+    }
+    if (!Array.isArray(history)) {
+      return c.json(apiError("VALIDATION_ERROR", "History debe ser un array"), 400);
     }
 
     if (!c.env.GEMINI_API_KEY) {
       return c.json(apiError("CONFIG_ERROR", "API key de Gemini no configurada"), 500);
     }
 
-    const now = new Date();
-    const currentMonth = now.getMonth() + 1;
-    const currentYear = now.getFullYear();
+    // Limitar historial a los últimos 20 mensajes
+    const trimmedHistory = (history as Array<{ role: string; content: string }>).slice(-20);
 
-    const employeesResult = await db
-      .prepare("SELECT * FROM employees WHERE negocio_id = ?")
-      .bind(negocio.id)
-      .all();
-    const employees = employeesResult.results || [];
+    // ── Caché de contexto de negocio (30 min TTL) ──────────────────────────
+    const CACHE_TTL_MS = 30 * 60_000;
+    const cached = await db
+      .prepare("SELECT context_text, fetched_at FROM chat_context_cache WHERE user_id = ? AND negocio_id = ?")
+      .bind(user.id, negocio.id)
+      .first<{ context_text: string; fetched_at: string }>();
 
-    const eventsResult = await db
-      .prepare(
-        `SELECT * FROM events
-         WHERE negocio_id = ?
-         AND strftime('%m', event_date) = ?
-         AND strftime('%Y', event_date) = ?`
-      )
-      .bind(negocio.id, currentMonth.toString().padStart(2, "0"), currentYear.toString())
-      .all();
-    const events = eventsResult.results || [];
+    const isStale =
+      !cached || Date.now() - new Date(cached.fetched_at).getTime() > CACHE_TTL_MS;
 
-    const topicsResult = await db
-      .prepare(
-        `SELECT t.*, e.name as employee_name
-         FROM topics t
-         JOIN employees e ON t.employee_id = e.id
-         WHERE e.negocio_id = ? AND t.is_open = 1`
-      )
-      .bind(negocio.id)
-      .all();
-    const topics = topicsResult.results || [];
+    let contextText: string;
+    if (isStale) {
+      const now = new Date();
+      const currentMonth = now.getMonth() + 1;
+      const currentYear = now.getFullYear();
+      const monthPad = currentMonth.toString().padStart(2, "0");
 
-    const advancesResult = await db
-      .prepare(
-        `SELECT a.*, e.name as employee_name
-         FROM advances a
-         JOIN employees e ON a.employee_id = e.id
-         WHERE a.negocio_id = ? AND a.period_month = ? AND a.period_year = ?`
-      )
-      .bind(negocio.id, currentMonth, currentYear)
-      .all();
-    const advances = advancesResult.results || [];
+      const [employeesResult, eventsResult, topicsResult, advancesResult, salaryPaymentsResult] =
+        await Promise.all([
+          db.prepare("SELECT name, role, is_active, monthly_salary FROM employees WHERE negocio_id = ?")
+            .bind(negocio.id).all(),
+          db.prepare(
+            `SELECT title, event_date, start_time FROM events
+             WHERE negocio_id = ? AND strftime('%m', event_date) = ? AND strftime('%Y', event_date) = ?`
+          ).bind(negocio.id, monthPad, currentYear.toString()).all(),
+          db.prepare(
+            `SELECT t.title, t.due_date, e.name as employee_name
+             FROM topics t JOIN employees e ON t.employee_id = e.id
+             WHERE e.negocio_id = ? AND t.is_open = 1`
+          ).bind(negocio.id).all(),
+          db.prepare(
+            `SELECT a.amount, e.name as employee_name
+             FROM advances a JOIN employees e ON a.employee_id = e.id
+             WHERE a.negocio_id = ? AND a.period_month = ? AND a.period_year = ?`
+          ).bind(negocio.id, currentMonth, currentYear).all(),
+          db.prepare(
+            `SELECT sp.salary_amount, sp.net_amount, sp.is_paid, e.name as employee_name
+             FROM salary_payments sp JOIN employees e ON sp.employee_id = e.id
+             WHERE sp.negocio_id = ? AND sp.period_month = ? AND sp.period_year = ?`
+          ).bind(negocio.id, currentMonth, currentYear).all(),
+        ]);
 
-    const salaryPaymentsResult = await db
-      .prepare(
-        `SELECT sp.*, e.name as employee_name
-         FROM salary_payments sp
-         JOIN employees e ON sp.employee_id = e.id
-         WHERE sp.negocio_id = ? AND sp.period_month = ? AND sp.period_year = ?`
-      )
-      .bind(negocio.id, currentMonth, currentYear)
-      .all();
-    const salaryPayments = salaryPaymentsResult.results || [];
+      const employees = employeesResult.results as any[];
+      const events = eventsResult.results as any[];
+      const topics = topicsResult.results as any[];
+      const advances = advancesResult.results as any[];
+      const salaryPayments = salaryPaymentsResult.results as any[];
 
-    const context = `
-Eres un asistente virtual para Gastro Manager, un sistema de gestión de restaurantes.
-Estás respondiendo en el contexto del negocio: "${negocio.name}".
+      const monthLabel = now.toLocaleString("es-ES", { month: "short" }) + "/" + currentYear;
+      const activeEmps = employees.filter((e) => e.is_active);
+      const inactiveEmps = employees.filter((e) => !e.is_active);
+      const totalAdvances = advances.reduce((s: number, a: any) => s + (a.amount || 0), 0);
 
-EMPLEADOS (${employees.length} total):
-${employees.map((emp: any) => `- ${emp.name} (${emp.role}), Estado: ${emp.is_active ? "Activo" : "Inactivo"}, Salario mensual: $${emp.monthly_salary || 0}`).join("\n")}
+      contextText = [
+        `Sistema: Gastro Manager. Negocio: "${negocio.name}". Responde en español, de forma concisa.`,
+        activeEmps.length
+          ? `Activos: ${activeEmps.map((e: any) => `${e.name}(${e.role} $${e.monthly_salary || 0})`).join(", ")}`
+          : "Sin empleados activos",
+        inactiveEmps.length
+          ? `Inactivos: ${inactiveEmps.map((e: any) => e.name).join(", ")}`
+          : null,
+        events.length
+          ? `Eventos ${monthLabel}: ${events.map((ev: any) => `"${ev.title}" ${ev.event_date}${ev.start_time ? " " + ev.start_time : ""}`).join(", ")}`
+          : `Sin eventos en ${monthLabel}`,
+        topics.length
+          ? `Temas abiertos: ${topics.map((t: any) => `"${t.title}"→${t.employee_name}${t.due_date ? " vence " + t.due_date : ""}`).join(", ")}`
+          : "Sin temas abiertos",
+        advances.length
+          ? `Adelantos ${monthLabel}: ${advances.map((a: any) => `${a.employee_name} $${a.amount}`).join(", ")} | Total $${totalAdvances}`
+          : `Sin adelantos en ${monthLabel}`,
+        salaryPayments.length
+          ? `Sueldos ${monthLabel}: ${salaryPayments.map((sp: any) => `${sp.employee_name} ${sp.is_paid ? "PAGADO" : "PENDIENTE"}($${sp.net_amount} neto)`).join(", ")}`
+          : `Sin pagos registrados en ${monthLabel}`,
+      ]
+        .filter(Boolean)
+        .join("\n");
 
-EVENTOS DEL MES ACTUAL (${events.length} total):
-${events.length > 0 ? events.map((evt: any) => `- ${evt.title} el ${evt.event_date} ${evt.start_time ? `a las ${evt.start_time}` : ""}`).join("\n") : "No hay eventos este mes"}
+      await db
+        .prepare(
+          `INSERT INTO chat_context_cache (user_id, negocio_id, context_text, fetched_at)
+           VALUES (?, ?, ?, datetime('now'))
+           ON CONFLICT(user_id, negocio_id) DO UPDATE SET
+             context_text = excluded.context_text,
+             fetched_at   = excluded.fetched_at`
+        )
+        .bind(user.id, negocio.id, contextText)
+        .run();
+    } else {
+      contextText = cached.context_text;
+    }
 
-TEMAS ABIERTOS (${topics.length} total):
-${topics.length > 0 ? topics.map((topic: any) => `- ${topic.title} (Empleado: ${topic.employee_name})${topic.due_date ? `, Vence: ${topic.due_date}` : ""}`).join("\n") : "No hay temas abiertos"}
+    // ── Construir contents[] para Gemini (multi-turno) ─────────────────────
+    type GeminiPart = { role: string; parts: [{ text: string }] };
+    let contents: GeminiPart[];
 
-ADELANTOS DEL MES (${advances.length} total):
-${advances.length > 0 ? advances.map((adv: any) => `- $${adv.amount} para ${adv.employee_name}`).join("\n") : "No hay adelantos este mes"}
+    if (trimmedHistory.length === 0) {
+      // Primera pregunta — contexto embebido en este único turno
+      contents = [{ role: "user", parts: [{ text: `${contextText}\n\nUsuario: ${message}` }] }];
+    } else {
+      // Historial existente — contexto solo en el primer turno histórico
+      const [firstTurn, ...restTurns] = trimmedHistory;
+      contents = [
+        { role: firstTurn.role, parts: [{ text: `${contextText}\n\nUsuario: ${firstTurn.content}` }] },
+        ...restTurns.map((m) => ({ role: m.role, parts: [{ text: m.content }] })),
+        { role: "user", parts: [{ text: message }] },
+      ];
+    }
 
-PAGOS DE SUELDOS DEL MES (${salaryPayments.length} total):
-${salaryPayments.length > 0 ? salaryPayments.map((sp: any) => `- ${sp.employee_name}: Salario $${sp.salary_amount}, Neto $${sp.net_amount}, ${sp.is_paid ? "PAGADO" : "PENDIENTE"}`).join("\n") : "No hay registros de pago este mes"}
-
-ESTADÍSTICAS:
-- Total empleados: ${employees.length}
-- Empleados activos: ${employees.filter((e: any) => e.is_active).length}
-- Total adelantos del mes: $${advances.reduce((sum: number, a: any) => sum + (a.amount || 0), 0)}
-
-Responde de manera concisa en español sobre los datos de este negocio.
-`;
-
-    const apiKey = c.env.GEMINI_API_KEY;
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+    // ── Llamada a Gemini ────────────────────────────────────────────────────
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${c.env.GEMINI_API_KEY}`;
 
     let geminiResponse;
     try {
@@ -2893,7 +2926,7 @@ Responde de manera concisa en español sobre los datos de este negocio.
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          contents: [{ parts: [{ text: `${context}\n\nUsuario pregunta: ${message}` }] }],
+          contents,
           generationConfig: { temperature: 1.0, maxOutputTokens: 500 },
         }),
       });

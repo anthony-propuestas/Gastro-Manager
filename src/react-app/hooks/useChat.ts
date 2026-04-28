@@ -27,9 +27,14 @@ export function useChat() {
     setError(null);
 
     try {
+      const history = messages.slice(-20).map((m) => ({
+        role: m.role === "assistant" ? "model" : "user",
+        content: m.content,
+      }));
+
       const response = await apiFetch(
         "/api/chat",
-        { method: "POST", body: JSON.stringify({ message }) },
+        { method: "POST", body: JSON.stringify({ message, history }) },
         currentNegocio?.id
       );
 
