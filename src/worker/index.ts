@@ -2901,7 +2901,7 @@ app.post("/api/chat", authMiddleware, negocioMiddleware, createUsageLimitMiddlew
     }
 
     // ── Construir contents[] para Gemini (multi-turno) ─────────────────────
-    type GeminiPart = { role: string; parts: [{ text: string }] };
+    type GeminiPart = { role: string; parts: { text: string }[] };
     let contents: GeminiPart[];
 
     if (trimmedHistory.length === 0) {

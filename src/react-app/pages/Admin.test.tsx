@@ -199,7 +199,7 @@ describe("Uso del Sistema", () => {
   it("muestra spinner mientras fetchUsage está pendiente", async () => {
     mockUseAdmin.mockReturnValue({
       ...BASE_MOCK,
-      fetchUsage: vi.fn(() => new Promise(() => {})),
+      fetchUsage: vi.fn(() => new Promise<void>(() => {})),
     });
 
     render(<Admin />);
