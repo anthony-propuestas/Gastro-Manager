@@ -7,7 +7,7 @@ Este documento describe las capas de seguridad implementadas en Gastro Manager y
 ## Autenticación
 
 - **Google OAuth 2.0** — no se almacenan contraseñas. El flujo completo pasa por Google; el backend solo intercambia el código por tokens y verifica la identidad.
-- **JWT firmado** — tras autenticar con Google, el backend emite un JWT firmado con `JWT_SECRET` y lo devuelve como cookie `HttpOnly`. Cada request subsiguiente incluye esta cookie automáticamente sin exposición en JavaScript.
+- **JWT firmado** — tras autenticar con Google, el backend emite un JWT firmado con `JWT_SECRET` (TTL: 7 días) y lo devuelve como cookie `HttpOnly`. Cada request subsiguiente incluye esta cookie automáticamente sin exposición en JavaScript.
 - **Rol leído de DB en cada request** — el campo `role` del usuario no se lee del JWT sino de la tabla `users` en cada llamada. Esto garantiza que una promoción o degradación de rol tenga efecto inmediato sin necesidad de re-login ni de invalidar tokens.
 
 ---
@@ -77,7 +77,7 @@ El cliente envía un array `history` con los turnos previos de la conversación.
 - El campo `message` se valida como string no vacío.
 - `history` se valida como array.
 
-**Gap conocido:** los ítems individuales de `history` no se validan en profundidad. Un cliente puede enviar `role` con valores arbitrarios o `content` de longitud ilimitada. El riesgo es autocontenido (solo afecta la respuesta del propio usuario), pero podría usarse para consumir tokens de forma acelerada. Pendiente agregar validación de tipo y longitud máxima por ítem.
+Cada ítem de `history` se valida con `chatHistoryItemSchema` (Zod): `role` debe ser `"user" | "model"` y `content` tiene un máximo de 2000 caracteres. El mensaje entrante también está limitado a 2000 caracteres server-side.
 
 ### Prompt injection via historial
 
@@ -95,7 +95,7 @@ Un usuario autenticado puede craftear ítems en `history` para intentar manipula
 
 - Todas las entradas del cliente se validan con **Zod** en el servidor antes de escribir en DB. Los schemas están centralizados en `src/worker/validation.ts` y tienen cobertura de tests al 100%.
 - El backend nunca confía en datos del cliente sin validar: tipos, rangos de monto, formatos de fecha/hora y campos requeridos se comprueban en cada endpoint.
-- El array `history` del chatbot se acota a 20 ítems server-side, pero la validación de cada ítem individual (tipo de `role`, longitud de `content`) está pendiente.
+- El array `history` del chatbot se acota a 20 ítems server-side y cada ítem se valida con Zod (`role: "user"|"model"`, `content` máx. 2000 chars).
 
 ---
 
@@ -124,7 +124,7 @@ Ninguna variable sensible se incluye en el build del frontend (Vite). El Worker 
 - `src/react-app/lib/api.test.ts`: verifica que `apiFetch` emita `USAGE_LIMIT_EVENT` ante `429 USAGE_LIMIT_EXCEEDED` y que agregue `X-Negocio-ID` correctamente.
 - `src/react-app/context/UsageLimitModalContext.test.tsx`: verifica que el modal de upgrade se active ante el evento global y no pueda ser ignorado.
 - `src/react-app/components/auth/ProtectedRoute.test.tsx`: verifica redirecciones para usuarios no autenticados.
-- `src/worker/validation.test.ts`: verifica que los schemas Zod rechacen entradas inválidas en todos los módulos.
+- `src/worker/validation.test.ts`: verifica que los schemas Zod rechacen entradas inválidas en todos los módulos. Incluye 8 casos para `chatHistoryItemSchema` y `chatHistoryArraySchema`: acepta roles válidos (`user`/`model`) y content dentro del límite; rechaza roles arbitrarios, content vacío y content > 2000 chars.
 
 ---
 
@@ -137,7 +137,8 @@ Ninguna variable sensible se incluye en el build del frontend (Vite). El Worker 
 | Exceder cuotas con requests concurrentes | Incremento atómico en D1 con RETURNING count |
 | Inyección SQL | D1 con prepared statements en todos los endpoints |
 | Prompt injection via `history` del chat | Autocontenido (solo afecta al atacante); contexto del negocio es server-controlled; pendiente validar ítems individuales |
-| Agotamiento de tokens de Gemini vía history largo | `history` cortado a 20 ítems server-side antes de enviar a Gemini |
+| Agotamiento de tokens de Gemini vía history largo | `history` cortado a 20 ítems server-side; cada ítem validado (role + longitud) |
+| Rate limiting en endpoints de auth (`/api/auth/*`) | No implementado — pendiente agregar a nivel IP en el Worker |
 | Datos de negocio en caché tras expulsión de miembro | Caché expira en 30 min; acceso a la API ya bloqueado por `negocioMiddleware` desde el momento de la expulsión |
 | XSS | React escapa por defecto; no se usa `dangerouslySetInnerHTML` |
 | CSRF | Cookies `HttpOnly` + validación de origen en el Worker |

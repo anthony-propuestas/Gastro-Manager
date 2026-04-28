@@ -191,6 +191,14 @@ export const createFacturaSchema = z.object({
 
 export const updateFacturaSchema = createFacturaSchema.partial();
 
+// Chat validation schemas
+export const chatHistoryItemSchema = z.object({
+  role: z.enum(["user", "model"]),
+  content: z.string().min(1).max(2000),
+});
+
+export const chatHistoryArraySchema = z.array(chatHistoryItemSchema);
+
 // Helper to validate and parse with Zod
 export function validateData<T>(schema: z.ZodSchema<T>, data: unknown): {
   success: boolean;

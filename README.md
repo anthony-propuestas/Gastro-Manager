@@ -152,7 +152,7 @@ Cuando el backend responde `429 USAGE_LIMIT_EXCEEDED`, `apiFetch` emite un event
 - Contexto incluye: empleados, sueldos, adelantos, eventos, temas pendientes
 - **Conversación multi-turno**: el modelo recuerda los turnos anteriores dentro de la misma sesión
 - **Caché de contexto**: los datos del negocio se cargan una sola vez por sesión (TTL 30 min) y no se reenvían en cada mensaje, reduciendo el consumo de tokens ~3x
-- El cliente envía el historial de la conversación (últimos 20 mensajes) y el servidor lo inyecta en el prompt de Gemini junto al contexto del negocio
+- El cliente envía el historial de la conversación; el servidor toma los últimos 20 mensajes, valida cada ítem (`role: "user"|"model"`, `content` máx. 2000 chars) e inyecta el historial en el prompt de Gemini junto al contexto del negocio
 - Potenciado por Google Gemini 2.5 Flash
 
 ### Panel de Administración
@@ -238,7 +238,7 @@ npm run cf-typegen      # Generar tipos de Cloudflare
 - Autenticación Google OAuth (sin manejo de contraseñas)
 - Rol leído de DB en cada request (inmune a tokens JWT desactualizados)
 - Aislamiento de datos por negocio en todas las queries
-- Validación Zod en servidor para todas las entradas
+- Validación Zod en servidor para todas las entradas, incluyendo tipo y longitud de cada ítem del historial del chatbot
 - Middleware de cuotas con incremento atómico (sin TOCTOU)
 - Admin protegido por variable de entorno + tabla de emails
 

@@ -21,6 +21,7 @@ import {
   updateCompraSchema,
   createFacturaSchema,
   updateFacturaSchema,
+  chatHistoryArraySchema,
 } from "./validation";
 import { USAGE_TOOLS, type UsageTool } from "./usageTools";
 
@@ -2766,8 +2767,8 @@ app.post("/api/chat", authMiddleware, negocioMiddleware, createUsageLimitMiddlew
     const body = await c.req.json();
     const { message, history = [] } = body;
 
-    if (!message || typeof message !== "string") {
-      return c.json(apiError("VALIDATION_ERROR", "Mensaje es requerido"), 400);
+    if (!message || typeof message !== "string" || message.length > 2000) {
+      return c.json(apiError("VALIDATION_ERROR", "Mensaje inválido o demasiado largo"), 400);
     }
     if (!Array.isArray(history)) {
       return c.json(apiError("VALIDATION_ERROR", "History debe ser un array"), 400);
@@ -2777,8 +2778,12 @@ app.post("/api/chat", authMiddleware, negocioMiddleware, createUsageLimitMiddlew
       return c.json(apiError("CONFIG_ERROR", "API key de Gemini no configurada"), 500);
     }
 
-    // Limitar historial a los últimos 20 mensajes
-    const trimmedHistory = (history as Array<{ role: string; content: string }>).slice(-20);
+    const sliced = (history as unknown[]).slice(-20);
+    const historyResult = validateData(chatHistoryArraySchema, sliced);
+    if (!historyResult.success) {
+      return c.json(apiError("VALIDATION_ERROR", `History inválido: ${historyResult.error}`), 400);
+    }
+    const trimmedHistory = historyResult.data!;
 
     // ── Caché de contexto de negocio (30 min TTL) ──────────────────────────
     const CACHE_TTL_MS = 30 * 60_000;

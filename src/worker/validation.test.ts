@@ -18,6 +18,8 @@ import {
   updateCompraSchema,
   createFacturaSchema,
   updateFacturaSchema,
+  chatHistoryItemSchema,
+  chatHistoryArraySchema,
 } from "./validation";
 
 describe("createEmployeeSchema", () => {
@@ -435,5 +437,46 @@ describe("updateFacturaSchema", () => {
   it("rejects monto_total of 0 when provided", () => {
     const result = updateFacturaSchema.safeParse({ monto_total: 0 });
     expect(result.success).toBe(false);
+  });
+});
+
+describe("chatHistoryItemSchema", () => {
+  it("accepts valid user turn", () => {
+    expect(chatHistoryItemSchema.safeParse({ role: "user", content: "hola" }).success).toBe(true);
+  });
+
+  it("accepts valid model turn", () => {
+    expect(chatHistoryItemSchema.safeParse({ role: "model", content: "hola" }).success).toBe(true);
+  });
+
+  it("rejects unknown role", () => {
+    expect(chatHistoryItemSchema.safeParse({ role: "system", content: "hola" }).success).toBe(false);
+  });
+
+  it("rejects empty content", () => {
+    expect(chatHistoryItemSchema.safeParse({ role: "user", content: "" }).success).toBe(false);
+  });
+
+  it("rejects content exceeding 2000 chars", () => {
+    expect(chatHistoryItemSchema.safeParse({ role: "user", content: "a".repeat(2001) }).success).toBe(false);
+  });
+});
+
+describe("chatHistoryArraySchema", () => {
+  it("accepts an empty array", () => {
+    expect(chatHistoryArraySchema.safeParse([]).success).toBe(true);
+  });
+
+  it("accepts valid history", () => {
+    const history = [
+      { role: "user", content: "pregunta" },
+      { role: "model", content: "respuesta" },
+    ];
+    expect(chatHistoryArraySchema.safeParse(history).success).toBe(true);
+  });
+
+  it("rejects array with invalid item", () => {
+    const history = [{ role: "admin", content: "hack" }];
+    expect(chatHistoryArraySchema.safeParse(history).success).toBe(false);
   });
 });
