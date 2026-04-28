@@ -42,10 +42,37 @@ Dentro de cada negocio los miembros tienen un rol de negocio (`owner` / `gerente
 
 ---
 
+## Chatbot (IA)
+
+El endpoint `POST /api/chat` introduce una superficie adicional que merece atención específica.
+
+### Historial enviado por el cliente
+
+El cliente envía un array `history` con los turnos previos de la conversación. El servidor lo recibe y lo inyecta en el prompt de Gemini como historial multi-turno. Mitigaciones aplicadas:
+
+- El array se corta a los últimos **20 ítems** (`slice(-20)`) antes de procesarlo, evitando que un cliente infle el payload para agotar tokens de la API.
+- El campo `message` se valida como string no vacío.
+- `history` se valida como array.
+
+**Gap conocido:** los ítems individuales de `history` no se validan en profundidad. Un cliente puede enviar `role` con valores arbitrarios o `content` de longitud ilimitada. El riesgo es autocontenido (solo afecta la respuesta del propio usuario), pero podría usarse para consumir tokens de forma acelerada. Pendiente agregar validación de tipo y longitud máxima por ítem.
+
+### Prompt injection via historial
+
+Un usuario autenticado puede craftear ítems en `history` para intentar manipular el comportamiento del modelo (ej. inyectar un turno `role: "model"` con instrucciones falsas). Esto es **autocontenido**: el contexto del negocio lo controla el servidor, y el historial manipulado solo afecta la respuesta que el propio atacante recibe. No hay acceso a datos de otros negocios.
+
+### Caché de contexto (`chat_context_cache`)
+
+- La clave es `(user_id, negocio_id)`: el contexto de un usuario no puede cruzarse con el de otro.
+- El contexto se genera **después** de que `negocioMiddleware` valida la membresía, por lo que los datos almacenados ya están autorizados.
+- **Staleness:** si un miembro es expulsado del negocio, su caché puede contener datos del negocio por hasta **30 minutos** hasta que expire. Riesgo bajo dado que el acceso a la API ya estará bloqueado por `negocioMiddleware` en el momento de la expulsión.
+
+---
+
 ## Validación de entrada
 
 - Todas las entradas del cliente se validan con **Zod** en el servidor antes de escribir en DB. Los schemas están centralizados en `src/worker/validation.ts` y tienen cobertura de tests al 100%.
 - El backend nunca confía en datos del cliente sin validar: tipos, rangos de monto, formatos de fecha/hora y campos requeridos se comprueban en cada endpoint.
+- El array `history` del chatbot se acota a 20 ítems server-side, pero la validación de cada ítem individual (tipo de `role`, longitud de `content`) está pendiente.
 
 ---
 
@@ -86,5 +113,8 @@ Ninguna variable sensible se incluye en el build del frontend (Vite). El Worker 
 | Acceso cruzado entre negocios | `negocio_id` validado en el servidor contra membresía del usuario |
 | Exceder cuotas con requests concurrentes | Incremento atómico en D1 con RETURNING count |
 | Inyección SQL | D1 con prepared statements en todos los endpoints |
+| Prompt injection via `history` del chat | Autocontenido (solo afecta al atacante); contexto del negocio es server-controlled; pendiente validar ítems individuales |
+| Agotamiento de tokens de Gemini vía history largo | `history` cortado a 20 ítems server-side antes de enviar a Gemini |
+| Datos de negocio en caché tras expulsión de miembro | Caché expira en 30 min; acceso a la API ya bloqueado por `negocioMiddleware` desde el momento de la expulsión |
 | XSS | React escapa por defecto; no se usa `dangerouslySetInnerHTML` |
 | CSRF | Cookies `HttpOnly` + validación de origen en el Worker |

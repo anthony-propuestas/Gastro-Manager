@@ -150,7 +150,9 @@ Cuando el backend responde `429 USAGE_LIMIT_EXCEEDED`, `apiFetch` emite un event
 - Widget flotante accesible desde cualquier página
 - Consultas en lenguaje natural sobre los datos del negocio activo
 - Contexto incluye: empleados, sueldos, adelantos, eventos, temas pendientes
-- Historial de conversación durante la sesión
+- **Conversación multi-turno**: el modelo recuerda los turnos anteriores dentro de la misma sesión
+- **Caché de contexto**: los datos del negocio se cargan una sola vez por sesión (TTL 30 min) y no se reenvían en cada mensaje, reduciendo el consumo de tokens ~3x
+- El cliente envía el historial de la conversación (últimos 20 mensajes) y el servidor lo inyecta en el prompt de Gemini junto al contexto del negocio
 - Potenciado por Google Gemini 2.5 Flash
 
 ### Panel de Administración
@@ -249,4 +251,4 @@ npm run cf-typegen      # Generar tipos de Cloudflare
 
 ---
 
-**Versión**: 2.2.0 · **Plataforma**: Cloudflare Workers · **Última actualización**: 2026-04-26
+**Versión**: 2.3.0 · **Plataforma**: Cloudflare Workers · **Última actualización**: 2026-04-28
