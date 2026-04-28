@@ -1,68 +1,69 @@
 # Workflow de Documentación Post-Cambio
 
-Seguir este documento paso a paso después de cualquier cambio de código.
+Ejecutar después de **cualquier** cambio de código antes de cerrar la tarea.
 
 ---
 
-## Paso 1 — Tests
+## Checklist rápida
 
-Revisar qué ocurrió con los tests como consecuencia del cambio:
-
-- **Si se crearon tests nuevos**: listar qué archivo(s) y qué casos cubre cada uno.
-- **Si se modificaron tests existentes**: describir qué cambió y por qué.
-- **Si se eliminaron tests**: indicar cuáles y el motivo.
-- **Si no hubo cambios en tests**: confirmar explícitamente que no aplica.
+- [ ] `docs/test.md` refleja el estado actual de tests
+- [ ] `docs/security.md` documenta el impacto (o la ausencia de impacto) del cambio
+- [ ] `README.md` describe con precisión el estado actual del sistema
 
 ---
 
-## Paso 2 — Documentar tests en `docs/test.md`
+## Paso 1 — Tests (`docs/test.md`)
 
-Actualizar `docs/test.md` según lo relevado en el Paso 1:
+Determinar qué cambió en la suite y actualizar `docs/test.md`:
 
-- Agregar entradas para tests nuevos bajo la sección del comando `npm test`, con el mismo formato de bullet que tienen las entradas existentes.
-- Actualizar entradas existentes si cambió lo que verifican.
-- Eliminar entradas de tests que ya no existen.
-- Actualizar los porcentajes de cobertura en la sección `npm run test:coverage` si cambiaron.
-- **No tocar** secciones que no fueron afectadas por el cambio.
+| Situación | Acción |
+|---|---|
+| Tests nuevos | Agregar bullet bajo `npm test` con archivo y qué verifica |
+| Tests modificados | Actualizar la entrada existente |
+| Tests eliminados | Eliminar la entrada |
+| Cobertura cambiada | Actualizar porcentajes en `npm run test:coverage` |
+| Sin cambios en tests | Confirmar explícitamente que no aplica y pasar al Paso 2 |
 
----
-
-## Paso 3 — Analizar y documentar en `docs/security.md`
-
-Analizar el cambio desde la perspectiva de seguridad y actualizar `docs/security.md`:
-
-Preguntas a responder antes de escribir:
-- ¿El cambio introduce una nueva superficie de ataque?
-- ¿Modifica validación de entrada, autenticación, autorización o manejo de cuotas?
-- ¿Expone datos de un negocio a otro?
-- ¿Agrega o elimina una mitigación existente?
-- ¿Cambia el comportamiento de algún riesgo listado en la tabla de superficie de ataque?
-
-Actualizar según corresponda:
-- Agregar o modificar la sección temática relevante (Autenticación, Autorización, Cuotas, Chatbot, Validación, etc.).
-- Actualizar la tabla **Superficie de ataque conocida y mitigaciones** si el riesgo o la mitigación cambiaron.
-- Actualizar la sección **Tests de seguridad relevantes** si se agregaron o eliminaron tests con impacto en seguridad.
-- Si el cambio no tiene impacto de seguridad, confirmar explícitamente que se revisó y no aplica.
+**Formato de bullet:** mismo estilo que las entradas existentes en `docs/test.md`.
 
 ---
 
-## Paso 4 — Documentar en `README.md`
+## Paso 2 — Seguridad (`docs/security.md`)
 
-Actualizar `README.md` para reflejar el estado actual del proyecto:
+**Mentalidad:** asumir que el atacante conoce el código. Pensar en el peor caso concreto para cada área.
 
-- **Características / Módulos**: si se agregó, modificó o eliminó un módulo o feature visible al usuario.
-- **Stack tecnológico**: si cambió alguna dependencia principal.
-- **Comandos NPM**: si se agregó o eliminó un comando.
-- **Sistema de roles y cuotas**: si cambió el comportamiento de cuotas, límites o roles.
-- **Sección de Seguridad** (resumen al pie): si cambió alguna capa de seguridad relevante.
-- **Versión y fecha**: actualizar la línea final si el cambio es significativo.
-- **No tocar** secciones que no fueron afectadas por el cambio.
+### 2a — Análisis obligatorio por área
+
+Para cada área que toca el cambio, responder la pregunta de peor caso:
+
+| Área | Pregunta de peor caso |
+|---|---|
+| **Endpoint nuevo o modificado** | ¿Qué pasa si se llama sin JWT, con JWT de otro negocio, o con payload malformado? ¿Devuelve datos? ¿Escribe en DB? |
+| **Validación de entrada** | ¿Qué pasa si el campo llega vacío, nulo, con 10 MB de texto, o con caracteres especiales SQL/HTML? ¿Falla silenciosamente o explota? |
+| **Aislamiento por `negocio_id`** | ¿Puede un usuario autenticado en el negocio A leer o escribir datos del negocio B con este cambio? |
+| **Autenticación / sesión** | ¿Puede alguien sin cuenta acceder a algo que antes requería login? ¿Se puede reutilizar un token expirado o revocado? |
+| **Autorización / roles** | ¿Puede un empleado ejecutar una acción que solo debería hacer el admin o el owner? |
+| **Cuotas y rate limiting** | ¿Puede un usuario agotar recursos de otro negocio, o bypassear su propio límite con este cambio? |
+| **Chatbot / historial** | ¿Puede el historial filtrar datos de otros negocios? ¿Se puede inyectar texto que altere el comportamiento del modelo? |
+| **Panel admin** | ¿El cambio expone una acción de admin a usuarios normales? ¿Algún endpoint `/api/admin/*` quedó sin verificar `isAdmin()`? |
+
+### 2b — Conclusión y documentación
+
+Después del análisis:
+
+- **Si hay riesgo:** describir el vector concreto, la mitigación implementada (o pendiente), y actualizar `docs/security.md`.
+- **Si no hay riesgo:** escribir una línea explícita que indique qué áreas se revisaron y por qué no aplica. No omitir silenciosamente.
 
 ---
 
-## Criterio de completitud
+## Paso 3 — README (`README.md`)
 
-El workflow está completo cuando:
-1. `docs/test.md` refleja el estado actual de la suite de tests.
-2. `docs/security.md` documenta el impacto (o la ausencia de impacto) del cambio en la postura de seguridad.
-3. `README.md` describe con precisión el estado actual del sistema.
+Actualizar solo las secciones afectadas:
+
+- **Características / Módulos** — si se agregó, modificó o eliminó un feature visible al usuario.
+- **Stack tecnológico** — si cambió una dependencia principal.
+- **Comandos NPM** — si se agregó o eliminó un comando.
+- **Sistema de roles y cuotas** — si cambió el comportamiento de cuotas, límites o roles.
+- **Versión y fecha** — si el cambio es significativo.
+
+No tocar secciones que no fueron afectadas.
