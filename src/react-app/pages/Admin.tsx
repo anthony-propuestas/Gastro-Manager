@@ -6,7 +6,8 @@ import { Input } from "@/react-app/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/react-app/components/ui/table";
 import { Badge } from "@/react-app/components/ui/badge";
 import { useToast } from "@/react-app/components/ui/toast";
-import { Shield, Users, Mail, TrendingUp, UserPlus, Trash2, AlertCircle, Settings2, Crown, UserMinus, Search, X, RefreshCw } from "lucide-react";
+import { Shield, Users, Mail, TrendingUp, UserPlus, Trash2, AlertCircle, Settings2, Crown, UserMinus, Search, X, RefreshCw, CreditCard, ChevronDown, ChevronUp } from "lucide-react";
+import type { AdminSuscripcion, AdminPagoSuscripcion } from "@/react-app/hooks/useAdmin";
 
 const TOOL_LABELS = [
   { key: "employees",       label: "Empleados",  color: "bg-green-500" },
@@ -25,7 +26,8 @@ const TOOL_LABELS = [
 export default function Admin() {
   const { isAdmin, loading, stats, emails, fetchStats, fetchEmails, addEmail, deleteEmail,
           usageData, limits, fetchUsage, fetchLimits, updateLimits,
-          users, fetchUsers, promoteUser, demoteUser } = useAdmin();
+          users, fetchUsers, promoteUser, demoteUser,
+          suscripciones, fetchSuscripciones, fetchPagosUsuario } = useAdmin();
   const { showToast } = useToast();
   const [newEmail, setNewEmail] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -39,6 +41,9 @@ export default function Admin() {
   const [usagePage, setUsagePage] = useState(0);
   const [usageError, setUsageError] = useState<string | null>(null);
   const [usageLoading, setUsageLoading] = useState(false);
+  const [susFilter, setSusFilter] = useState("");
+  const [expandedSus, setExpandedSus] = useState<Record<string, AdminPagoSuscripcion[]>>({});
+  const [loadingPagos, setLoadingPagos] = useState<Record<string, boolean>>({});
 
   const loadUsage = async () => {
     setUsageLoading(true);
@@ -58,6 +63,7 @@ export default function Admin() {
       fetchEmails();
       fetchUsers();
       loadUsage();
+      fetchSuscripciones();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAdmin]);
@@ -529,6 +535,128 @@ export default function Admin() {
                   ))}
                 </TableBody>
               </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Suscripciones */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <CreditCard className="h-5 w-5" />
+            Suscripciones
+          </CardTitle>
+          <CardDescription>Usuarios con suscripción activa o histórica</CardDescription>
+          <div className="flex gap-2 flex-wrap pt-2">
+            {["", "autorizada", "en_gracia", "cancelada", "pausada", "pendiente"].map((e) => (
+              <button
+                key={e}
+                onClick={() => { setSusFilter(e); fetchSuscripciones(e || undefined); }}
+                className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
+                  susFilter === e
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "border-border text-muted-foreground hover:bg-muted"
+                }`}
+              >
+                {e === "" ? "Todos" : e.charAt(0).toUpperCase() + e.slice(1).replace("_", " ")}
+              </button>
+            ))}
+          </div>
+        </CardHeader>
+        <CardContent>
+          {suscripciones.length === 0 ? (
+            <p className="text-sm text-muted-foreground py-4 text-center">No hay suscripciones.</p>
+          ) : (
+            <div className="space-y-2">
+              {suscripciones.map((s: AdminSuscripcion) => {
+                const BADGE: Record<string, string> = {
+                  autorizada: "bg-green-100 text-green-800",
+                  en_gracia: "bg-amber-100 text-amber-800",
+                  cancelada: "bg-red-100 text-red-800",
+                  pausada: "bg-gray-100 text-gray-700",
+                  pendiente: "bg-blue-100 text-blue-800",
+                };
+                const isExpanded = s.user_id in expandedSus;
+                const toggleExpand = async () => {
+                  if (isExpanded) {
+                    setExpandedSus(prev => { const n = { ...prev }; delete n[s.user_id]; return n; });
+                  } else {
+                    setLoadingPagos(prev => ({ ...prev, [s.user_id]: true }));
+                    const pagos = await fetchPagosUsuario(s.user_id);
+                    setExpandedSus(prev => ({ ...prev, [s.user_id]: pagos }));
+                    setLoadingPagos(prev => ({ ...prev, [s.user_id]: false }));
+                  }
+                };
+                return (
+                  <div key={s.id} className="border rounded-lg overflow-hidden">
+                    <div className="flex items-center gap-3 p-3 hover:bg-muted/50 cursor-pointer" onClick={toggleExpand}>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{s.email}</p>
+                        <p className="text-xs text-muted-foreground truncate">{s.name}</p>
+                      </div>
+                      <Badge className={`${BADGE[s.estado] ?? "bg-gray-100 text-gray-700"} flex-shrink-0 text-xs`}>
+                        {s.estado.replace("_", " ")}
+                      </Badge>
+                      <div className="text-xs text-muted-foreground flex-shrink-0 hidden sm:block">
+                        {s.proximo_cobro ? new Date(s.proximo_cobro).toLocaleDateString("es-AR") : "—"}
+                      </div>
+                      <div className="text-xs text-muted-foreground flex-shrink-0">
+                        {s.pagos_ok}/{s.total_pagos}
+                      </div>
+                      {loadingPagos[s.user_id] ? (
+                        <RefreshCw className="w-4 h-4 animate-spin flex-shrink-0" />
+                      ) : isExpanded ? (
+                        <ChevronUp className="w-4 h-4 flex-shrink-0" />
+                      ) : (
+                        <ChevronDown className="w-4 h-4 flex-shrink-0" />
+                      )}
+                    </div>
+                    {isExpanded && (
+                      <div className="border-t bg-muted/20 p-3">
+                        {expandedSus[s.user_id].length === 0 ? (
+                          <p className="text-xs text-muted-foreground">Sin pagos registrados.</p>
+                        ) : (
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead className="text-xs">Fecha</TableHead>
+                                <TableHead className="text-xs">Monto</TableHead>
+                                <TableHead className="text-xs">Estado</TableHead>
+                                <TableHead className="text-xs">Razón</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {expandedSus[s.user_id].map((p: AdminPagoSuscripcion) => (
+                                <TableRow key={p.id}>
+                                  <TableCell className="text-xs">
+                                    {p.fecha_pago ? new Date(p.fecha_pago).toLocaleDateString("es-AR") : "—"}
+                                  </TableCell>
+                                  <TableCell className="text-xs">
+                                    {p.monto != null ? `${p.moneda} ${p.monto.toLocaleString("es-AR")}` : "—"}
+                                  </TableCell>
+                                  <TableCell>
+                                    <Badge className={`text-xs ${
+                                      p.estado_pago === "approved" ? "bg-green-100 text-green-800" :
+                                      p.estado_pago === "rejected" ? "bg-red-100 text-red-800" :
+                                      "bg-gray-100 text-gray-700"
+                                    }`}>
+                                      {p.estado_pago}
+                                    </Badge>
+                                  </TableCell>
+                                  <TableCell className="text-xs text-muted-foreground">
+                                    {p.razon_rechazo ?? "—"}
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           )}
         </CardContent>

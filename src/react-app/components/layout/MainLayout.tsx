@@ -1,6 +1,7 @@
 import { ReactNode } from "react";
 import Sidebar from "./Sidebar";
 import BottomNav from "./BottomNav";
+import GracePeriodBanner from "@/react-app/components/GracePeriodBanner";
 import { useSidebar } from "@/react-app/hooks/useSidebar";
 import { ChefHat } from "lucide-react";
 import { cn } from "@/react-app/lib/utils";
@@ -36,6 +37,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
           isCollapsed ? "lg:ml-20" : "lg:ml-64"
         )}
       >
+        <GracePeriodBanner />
         <div className="p-4 sm:p-6 lg:p-8">{children}</div>
       </main>
 

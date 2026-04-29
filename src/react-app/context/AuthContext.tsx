@@ -8,6 +8,7 @@ interface AuthUser {
   picture: string;
   role: string;
   email_verified: boolean;
+  graceDaysLeft: number | null;
 }
 
 interface AuthContextValue {
@@ -72,7 +73,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     fetch("/api/users/me")
       .then((res) => (res.ok ? res.json() : null))
-      .then((data) => setUser(data?.data ?? null))
+      .then((data) => {
+        if (!data?.data) { setUser(null); return; }
+        const raw = data.data;
+        setUser({
+          ...raw,
+          graceDaysLeft: raw.suscripcion?.grace_days_left ?? null,
+        });
+      })
       .catch(() => setUser(null))
       .finally(() => setIsPending(false));
   }, []);

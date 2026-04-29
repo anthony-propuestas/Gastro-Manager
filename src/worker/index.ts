@@ -34,6 +34,11 @@ type Env = {
   RESEND_API_KEY: string;
   INITIAL_ADMIN_EMAIL?: string;
   GEMINI_API_KEY?: string;
+  MERCADO_PAGO_ACCESS_TOKEN: string;
+  MERCADO_PAGO_ACCESS_TOKEN_TEST?: string;
+  MERCADO_PAGO_WEBHOOK_SECRET: string;
+  MERCADO_PAGO_PLAN_ID: string;
+  APP_URL?: string;
 };
 
 type UserPayload = { id: string; email: string; name: string; picture: string; role: string };
@@ -70,6 +75,44 @@ async function generateToken(): Promise<string> {
   const bytes = new Uint8Array(32);
   crypto.getRandomValues(bytes);
   return Array.from(bytes).map(b => b.toString(16).padStart(2, "0")).join("");
+}
+
+// ============================================
+// MercadoPago helpers y tipos
+// ============================================
+
+type MPPayment = {
+  id: number; status: string; status_detail: string | null;
+  transaction_amount: number; currency_id: string;
+  date_approved: string | null; external_reference: string;
+  preapproval_id: string | null;
+};
+type MPPreapproval = {
+  id: string; status: string; external_reference: string;
+  next_payment_date: string | null;
+};
+
+function getMPToken(env: Env): string {
+  return env.MERCADO_PAGO_ACCESS_TOKEN_TEST ?? env.MERCADO_PAGO_ACCESS_TOKEN;
+}
+
+async function verifyMPWebhook(
+  c: import("hono").Context<{ Bindings: Env; Variables: Variables }>,
+  dataId: string
+): Promise<boolean> {
+  const sig = c.req.header("x-signature") ?? "";
+  const reqId = c.req.header("x-request-id") ?? "";
+  const ts = sig.match(/ts=([^,]+)/)?.[1];
+  const v1 = sig.match(/v1=([^,]+)/)?.[1];
+  if (!ts || !v1 || !c.env.MERCADO_PAGO_WEBHOOK_SECRET) return false;
+  const manifest = `id:${dataId};request-id:${reqId};ts:${ts}`;
+  const key = await crypto.subtle.importKey(
+    "raw", new TextEncoder().encode(c.env.MERCADO_PAGO_WEBHOOK_SECRET),
+    { name: "HMAC", hash: "SHA-256" }, false, ["sign"]
+  );
+  const buf = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(manifest));
+  const computed = Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, "0")).join("");
+  return computed === v1;
 }
 
 async function hashToken(token: string): Promise<string> {
@@ -125,6 +168,24 @@ const authMiddleware: MiddlewareHandler<{ Bindings: Env; Variables: Variables }>
       .bind(user.id)
       .first<{ role: string; email_verified: number }>();
     user.role = dbUser?.role ?? "usuario_basico";
+    if (user.role === "usuario_inteligente") {
+      const sub = await c.env.DB
+        .prepare("SELECT estado, grace_deadline FROM suscripciones WHERE user_id = ?")
+        .bind(user.id)
+        .first<{ estado: string; grace_deadline: string | null }>();
+      if (sub?.estado === "en_gracia" && sub.grace_deadline) {
+        if (Date.now() > new Date(sub.grace_deadline).getTime()) {
+          await c.env.DB.batch([
+            c.env.DB.prepare("UPDATE suscripciones SET estado='pausada', updated_at=datetime('now') WHERE user_id=?").bind(user.id),
+            c.env.DB.prepare("UPDATE users SET role='usuario_basico', updated_at=datetime('now') WHERE id=?").bind(user.id),
+          ]);
+          user.role = "usuario_basico";
+        } else {
+          const daysLeft = Math.ceil((new Date(sub.grace_deadline).getTime() - Date.now()) / 86_400_000);
+          c.header("X-Grace-Days-Left", String(daysLeft));
+        }
+      }
+    }
     (user as any).email_verified = dbUser?.email_verified === 1;
     c.set("user", user);
     await next();
@@ -448,8 +509,24 @@ app.get("/api/auth/verify-email", async (c) => {
   }
 });
 
-app.get("/api/users/me", authMiddleware, (c) => {
-  return c.json({ success: true, data: c.get("user") });
+app.get("/api/users/me", authMiddleware, async (c) => {
+  const user = c.get("user");
+  const sub = await c.env.DB
+    .prepare("SELECT estado, grace_deadline FROM suscripciones WHERE user_id = ?")
+    .bind(user.id)
+    .first<{ estado: string; grace_deadline: string | null }>();
+  let graceDaysLeft: number | null = null;
+  if (sub?.estado === "en_gracia" && sub.grace_deadline) {
+    const ms = new Date(sub.grace_deadline).getTime() - Date.now();
+    if (ms > 0) graceDaysLeft = Math.ceil(ms / 86_400_000);
+  }
+  return c.json({
+    success: true,
+    data: {
+      ...user,
+      suscripcion: sub ? { estado: sub.estado, grace_days_left: graceDaysLeft } : null,
+    },
+  });
 });
 
 app.get("/api/logout", (c) => {
@@ -3405,5 +3482,210 @@ app.delete("/api/facturacion/:id",
     }
   }
 );
+
+// ============================================
+// Suscripciones (MercadoPago Preaprobación)
+// ============================================
+
+app.post("/api/suscripciones/crear", authMiddleware, async (c) => {
+  const user = c.get("user");
+  const existing = await c.env.DB
+    .prepare("SELECT id FROM suscripciones WHERE user_id = ? AND estado IN ('autorizada','en_gracia')")
+    .bind(user.id)
+    .first();
+  if (existing) return c.json(apiError("ALREADY_SUBSCRIBED", "Ya tienes una suscripción activa"), 400);
+
+  const backUrl = `${c.env.APP_URL ?? ""}/suscripcion/estado`;
+  const mpRes = await fetch("https://api.mercadopago.com/preapproval", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${getMPToken(c.env)}`,
+    },
+    body: JSON.stringify({
+      preapproval_plan_id: c.env.MERCADO_PAGO_PLAN_ID,
+      back_url: backUrl,
+      external_reference: user.id,
+      payer_email: user.email,
+      reason: "Gastro Manager — Plan Inteligente",
+    }),
+  });
+  if (!mpRes.ok) {
+    const err = await mpRes.text();
+    console.error("MP crear preapproval error:", err);
+    return c.json(apiError("MP_ERROR", "Error al crear suscripción en MercadoPago"), 502);
+  }
+  const mpData = await mpRes.json<{ id: string; init_point: string }>();
+  await c.env.DB
+    .prepare(`INSERT INTO suscripciones (user_id, mp_preapproval_id, estado, payer_email)
+              VALUES (?, ?, 'pendiente', ?)
+              ON CONFLICT(user_id) DO UPDATE SET
+                mp_preapproval_id = excluded.mp_preapproval_id,
+                estado = 'pendiente',
+                updated_at = datetime('now')`)
+    .bind(user.id, mpData.id, user.email)
+    .run();
+  return c.json(apiResponse({ init_point: mpData.init_point }), 201);
+});
+
+app.get("/api/suscripciones/estado", authMiddleware, async (c) => {
+  const user = c.get("user");
+  const sub = await c.env.DB
+    .prepare("SELECT * FROM suscripciones WHERE user_id = ?")
+    .bind(user.id)
+    .first<Record<string, unknown>>();
+  if (!sub) return c.json(apiResponse(null));
+  let grace_days_left: number | null = null;
+  if (sub.estado === "en_gracia" && sub.grace_deadline) {
+    const ms = new Date(sub.grace_deadline as string).getTime() - Date.now();
+    if (ms > 0) grace_days_left = Math.ceil(ms / 86_400_000);
+  }
+  return c.json(apiResponse({ ...sub, grace_days_left }));
+});
+
+app.post("/api/suscripciones/cancelar", authMiddleware, async (c) => {
+  const user = c.get("user");
+  const sub = await c.env.DB
+    .prepare("SELECT id, mp_preapproval_id FROM suscripciones WHERE user_id = ? AND estado IN ('autorizada','en_gracia')")
+    .bind(user.id)
+    .first<{ id: number; mp_preapproval_id: string }>();
+  if (!sub) return c.json(apiError("NOT_FOUND", "No hay suscripción activa"), 404);
+
+  if (sub.mp_preapproval_id) {
+    await fetch(`https://api.mercadopago.com/preapproval/${sub.mp_preapproval_id}`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${getMPToken(c.env)}`,
+      },
+      body: JSON.stringify({ status: "cancelled" }),
+    });
+  }
+  await c.env.DB.batch([
+    c.env.DB.prepare("UPDATE suscripciones SET estado='cancelada', updated_at=datetime('now') WHERE id=?").bind(sub.id),
+    c.env.DB.prepare("UPDATE users SET role='usuario_basico', updated_at=datetime('now') WHERE id=?").bind(user.id),
+  ]);
+  return c.json(apiResponse({ cancelled: true }));
+});
+
+// Webhook público — siempre responde 200
+app.post("/api/webhooks/mercadopago", async (c) => {
+  try {
+    const url = new URL(c.req.url);
+    const type = c.req.query("type") || url.searchParams.get("type");
+    const dataId = c.req.query("data.id") || url.searchParams.get("data.id") || "";
+
+    const valid = await verifyMPWebhook(c as any, dataId);
+    if (!valid) return c.json({ received: true }, 200);
+
+    if (type === "payment") {
+      const pmRes = await fetch(`https://api.mercadopago.com/v1/payments/${dataId}`, {
+        headers: { Authorization: `Bearer ${getMPToken(c.env)}` },
+      });
+      if (!pmRes.ok) return c.json({ received: true }, 200);
+      const pm = await pmRes.json<MPPayment>();
+      const userId = pm.external_reference;
+
+      const sub = await c.env.DB
+        .prepare("SELECT id, ultimo_pago_ok FROM suscripciones WHERE user_id = ?")
+        .bind(userId)
+        .first<{ id: number; ultimo_pago_ok: string | null }>();
+      if (!sub) return c.json({ received: true }, 200);
+
+      await c.env.DB
+        .prepare(`INSERT OR IGNORE INTO pagos_suscripcion
+                  (suscripcion_id, user_id, mp_payment_id, mp_preapproval_id, estado_pago, monto, moneda, fecha_pago, payload_raw)
+                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+        .bind(
+          sub.id, userId, String(pm.id), pm.preapproval_id,
+          pm.status, pm.transaction_amount, pm.currency_id,
+          pm.date_approved, JSON.stringify(pm)
+        )
+        .run();
+
+      if (pm.status === "approved") {
+        await c.env.DB.batch([
+          c.env.DB.prepare("UPDATE suscripciones SET estado='autorizada', grace_deadline=NULL, ultimo_pago_ok=datetime('now'), updated_at=datetime('now') WHERE user_id=?").bind(userId),
+          c.env.DB.prepare("UPDATE users SET role='usuario_inteligente', updated_at=datetime('now') WHERE id=?").bind(userId),
+        ]);
+      } else if (pm.status === "rejected") {
+        const base = sub.ultimo_pago_ok ? new Date(sub.ultimo_pago_ok) : new Date();
+        base.setDate(base.getDate() + 7);
+        const deadline = base.toISOString();
+        await c.env.DB
+          .prepare("UPDATE suscripciones SET estado='en_gracia', grace_deadline=?, updated_at=datetime('now') WHERE user_id=?")
+          .bind(deadline, userId)
+          .run();
+      }
+    } else if (type === "preapproval") {
+      const paRes = await fetch(`https://api.mercadopago.com/preapproval/${dataId}`, {
+        headers: { Authorization: `Bearer ${getMPToken(c.env)}` },
+      });
+      if (!paRes.ok) return c.json({ received: true }, 200);
+      const pa = await paRes.json<MPPreapproval>();
+      const userId = pa.external_reference;
+
+      if (pa.status === "authorized") {
+        await c.env.DB
+          .prepare("UPDATE suscripciones SET estado='autorizada', mp_preapproval_id=?, proximo_cobro=?, updated_at=datetime('now') WHERE user_id=?")
+          .bind(pa.id, pa.next_payment_date, userId)
+          .run();
+      } else if (pa.status === "cancelled") {
+        await c.env.DB.batch([
+          c.env.DB.prepare("UPDATE suscripciones SET estado='cancelada', updated_at=datetime('now') WHERE user_id=?").bind(userId),
+          c.env.DB.prepare("UPDATE users SET role='usuario_basico', updated_at=datetime('now') WHERE id=?").bind(userId),
+        ]);
+      } else if (pa.status === "paused") {
+        await c.env.DB.batch([
+          c.env.DB.prepare("UPDATE suscripciones SET estado='pausada', updated_at=datetime('now') WHERE user_id=?").bind(userId),
+          c.env.DB.prepare("UPDATE users SET role='usuario_basico', updated_at=datetime('now') WHERE id=?").bind(userId),
+        ]);
+      }
+    }
+  } catch (err) {
+    console.error("Webhook MP error:", err);
+  }
+  return c.json({ received: true }, 200);
+});
+
+app.get("/api/suscripciones/pagos", authMiddleware, async (c) => {
+  const user = c.get("user");
+  const rows = await c.env.DB
+    .prepare(`SELECT p.* FROM pagos_suscripcion p
+      JOIN suscripciones s ON s.id = p.suscripcion_id
+      WHERE s.user_id = ? ORDER BY p.fecha_pago DESC LIMIT 5`)
+    .bind(user.id)
+    .all();
+  return c.json(apiResponse(rows.results));
+});
+
+app.get("/api/admin/suscripciones", authMiddleware, async (c) => {
+  const user = c.get("user");
+  if (!await isAdmin(user.email, c.env.DB, c.env)) return c.json(apiError("FORBIDDEN", "No autorizado"), 403);
+  const estado = c.req.query("estado");
+  const whereClause = estado ? "WHERE s.estado = ?" : "";
+  const stmt = c.env.DB.prepare(
+    `SELECT s.*, u.email, u.name, u.role,
+      (SELECT COUNT(*) FROM pagos_suscripcion p WHERE p.suscripcion_id = s.id) as total_pagos,
+      (SELECT COUNT(*) FROM pagos_suscripcion p WHERE p.suscripcion_id = s.id AND p.estado_pago='approved') as pagos_ok
+      FROM suscripciones s JOIN users u ON u.id = s.user_id
+      ${whereClause} ORDER BY s.created_at DESC`
+  );
+  const rows = await (estado ? stmt.bind(estado) : stmt).all();
+  return c.json(apiResponse(rows.results));
+});
+
+app.get("/api/admin/suscripciones/:userId/pagos", authMiddleware, async (c) => {
+  const user = c.get("user");
+  if (!await isAdmin(user.email, c.env.DB, c.env)) return c.json(apiError("FORBIDDEN", "No autorizado"), 403);
+  const userId = c.req.param("userId");
+  const rows = await c.env.DB
+    .prepare(`SELECT p.* FROM pagos_suscripcion p
+      JOIN suscripciones s ON s.id = p.suscripcion_id
+      WHERE s.user_id = ? ORDER BY p.fecha_pago DESC LIMIT 100`)
+    .bind(userId)
+    .all();
+  return c.json(apiResponse(rows.results));
+});
 
 export default app;

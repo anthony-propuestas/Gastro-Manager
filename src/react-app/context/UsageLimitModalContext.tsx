@@ -126,8 +126,8 @@ function UsageLimitUpgradeModal({
               <Button
                 className="bg-gradient-to-r from-primary via-emerald-500 to-emerald-600 text-white hover:opacity-90"
                 onClick={() => {
-                  // TODO: conectar este CTA con el flujo real de upgrade a Usuario Inteligente.
-                  // TODO: cuando exista checkout o contacto comercial, registrar analytics y navegar al siguiente paso.
+                  onClose();
+                  window.location.assign("/suscripcion");
                 }}
                 size="lg"
                 type="button"

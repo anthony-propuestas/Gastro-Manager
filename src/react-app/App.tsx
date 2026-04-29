@@ -22,6 +22,8 @@ import AuthCallback from "@/react-app/pages/AuthCallback";
 import VerifyEmailPage from "@/react-app/pages/VerifyEmailPage";
 import NegocioSetup from "@/react-app/pages/NegocioSetup";
 import InvitePage from "@/react-app/pages/InvitePage";
+import SuscripcionPage from "@/react-app/pages/Suscripcion";
+import SuscripcionEstadoPage from "@/react-app/pages/SuscripcionEstado";
 
 export default function App() {
   return (
@@ -164,6 +166,30 @@ export default function App() {
                     <MainLayout>
                       <PageErrorBoundary>
                         <OwnerPanel />
+                      </PageErrorBoundary>
+                    </MainLayout>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/suscripcion"
+                element={
+                  <ProtectedRoute>
+                    <MainLayout>
+                      <PageErrorBoundary>
+                        <SuscripcionPage />
+                      </PageErrorBoundary>
+                    </MainLayout>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/suscripcion/estado"
+                element={
+                  <ProtectedRoute>
+                    <MainLayout>
+                      <PageErrorBoundary>
+                        <SuscripcionEstadoPage />
                       </PageErrorBoundary>
                     </MainLayout>
                   </ProtectedRoute>

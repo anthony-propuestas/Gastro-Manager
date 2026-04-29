@@ -48,6 +48,34 @@ interface AdminEmail {
   is_initial?: boolean;
 }
 
+export interface AdminSuscripcion {
+  id: number;
+  user_id: string;
+  email: string;
+  name: string;
+  role: string;
+  mp_preapproval_id: string | null;
+  estado: string;
+  proximo_cobro: string | null;
+  ultimo_pago_ok: string | null;
+  monto: number;
+  moneda: string;
+  total_pagos: number;
+  pagos_ok: number;
+  created_at: string;
+}
+
+export interface AdminPagoSuscripcion {
+  id: number;
+  mp_payment_id: string | null;
+  estado_pago: string;
+  monto: number | null;
+  moneda: string;
+  fecha_pago: string | null;
+  razon_rechazo: string | null;
+  created_at: string;
+}
+
 export function useAdmin() {
   const [isAdmin, setIsAdmin] = useState<boolean>(false);
   const [loading, setLoading] = useState(true);
@@ -56,6 +84,7 @@ export function useAdmin() {
   const [usageData, setUsageData] = useState<AdminUsageData | null>(null);
   const [limits, setLimits] = useState<UsageLimits>({});
   const [users, setUsers] = useState<AdminUser[]>([]);
+  const [suscripciones, setSuscripciones] = useState<AdminSuscripcion[]>([]);
 
   useEffect(() => {
     checkAdminStatus();
@@ -196,6 +225,27 @@ export function useAdmin() {
     }
   };
 
+  const fetchSuscripciones = async (estado?: string) => {
+    try {
+      const url = estado ? `/api/admin/suscripciones?estado=${estado}` : "/api/admin/suscripciones";
+      const res = await fetch(url);
+      const data = await res.json();
+      if (data.success) setSuscripciones(data.data);
+    } catch (error) {
+      console.error("Error fetching suscripciones:", error);
+    }
+  };
+
+  const fetchPagosUsuario = async (userId: string): Promise<AdminPagoSuscripcion[]> => {
+    try {
+      const res = await fetch(`/api/admin/suscripciones/${userId}/pagos`);
+      const data = await res.json();
+      return data.success ? data.data : [];
+    } catch {
+      return [];
+    }
+  };
+
   return {
     isAdmin,
     loading,
@@ -214,5 +264,8 @@ export function useAdmin() {
     fetchUsers,
     promoteUser,
     demoteUser,
+    suscripciones,
+    fetchSuscripciones,
+    fetchPagosUsuario,
   };
 }

@@ -293,6 +293,39 @@ export default function Settings() {
         <CardHeader>
           <div className="flex items-center gap-3">
             <div className="p-2 rounded-lg bg-primary/10">
+              <LayoutGrid className="w-5 h-5 text-primary" />
+            </div>
+            <div>
+              <CardTitle className="text-lg font-serif">Plan</CardTitle>
+              <CardDescription>Gestiona tu suscripción a Gastro Manager.</CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="flex items-center justify-between gap-4">
+          <div>
+            <p className="text-sm font-medium">
+              {user?.role === "usuario_inteligente" ? "Plan Inteligente" : "Plan Básico"}
+            </p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {user?.role === "usuario_inteligente"
+                ? "Sin límites de uso · IA avanzada"
+                : "Funciones básicas con límite de uso"}
+            </p>
+          </div>
+          <Button
+            size="sm"
+            variant={user?.role === "usuario_inteligente" ? "outline" : "default"}
+            onClick={() => navigate("/suscripcion")}
+          >
+            {user?.role === "usuario_inteligente" ? "Ver mi suscripción" : "Suscribirse"}
+          </Button>
+        </CardContent>
+      </Card>
+
+      <Card className="border-0 shadow-sm">
+        <CardHeader>
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-primary/10">
               <UsersRound className="w-5 h-5 text-primary" />
             </div>
             <div>
