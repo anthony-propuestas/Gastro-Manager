@@ -3506,11 +3506,17 @@ app.post("/api/suscripciones/crear", authMiddleware, async (c) => {
         Authorization: `Bearer ${getMPToken(c.env)}`,
       },
       body: JSON.stringify({
-        preapproval_plan_id: c.env.MERCADO_PAGO_PLAN_ID,
-        back_url: backUrl,
-        external_reference: user.id,
         payer_email: user.email,
+        status: "pending",
         reason: "Gastro Manager — Plan Inteligente",
+        external_reference: user.id,
+        back_url: backUrl,
+        auto_recurring: {
+          frequency: 1,
+          frequency_type: "months",
+          transaction_amount: 15000,
+          currency_id: "ARS",
+        },
       }),
     });
   } catch (netErr) {
