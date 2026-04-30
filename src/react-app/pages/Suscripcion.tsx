@@ -71,14 +71,43 @@ export default function SuscripcionPage() {
         <CardContent className="space-y-4">
           {sinSuscripcion && (
             <div className="space-y-3">
-              <p className="text-muted-foreground text-sm">
-                Accedé a funciones avanzadas de IA, sin límites de uso y soporte prioritario.
-              </p>
+              <ul className="space-y-2">
+                <li className="flex items-center gap-2 text-sm">
+                  <CheckCircle className="w-4 h-4 text-green-500 shrink-0" />
+                  <span><strong>Usos ilimitados</strong> en todas las funciones</span>
+                </li>
+                <li className="flex items-center gap-2 text-sm">
+                  <CheckCircle className="w-4 h-4 text-green-500 shrink-0" />
+                  <span>Chat con IA sin restricciones mensuales</span>
+                </li>
+                <li className="flex items-center gap-2 text-sm">
+                  <CheckCircle className="w-4 h-4 text-green-500 shrink-0" />
+                  <span>Facturación y compras ilimitadas</span>
+                </li>
+                <li className="flex items-center gap-2 text-sm">
+                  <CheckCircle className="w-4 h-4 text-green-500 shrink-0" />
+                  <span>Empleados, adelantos y pagos de sueldos sin tope</span>
+                </li>
+                <li className="flex items-center gap-2 text-sm">
+                  <CheckCircle className="w-4 h-4 text-green-500 shrink-0" />
+                  <span>Soporte prioritario</span>
+                </li>
+              </ul>
               <p className="text-2xl font-bold">ARS 15.000 <span className="text-base font-normal text-muted-foreground">/mes</span></p>
               <Button className="w-full" onClick={handleSuscribirse} disabled={isLoading}>
                 {isLoading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
                 Suscribirse
               </Button>
+              <div className="border-t pt-4">
+                <p className="text-sm font-semibold text-muted-foreground mb-2">Plan Básico (gratuito)</p>
+                <ul className="space-y-1 text-sm text-muted-foreground">
+                  <li className="flex items-start gap-2"><span>·</span><span>20 consultas de IA por mes</span></li>
+                  <li className="flex items-start gap-2"><span>·</span><span>50 facturas y 50 compras por mes</span></li>
+                  <li className="flex items-start gap-2"><span>·</span><span>5 empleados, 10 adelantos y 10 pagos de sueldos</span></li>
+                  <li className="flex items-start gap-2"><span>·</span><span>15 eventos y 10 temas por mes</span></li>
+                  <li className="flex items-start gap-2"><span>·</span><span>Sin soporte prioritario</span></li>
+                </ul>
+              </div>
             </div>
           )}
 
