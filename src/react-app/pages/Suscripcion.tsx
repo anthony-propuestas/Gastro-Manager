@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/react-app/components
 import { Button } from "@/react-app/components/ui/button";
 import { Badge } from "@/react-app/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/react-app/components/ui/table";
-import { CheckCircle, AlertTriangle, XCircle, Clock, Loader2 } from "lucide-react";
+import { CheckCircle, AlertTriangle, Clock, Loader2 } from "lucide-react";
 
 const ESTADO_BADGE: Record<string, { label: string; className: string }> = {
   autorizada: { label: "Activa", className: "bg-green-100 text-green-800" },

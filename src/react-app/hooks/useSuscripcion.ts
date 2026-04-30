@@ -55,7 +55,37 @@ export function useSuscripcion() {
       const res = await fetch("/api/suscripciones/crear", { method: "POST" });
       const data = await res.json();
       if (!res.ok) {
-        setError(data.error?.message ?? "Error al crear suscripción");
+        const err = data.error as { code?: string; message?: string; mp_status?: number | null; mp_detail?: string | null } | undefined;
+        const code = err?.code ?? "ERROR";
+        if (res.status === 502) {
+          let msg: string;
+          switch (code) {
+            case "MP_NETWORK_ERROR":
+              msg = "No se pudo conectar con Mercado Pago. Verificá tu conexión a internet.";
+              break;
+            case "MP_AUTH_ERROR":
+              msg = "Credenciales de Mercado Pago inválidas. Contactá al soporte.";
+              break;
+            case "MP_VALIDATION_ERROR":
+              msg = err?.mp_detail
+                ? `Mercado Pago rechazó la solicitud: ${err.mp_detail}`
+                : "Solicitud rechazada por Mercado Pago. Revisá la configuración.";
+              break;
+            case "MP_SERVER_ERROR":
+              msg = "Mercado Pago está experimentando problemas. Intentá más tarde.";
+              break;
+            case "MP_NO_INIT_POINT":
+              msg = "Mercado Pago no generó el enlace de pago. Intentá de nuevo.";
+              break;
+            default:
+              msg = err?.mp_detail
+                ? `Error de Mercado Pago: ${err.mp_detail}`
+                : "Mercado Pago no respondió correctamente. Intentá de nuevo.";
+          }
+          setError(`${msg} (${code}${err?.mp_status ? ` — ${err.mp_status}` : ""})`);
+        } else {
+          setError(err?.message ?? "Error al crear suscripción");
+        }
         return null;
       }
       await fetchEstado();

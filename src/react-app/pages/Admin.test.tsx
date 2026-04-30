@@ -40,6 +40,9 @@ const BASE_MOCK = {
   fetchUsers: vi.fn(),
   promoteUser: vi.fn(),
   demoteUser: vi.fn(),
+  suscripciones: [],
+  fetchSuscripciones: vi.fn(),
+  fetchPagosUsuario: vi.fn(() => Promise.resolve([])),
 };
 
 beforeEach(() => {

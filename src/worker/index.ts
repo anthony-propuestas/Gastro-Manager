@@ -3496,26 +3496,51 @@ app.post("/api/suscripciones/crear", authMiddleware, async (c) => {
   if (existing) return c.json(apiError("ALREADY_SUBSCRIBED", "Ya tienes una suscripción activa"), 400);
 
   const backUrl = `${c.env.APP_URL ?? ""}/suscripcion/estado`;
-  const mpRes = await fetch("https://api.mercadopago.com/preapproval", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${getMPToken(c.env)}`,
-    },
-    body: JSON.stringify({
-      preapproval_plan_id: c.env.MERCADO_PAGO_PLAN_ID,
-      back_url: backUrl,
-      external_reference: user.id,
-      payer_email: user.email,
-      reason: "Gastro Manager — Plan Inteligente",
-    }),
-  });
-  if (!mpRes.ok) {
-    const err = await mpRes.text();
-    console.error("MP crear preapproval error:", err);
-    return c.json(apiError("MP_ERROR", "Error al crear suscripción en MercadoPago"), 502);
+
+  let mpRes: Response;
+  try {
+    mpRes = await fetch("https://api.mercadopago.com/preapproval", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${getMPToken(c.env)}`,
+      },
+      body: JSON.stringify({
+        preapproval_plan_id: c.env.MERCADO_PAGO_PLAN_ID,
+        back_url: backUrl,
+        external_reference: user.id,
+        payer_email: user.email,
+        reason: "Gastro Manager — Plan Inteligente",
+      }),
+    });
+  } catch (netErr) {
+    console.error("MP network error al crear preapproval:", netErr);
+    return c.json({ success: false, error: { code: "MP_NETWORK_ERROR", message: "No se pudo conectar con Mercado Pago", mp_status: null, mp_detail: String(netErr) } }, 502);
   }
+
+  if (!mpRes.ok) {
+    const errText = await mpRes.text();
+    console.error("MP crear preapproval error:", mpRes.status, errText);
+    let errorCode = "MP_ERROR";
+    let mpDetail: string | null = null;
+    try {
+      const errJson = JSON.parse(errText) as { message?: string; cause?: { code: number; description: string }[] };
+      mpDetail = errJson.cause?.[0]?.description ?? errJson.message ?? null;
+    } catch {
+      mpDetail = errText.slice(0, 300) || null;
+    }
+    if (mpRes.status === 401) errorCode = "MP_AUTH_ERROR";
+    else if (mpRes.status === 400) errorCode = "MP_VALIDATION_ERROR";
+    else if (mpRes.status >= 500) errorCode = "MP_SERVER_ERROR";
+    return c.json({ success: false, error: { code: errorCode, message: "Error al crear suscripción en MercadoPago", mp_status: mpRes.status, mp_detail: mpDetail } }, 502);
+  }
+
   const mpData = await mpRes.json<{ id: string; init_point: string }>();
+  if (!mpData.init_point) {
+    console.error("MP no devolvió init_point:", JSON.stringify(mpData));
+    return c.json({ success: false, error: { code: "MP_NO_INIT_POINT", message: "Mercado Pago no generó el enlace de pago", mp_status: mpRes.status, mp_detail: null } }, 502);
+  }
+
   await c.env.DB
     .prepare(`INSERT INTO suscripciones (user_id, mp_preapproval_id, estado, payer_email)
               VALUES (?, ?, 'pendiente', ?)
