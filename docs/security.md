@@ -106,6 +106,32 @@ Un usuario autenticado puede craftear ítems en `history` para intentar manipula
 
 ---
 
+## Suscripciones (MercadoPago)
+
+### Webhook público `POST /api/webhooks/mercadopago`
+
+Este endpoint es intencionalmente público (MercadoPago no envía credenciales de sesión). Protección implementada:
+
+- **Firma HMAC verificada** via `verifyMPWebhook()`: si la firma en el header `x-signature` no coincide, el handler retorna `200` silencioso sin procesar el evento. Un atacante no puede activar cambios de estado (rol, suscripción) sin conocer el `MERCADO_PAGO_WEBHOOK_SECRET`.
+- **Sin parseo de body directo**: el handler solo lee `c.req.query("type")` y `c.req.query("data.id")`. Query strings malformadas o con tipos no reconocidos resultan en no-ops.
+- **Idempotente**: el INSERT de pagos usa `INSERT OR IGNORE` con `mp_payment_id` como clave; un mismo evento procesado dos veces no duplica registros.
+
+### Error detail forwarding en `POST /api/suscripciones/crear`
+
+En caso de error 502, la respuesta incluye `mp_detail` (mensaje de error de MercadoPago) y `mp_status` (código HTTP de MP). Análisis:
+
+- Endpoint protegido por `authMiddleware` → solo usuarios autenticados reciben estos detalles.
+- `mp_detail` proviene de la respuesta pública de la API de MP (mensajes como "Invalid credentials" o "Invalid value for preapproval_plan_id"), no de datos internos del sistema.
+- Riesgo de info disclosure: bajo. El usuario solo recibe información sobre el fallo de su propia solicitud de suscripción.
+
+### Aislamiento
+
+Los endpoints de suscripción (`/api/suscripciones/*`) operan sobre `user_id` extraído del JWT, no sobre `negocio_id`. No hay riesgo de acceso cruzado entre negocios.
+
+Los endpoints de admin (`/api/admin/suscripciones*`) verifican `isAdmin()` en cada request.
+
+---
+
 ## Variables de entorno sensibles
 
 | Variable | Uso |
@@ -114,6 +140,11 @@ Un usuario autenticado puede craftear ítems en `history` para intentar manipula
 | `GOOGLE_CLIENT_SECRET` | Intercambio OAuth. Solo en el Worker. |
 | `GEMINI_API_KEY` | Llamadas a la API de Gemini. Solo en el Worker. |
 | `INITIAL_ADMIN_EMAIL` | Email del primer admin. No se incluye en el bundle del cliente. |
+| `MERCADO_PAGO_ACCESS_TOKEN` | Token de producción para llamadas a la API de MercadoPago. |
+| `MERCADO_PAGO_ACCESS_TOKEN_TEST` | *(Opcional)* Token de prueba; si está presente, tiene precedencia sobre el de producción. |
+| `MERCADO_PAGO_WEBHOOK_SECRET` | Clave HMAC para verificar la firma de los webhooks de MercadoPago. |
+| `MERCADO_PAGO_PLAN_ID` | ID del plan de suscripción en MercadoPago. |
+| `APP_URL` | *(Opcional)* URL base de la app; usada como `back_url` al crear suscripciones. |
 
 Ninguna variable sensible se incluye en el build del frontend (Vite). El Worker las lee de los secretos de Cloudflare.
 

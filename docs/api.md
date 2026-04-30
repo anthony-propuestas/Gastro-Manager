@@ -88,7 +88,8 @@ Información del usuario autenticado.
   "name": "Juan Pérez",
   "picture": "https://...",
   "role": "usuario_basico",
-  "email_verified": true
+  "email_verified": true,
+  "suscripcion": { "estado": "autorizada", "grace_days_left": null }
 }
 ```
 
@@ -716,9 +717,6 @@ Estadísticas globales del sistema.
 // Response data
 {
   "totalUsers": 32,
-  "totalNegocios": 8,
-  "avgEmployees": 7,
-  "avgEvents": 11,
   "usage": {
     "employees": 48,
     "salaries": 30,
@@ -726,7 +724,9 @@ Estadísticas globales del sistema.
     "job_roles": 15,
     "topics": 34,
     "notes": 67,
-    "chat": 12
+    "chat": 12,
+    "compras": 5,
+    "facturacion": 8
   }
 }
 ```
@@ -835,14 +835,68 @@ El contexto enviado a Gemini incluye: empleados activos, sueldos del mes, antici
 | `DUPLICATE_EMAIL` | 409 | Email de admin ya registrado |
 | `DATABASE_ERROR` | 500 | Error interno de base de datos |
 | `OAUTH_ERROR` | 400 | Error en autenticación OAuth |
-| `GEMINI_ERROR` | 500 | Error en API de Gemini |
-| `API_KEY_MISSING` | 500 | `GEMINI_API_KEY` no configurada |
+| `GEMINI_API_ERROR` | 500 | Error en API de Gemini |
+| `CONFIG_ERROR` | 500 | `GEMINI_API_KEY` no configurada |
+
+---
+
+## Suscripciones (MercadoPago)
+
+### `POST /api/suscripciones/crear`
+
+- **Auth:** JWT requerido
+- **Body:** ninguno
+- **Respuesta exitosa `201`:**
+```json
+{ "success": true, "data": { "init_point": "https://www.mercadopago.com.ar/subscriptions/checkout?preapproval_plan_id=..." } }
+```
+- **Errores:**
+  - `400 ALREADY_SUBSCRIBED` — el usuario ya tiene una suscripción activa o en gracia.
+  - `502` — fallo al comunicarse con MercadoPago. Cuerpo: `{ "success": false, "error": { "code": string, "message": string, "mp_status": number | null, "mp_detail": string | null } }`.
+    - Códigos posibles: `MP_NETWORK_ERROR`, `MP_AUTH_ERROR`, `MP_VALIDATION_ERROR`, `MP_SERVER_ERROR`, `MP_NO_INIT_POINT`.
+
+### `GET /api/suscripciones/estado`
+
+- **Auth:** JWT requerido
+- **Respuesta `200`:** `{ "success": true, "data": <registro suscripcion | null> }`. Incluye el campo calculado `grace_days_left: number | null` (días restantes del período de gracia, solo cuando `estado = "en_gracia"`).
+
+### `POST /api/suscripciones/cancelar`
+
+- **Auth:** JWT requerido
+- **Body:** ninguno
+- **Respuesta exitosa `200`:** `{ "success": true, "data": { "cancelled": true } }`
+- **Error `404 NOT_FOUND`** — no hay suscripción activa o en gracia para el usuario.
+
+### `GET /api/suscripciones/pagos`
+
+- **Auth:** JWT requerido
+- **Respuesta `200`:** lista con los últimos 5 registros de `pagos_suscripcion` del usuario, ordenados por `fecha_pago DESC`.
+
+### `POST /api/webhooks/mercadopago`
+
+- **Auth:** ninguna (endpoint público). La autenticidad se verifica internamente con firma HMAC (`x-signature` header).
+- **Siempre retorna `200`:** `{ "received": true }` — independientemente del resultado del procesamiento.
+- **Lógica:**
+  - `type=payment` + `status=approved` → rol del usuario a `usuario_inteligente`, suscripción a `autorizada`.
+  - `type=payment` + `status=rejected` → suscripción a `en_gracia` con `grace_deadline = último pago + 7 días`.
+  - `type=preapproval` + `status=authorized|cancelled|paused` → actualiza estado y rol.
+
+### `GET /api/admin/suscripciones`
+
+- **Auth:** JWT + admin
+- **Query param opcional:** `?estado=autorizada|pendiente|cancelada|en_gracia|pausada`
+- **Respuesta `200`:** lista de suscripciones con datos del usuario (`email`, `name`, `role`) y contadores `total_pagos` y `pagos_ok`.
+
+### `GET /api/admin/suscripciones/:userId/pagos`
+
+- **Auth:** JWT + admin
+- **Respuesta `200`:** últimos 100 registros de `pagos_suscripcion` para el usuario especificado, ordenados por `fecha_pago DESC`.
 
 ---
 
 ## Notas Generales
 
-- **Total de endpoints**: 76 rutas registradas en el Worker (GET, POST, PUT, DELETE).
+- **Total de endpoints**: 83 rutas registradas en el Worker (GET, POST, PUT, DELETE).
 - **Sin paginación**: todos los listados retornan el conjunto completo. Filtrado se realiza en cliente.
 - **Sin rate limiting propio**: Cloudflare Workers aplica 100,000 req/día en Free tier.
 - **CORS**: no configurado explícitamente; funciona por same-origin (SPA y API servidos por el mismo Worker via `not_found_handling: single-page-application`).

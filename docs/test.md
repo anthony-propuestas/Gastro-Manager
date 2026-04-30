@@ -34,8 +34,13 @@ Cobertura actual:
 - `src/react-app/hooks/useSidebar.test.tsx`: verifica estado inicial, toggles de isOpen e isCollapsed, cierre del menú mobile al hacer resize a ≥1024px, y error al usar el hook fuera del Provider.
 - `src/react-app/components/auth/ProtectedRoute.test.tsx`: verifica loading y redirecciones de rutas protegidas.
 - `src/react-app/hooks/useModulePrefs.test.ts`: verifica estado por defecto sin usuario (no hace fetch), carga de prefs y restricciones de negocio para usuarios autenticados (incluyendo `isGerente`), mantenimiento de prefs por defecto cuando la respuesta del endpoint tiene formato inválido, update optimista con confirmación exitosa y rollback ante fallo. Módulos registrados: `calendario`, `personal`, `sueldos`, `compras` y `facturacion`.
+- `src/react-app/hooks/useSuscripcion.test.ts`: verifica el hook de suscripciones MercadoPago (23 tests). Cubre 4 bloques:
+  - **Estado inicial y carga en mount** (4 tests): `isLoading: true` antes de resolver, fetch a `/api/suscripciones/estado` en mount y seteo de `suscripcion`, respuesta `null` cuando no hay suscripción, error de red al cargar estado.
+  - **crear()** (13 tests): retorno de `init_point` y llamada a `fetchEstado` en éxito, reset de `isLoading`; `400 ALREADY_SUBSCRIBED` con mensaje del servidor; los 5 códigos 502 de MercadoPago (`MP_NETWORK_ERROR`, `MP_AUTH_ERROR`, `MP_VALIDATION_ERROR` con y sin `mp_detail`, `MP_SERVER_ERROR`, `MP_NO_INIT_POINT`); código desconocido con y sin `mp_detail`; error sin código; `fetch` throws.
+  - **cancelar()** (3 tests): retorno `true` y llamada a `fetchEstado` en éxito; retorno `false` con error en fallo 404; `fetch` throws → retorna `false` y error de red.
+  - **fetchPagos()** (3 tests): seteo de lista de pagos en éxito; respuesta no-ok no modifica el estado de error; excepción de red no modifica el estado de error.
 - `src/react-app/hooks/useChat.test.ts`: verifica el hook del chatbot. Cubre: estado inicial vacío, que mensajes vacíos o con solo espacios no disparen la API, que el primer mensaje envíe `history: []`, que el mensaje del usuario y la respuesta del asistente se agreguen al estado `messages`, que los mensajes siguientes incluyan el intercambio previo como historial, que el rol `assistant` se mapee a `model` (formato requerido por Gemini), que el historial se corte a 20 items, manejo de errores de API y de red, reset de `isLoading` en ambos casos, `clearMessages`, y propagación del id del negocio a `apiFetch`.
-- `src/react-app/pages/Admin.test.tsx`: verifica el panel de administración en tres bloques:
+- `src/react-app/pages/Admin.test.tsx`: verifica el panel de administración en tres bloques. El `BASE_MOCK` incluye `suscripciones`, `fetchSuscripciones` y `fetchPagosUsuario` (requeridos por la sección de suscripciones del panel Admin):
   - **Paginación de uso por usuario** (9 tests): ausencia de controles con ≤50 filas, aparición de controles con >50 filas, estado disabled de "Anterior" en página 1 y "Siguiente" en la última, visibilidad correcta de filas por página, navegación hacia adelante y hacia atrás, indicador "Página X de Y", y reset a página 1 al filtrar por email o al limpiar filtros.
   - **Uso del Sistema** (12 tests): spinner mientras `fetchUsage` está pendiente, mensaje de error cuando `fetchUsage` falla, botón "Reintentar" visible en estado de error y que vuelve a llamar a `fetchUsage` y `fetchLimits`, mensaje "Sin datos" cuando `usageData` es null, período y conteo de usuarios básicos en la descripción de la tarjeta, cálculo correcto de `usado / (límite × usuariosBásicos)` con uno y con múltiples usuarios, subtexto "Límite: X/usuario" por herramienta, `0%` cuando no hay límite configurado, y que los usuarios inteligentes no se cuentan en el denominador del límite.
   - **Tarjeta de Usuarios Registrados** (3 tests): muestra `0` cuando `stats` es null, muestra el valor correcto de `totalUsers` cuando `stats` está disponible, y verifica que las tarjetas antiguas eliminadas ("Correos Registrados", "Promedio Empleados", "Promedio Eventos") ya no aparecen en el DOM.
@@ -64,8 +69,10 @@ Que verifica:
 
 Estado actual:
 - Con `npm install`, este comando ya funciona sin instalar dependencias adicionales manualmente.
-- La cobertura actual verificada del repo es 96.34% en statements y 92.3% en branches.
-- `src/worker/validation.ts` quedo en 100% de statements, branches, funciones y lineas.
+- Cobertura global: **61.15% statements / 55.67% branches / 69.44% funciones / 63.7% líneas**.
+- Módulos con cobertura 100%: `src/worker/validation.ts`, `useSuscripcion.ts`, `useChat.ts`, `api.ts`, `utils.ts`, `UsageBanner.tsx`, `ProtectedRoute.tsx` y todos los componentes UI.
+- Módulos sin cobertura: `useAdmin.ts` (0%) y la mayor parte de `Admin.tsx` (54.76%) — ambos son candidatos a ampliar en el futuro.
+- `useSuscripcion.ts` cubre 100% statements y 90.62% branches; las 3 ramas no cubiertas son fallbacks `?? null` en líneas 92, 107 y 125.
 
 ### 4. Ejecutar el linter
 
