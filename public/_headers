@@ -1,5 +1,10 @@
+/index.html
+  Cache-Control: no-cache, no-store, must-revalidate
+
 /assets/*.js
   Content-Type: application/javascript; charset=utf-8
+  Cache-Control: public, max-age=31536000, immutable
 
 /assets/*.css
   Content-Type: text/css; charset=utf-8
+  Cache-Control: public, max-age=31536000, immutable

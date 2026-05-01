@@ -226,7 +226,7 @@ gastro-manager/
 ├── migrations/           # 17 migraciones SQL (inmutables)
 ├── docs/                 # Documentación
 ├── functions/
-│   └── [[route]].ts      # Pages Function: rutas /api/* → Hono Worker; demás → ASSETS
+│   └── [[route]].ts      # Pages Function: /api/* → Hono Worker; /assets/* → ASSETS (404 limpio si falta); demás → ASSETS con fallback a index.html
 ├── public/
 │   └── _redirects        # Requerido para SPA routing en Cloudflare Pages
 ├── src/

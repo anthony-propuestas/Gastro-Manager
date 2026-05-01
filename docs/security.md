@@ -161,6 +161,19 @@ Ninguna variable sensible se incluye en el build del frontend (Vite). El Worker 
 
 ---
 
+## Integridad de assets estáticos (SPA)
+
+Vite genera archivos con hash en el nombre (ej. `index-BFSxencr.js`). Tras un redeploy, el browser puede tener un `index.html` viejo con hashes que ya no existen.
+
+**Mitigaciones aplicadas:**
+
+- `public/_headers`: `index.html` se sirve con `Cache-Control: no-cache, no-store, must-revalidate`. El browser siempre solicita el `index.html` fresco antes de cargar assets. Los assets del directorio `/assets/` reciben `Cache-Control: immutable, max-age=31536000` porque sus nombres cambian con el contenido.
+- `functions/[[route]].ts`: para rutas `/assets/*`, si el asset no existe en ASSETS, se devuelve `Response('Not found', { status: 404 })` en lugar de la página HTML de error de Cloudflare. Esto evita que el browser intente parsear HTML como JavaScript (`Uncaught SyntaxError: Unexpected token '<'`).
+
+**Áreas revisadas que no aplican:** endpoints de API, aislamiento por negocio, autenticación, autorización. El cambio es exclusivamente de routing de archivos estáticos sin lógica de datos.
+
+---
+
 ## Superficie de ataque conocida y mitigaciones
 
 | Riesgo | Mitigación |
