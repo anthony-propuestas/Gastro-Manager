@@ -11,7 +11,7 @@ export const onRequest: PagesFunction<{ ASSETS: Fetcher }> = async (context) => 
   if (url.pathname.startsWith('/assets/')) {
     const assetRes = await context.env.ASSETS.fetch(context.request);
     if (!assetRes.ok) {
-      return new Response('Not found', { status: 404 });
+      return new Response('Not found', { status: 404, headers: { 'Cache-Control': 'no-store' } });
     }
     return assetRes;
   }

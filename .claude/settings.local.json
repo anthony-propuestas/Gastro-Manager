@@ -9,7 +9,11 @@
       "Bash(npm test *)",
       "Bash(npx eslint *)",
       "Bash(npx vitest *)",
-      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:8788/api/oauth/google/redirect_url)"
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:8788/api/oauth/google/redirect_url)",
+      "Bash(git diff *)",
+      "PowerShell(cd \"c:\\\\Users\\\\dell\\\\Desktop\\\\PPORGAMACION\\\\proyectos de prueva\\\\Gastro Manager\"; git diff -- \"functions/[[route]].ts\" vitest.config.ts tsconfig.worker.json | Select-Object -First 300)",
+      "PowerShell(Set-Location \"c:\\\\Users\\\\dell\\\\Desktop\\\\PPORGAMACION\\\\proyectos de prueva\\\\Gastro Manager\"; git diff HEAD -- vitest.config.ts tsconfig.worker.json 2>&1 | Select-Object -First 200)",
+      "PowerShell(Set-Location \"c:\\\\Users\\\\dell\\\\Desktop\\\\PPORGAMACION\\\\proyectos de prueva\\\\Gastro Manager\"; git diff HEAD -- \"functions/[[route]].ts\" 2>&1 | Select-Object -First 300)"
     ],
     "additionalDirectories": [
       "c:\\Users\\dell\\Desktop\\PPORGAMACION\\proyectos de prueva\\Gastro Manager\\src\\react-app\\pages"

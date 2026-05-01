@@ -1,8 +1,27 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<coverage generated="1777577749511" clover="3.2.0">
-  <project timestamp="1777577749512" name="All files">
-    <metrics statements="620" coveredstatements="395" conditionals="467" coveredconditionals="260" methods="180" coveredmethods="125" elements="1267" coveredelements="780" complexity="0" loc="620" ncloc="620" packages="9" files="21" classes="21"/>
-    <package name="react-app.components">
+<coverage generated="1777649888098" clover="3.2.0">
+  <project timestamp="1777649888098" name="All files">
+    <metrics statements="633" coveredstatements="408" conditionals="475" coveredconditionals="268" methods="181" coveredmethods="126" elements="1289" coveredelements="802" complexity="0" loc="633" ncloc="633" packages="10" files="22" classes="22"/>
+    <package name="functions">
+      <metrics statements="13" coveredstatements="13" conditionals="8" coveredconditionals="8" methods="1" coveredmethods="1"/>
+      <file name="[[route]].ts" path="C:\Users\dell\Desktop\PPORGAMACION\proyectos de prueva\Gastro Manager\functions\[[route]].ts">
+        <metrics statements="13" coveredstatements="13" conditionals="8" coveredconditionals="8" methods="1" coveredmethods="1"/>
+        <line num="3" count="1" type="stmt"/>
+        <line num="4" count="7" type="stmt"/>
+        <line num="6" count="7" type="cond" truecount="2" falsecount="0"/>
+        <line num="7" count="1" type="stmt"/>
+        <line num="11" count="6" type="cond" truecount="2" falsecount="0"/>
+        <line num="12" count="4" type="stmt"/>
+        <line num="13" count="4" type="cond" truecount="2" falsecount="0"/>
+        <line num="14" count="3" type="stmt"/>
+        <line num="16" count="1" type="stmt"/>
+        <line num="20" count="2" type="stmt"/>
+        <line num="21" count="2" type="cond" truecount="2" falsecount="0"/>
+        <line num="22" count="1" type="stmt"/>
+        <line num="24" count="1" type="stmt"/>
+      </file>
+    </package>
+    <package name="src.react-app.components">
       <metrics statements="20" coveredstatements="17" conditionals="17" coveredconditionals="15" methods="9" coveredmethods="7"/>
       <file name="ErrorBoundary.tsx" path="C:\Users\dell\Desktop\PPORGAMACION\proyectos de prueva\Gastro Manager\src\react-app\components\ErrorBoundary.tsx">
         <metrics statements="15" coveredstatements="12" conditionals="7" coveredconditionals="5" methods="8" coveredmethods="6"/>
@@ -31,7 +50,7 @@
         <line num="15" count="2" type="stmt"/>
       </file>
     </package>
-    <package name="react-app.components.auth">
+    <package name="src.react-app.components.auth">
       <metrics statements="17" coveredstatements="17" conditionals="15" coveredconditionals="15" methods="2" coveredmethods="2"/>
       <file name="ProtectedRoute.tsx" path="C:\Users\dell\Desktop\PPORGAMACION\proyectos de prueva\Gastro Manager\src\react-app\components\auth\ProtectedRoute.tsx">
         <metrics statements="17" coveredstatements="17" conditionals="15" coveredconditionals="15" methods="2" coveredmethods="2"/>
@@ -54,7 +73,7 @@
         <line num="60" count="1" type="stmt"/>
       </file>
     </package>
-    <package name="react-app.components.employees">
+    <package name="src.react-app.components.employees">
       <metrics statements="65" coveredstatements="17" conditionals="71" coveredconditionals="26" methods="16" coveredmethods="5"/>
       <file name="EmployeeModal.tsx" path="C:\Users\dell\Desktop\PPORGAMACION\proyectos de prueva\Gastro Manager\src\react-app\components\employees\EmployeeModal.tsx">
         <metrics statements="65" coveredstatements="17" conditionals="71" coveredconditionals="26" methods="16" coveredmethods="5"/>
@@ -125,7 +144,7 @@
         <line num="353" count="0" type="cond" truecount="0" falsecount="2"/>
       </file>
     </package>
-    <package name="react-app.components.ui">
+    <package name="src.react-app.components.ui">
       <metrics statements="19" coveredstatements="19" conditionals="10" coveredconditionals="8" methods="15" coveredmethods="15"/>
       <file name="badge.tsx" path="C:\Users\dell\Desktop\PPORGAMACION\proyectos de prueva\Gastro Manager\src\react-app\components\ui\badge.tsx">
         <metrics statements="3" coveredstatements="3" conditionals="4" coveredconditionals="3" methods="1" coveredmethods="1"/>
@@ -165,7 +184,7 @@
         <line num="58" count="14397" type="stmt"/>
       </file>
     </package>
-    <package name="react-app.context">
+    <package name="src.react-app.context">
       <metrics statements="29" coveredstatements="27" conditionals="8" coveredconditionals="6" methods="12" coveredmethods="11"/>
       <file name="UsageLimitModalContext.tsx" path="C:\Users\dell\Desktop\PPORGAMACION\proyectos de prueva\Gastro Manager\src\react-app\context\UsageLimitModalContext.tsx">
         <metrics statements="29" coveredstatements="27" conditionals="8" coveredconditionals="6" methods="12" coveredmethods="11"/>
@@ -200,7 +219,7 @@
         <line num="177" count="8" type="stmt"/>
       </file>
     </package>
-    <package name="react-app.hooks">
+    <package name="src.react-app.hooks">
       <metrics statements="250" coveredstatements="145" conditionals="104" coveredconditionals="66" methods="50" coveredmethods="34"/>
       <file name="useAdmin.ts" path="C:\Users\dell\Desktop\PPORGAMACION\proyectos de prueva\Gastro Manager\src\react-app\hooks\useAdmin.ts">
         <metrics statements="102" coveredstatements="0" conditionals="28" coveredconditionals="0" methods="15" coveredmethods="0"/>
@@ -468,7 +487,7 @@
         <line num="132" count="62" type="stmt"/>
       </file>
     </package>
-    <package name="react-app.lib">
+    <package name="src.react-app.lib">
       <metrics statements="36" coveredstatements="24" conditionals="47" coveredconditionals="13" methods="7" coveredmethods="7"/>
       <file name="api.ts" path="C:\Users\dell\Desktop\PPORGAMACION\proyectos de prueva\Gastro Manager\src\react-app\lib\api.ts">
         <metrics statements="6" coveredstatements="6" conditionals="3" coveredconditionals="3" methods="2" coveredmethods="2"/>
@@ -516,7 +535,7 @@
         <line num="5" count="21211" type="stmt"/>
       </file>
     </package>
-    <package name="react-app.pages">
+    <package name="src.react-app.pages">
       <metrics statements="135" coveredstatements="80" conditionals="163" coveredconditionals="79" methods="51" coveredmethods="26"/>
       <file name="Admin.tsx" path="C:\Users\dell\Desktop\PPORGAMACION\proyectos de prueva\Gastro Manager\src\react-app\pages\Admin.tsx">
         <metrics statements="135" coveredstatements="80" conditionals="163" coveredconditionals="79" methods="51" coveredmethods="26"/>
@@ -657,7 +676,7 @@
         <line num="711" count="0" type="stmt"/>
       </file>
     </package>
-    <package name="worker">
+    <package name="src.worker">
       <metrics statements="49" coveredstatements="49" conditionals="32" coveredconditionals="32" methods="18" coveredmethods="18"/>
       <file name="validation.ts" path="C:\Users\dell\Desktop\PPORGAMACION\proyectos de prueva\Gastro Manager\src\worker\validation.ts">
         <metrics statements="49" coveredstatements="49" conditionals="32" coveredconditionals="32" methods="18" coveredmethods="18"/>

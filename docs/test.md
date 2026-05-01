@@ -24,6 +24,8 @@ Que verifica:
 - Ejecuta la suite de Vitest.
 - Comprueba utilidades, validaciones, rutas protegidas y hooks ya cubiertos por tests.
 
+Los tests cubren dos ubicaciones: `src/**` y `functions/**` (ambas incluidas en el `include` de `vitest.config.ts` — ver sección de cobertura).
+
 Cobertura actual:
 - `src/react-app/lib/api.test.ts`: verifica que `apiFetch` agregue `X-Negocio-ID` cuando corresponde, que no lo inyecte cuando `negocioId` está ausente, y que dispare el evento global `USAGE_LIMIT_EVENT` cuando el backend responde `429 USAGE_LIMIT_EXCEEDED`.
 - `src/worker/validation.test.ts`: verifica schemas Zod y el helper `validateData`. Cubre los schemas de creación y actualización de todas las entidades: empleados, job roles, negocios, tópicos, notas, adelantos, pagos de sueldo, compras y facturación. Para empleados cubre también los campos de salida (`ausencia_desde`, `informo`, `cuando_informo`, `sueldo_pendiente`): acepta valores válidos y null, rechaza `sueldo_pendiente` negativo en ambos schemas. Cubre también `chatHistoryItemSchema` (acepta `role: "user"|"model"` con content de 1–2000 chars; rechaza roles inválidos, content vacío y content excesivo) y `chatHistoryArraySchema` (acepta array vacío y arrays válidos; rechaza ítems con role inválido). Valida tipos enum, rangos de monto, formatos de fecha y hora, campos requeridos y fallbacks de error. Actualmente deja `src/worker/validation.ts` con cobertura completa.
@@ -40,6 +42,7 @@ Cobertura actual:
   - **cancelar()** (3 tests): retorno `true` y llamada a `fetchEstado` en éxito; retorno `false` con error en fallo 404; `fetch` throws → retorna `false` y error de red.
   - **fetchPagos()** (3 tests): seteo de lista de pagos en éxito; respuesta no-ok no modifica el estado de error; excepción de red no modifica el estado de error.
 - `src/react-app/hooks/useChat.test.ts`: verifica el hook del chatbot. Cubre: estado inicial vacío, que mensajes vacíos o con solo espacios no disparen la API, que el primer mensaje envíe `history: []`, que el mensaje del usuario y la respuesta del asistente se agreguen al estado `messages`, que los mensajes siguientes incluyan el intercambio previo como historial, que el rol `assistant` se mapee a `model` (formato requerido por Gemini), que el historial se corte a 20 items, manejo de errores de API y de red, reset de `isLoading` en ambos casos, `clearMessages`, y propagación del id del negocio a `apiFetch`.
+- `functions/route.test.ts`: verifica el routing de la Pages Function de Cloudflare. 7 tests en 3 grupos: `/assets/*` (asset existente pasa sin modificar; asset faltante o con error devuelve 404 `text/plain` con `Cache-Control: no-store`; nunca hace fallback a `index.html`), SPA routing (recurso existente pasa directo; ruta desconocida hace fallback a `/index.html`), y `/api/*` (delega al Hono Worker sin llamar a ASSETS). El mock de `src/worker/index` aísla completamente la lógica de routing de los endpoints de negocio.
 - `src/react-app/pages/Admin.test.tsx`: verifica el panel de administración en tres bloques. El `BASE_MOCK` incluye `suscripciones`, `fetchSuscripciones` y `fetchPagosUsuario` (requeridos por la sección de suscripciones del panel Admin):
   - **Paginación de uso por usuario** (9 tests): ausencia de controles con ≤50 filas, aparición de controles con >50 filas, estado disabled de "Anterior" en página 1 y "Siguiente" en la última, visibilidad correcta de filas por página, navegación hacia adelante y hacia atrás, indicador "Página X de Y", y reset a página 1 al filtrar por email o al limpiar filtros.
   - **Uso del Sistema** (12 tests): spinner mientras `fetchUsage` está pendiente, mensaje de error cuando `fetchUsage` falla, botón "Reintentar" visible en estado de error y que vuelve a llamar a `fetchUsage` y `fetchLimits`, mensaje "Sin datos" cuando `usageData` es null, período y conteo de usuarios básicos en la descripción de la tarjeta, cálculo correcto de `usado / (límite × usuariosBásicos)` con uno y con múltiples usuarios, subtexto "Límite: X/usuario" por herramienta, `0%` cuando no hay límite configurado, y que los usuarios inteligentes no se cuentan en el denominador del límite.
@@ -69,8 +72,8 @@ Que verifica:
 
 Estado actual:
 - Con `npm install`, este comando ya funciona sin instalar dependencias adicionales manualmente.
-- Cobertura global: **61.15% statements / 55.67% branches / 69.44% funciones / 63.7% líneas**.
-- Módulos con cobertura 100%: `src/worker/validation.ts`, `useSuscripcion.ts`, `useChat.ts`, `api.ts`, `utils.ts`, `UsageBanner.tsx`, `ProtectedRoute.tsx` y todos los componentes UI.
+- Cobertura global: **61.86% statements / 56.42% branches / 69.61% funciones / 64.45% líneas**.
+- Módulos con cobertura 100%: `functions/[[route]].ts`, `src/worker/validation.ts`, `useSuscripcion.ts`, `useChat.ts`, `api.ts`, `utils.ts`, `UsageBanner.tsx`, `ProtectedRoute.tsx` y todos los componentes UI.
 - Módulos sin cobertura: `useAdmin.ts` (0%) y la mayor parte de `Admin.tsx` (54.76%) — ambos son candidatos a ampliar en el futuro.
 - `useSuscripcion.ts` cubre 100% statements y 90.62% branches; las 3 ramas no cubiertas son fallbacks `?? null` en líneas 92, 107 y 125.
 

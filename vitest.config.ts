@@ -14,7 +14,7 @@ export default defineConfig({
     globals: true,
     pool: "threads",
     setupFiles: ["./src/react-app/test/setup.ts"],
-    include: ["src/**/*.{test,spec}.{ts,tsx}"],
+    include: ["src/**/*.{test,spec}.{ts,tsx}", "functions/**/*.test.ts"],
     css: true,
   },
 });

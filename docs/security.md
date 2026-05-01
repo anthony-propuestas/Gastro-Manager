@@ -167,8 +167,8 @@ Vite genera archivos con hash en el nombre (ej. `index-BFSxencr.js`). Tras un re
 
 **Mitigaciones aplicadas:**
 
-- `public/_headers`: `index.html` se sirve con `Cache-Control: no-cache, no-store, must-revalidate`. El browser siempre solicita el `index.html` fresco antes de cargar assets. Los assets del directorio `/assets/` reciben `Cache-Control: immutable, max-age=31536000` porque sus nombres cambian con el contenido.
-- `functions/[[route]].ts`: para rutas `/assets/*`, si el asset no existe en ASSETS, se devuelve `Response('Not found', { status: 404 })` en lugar de la página HTML de error de Cloudflare. Esto evita que el browser intente parsear HTML como JavaScript (`Uncaught SyntaxError: Unexpected token '<'`).
+- `public/_headers`: `index.html` se sirve con `Cache-Control: no-cache, no-store, must-revalidate`. El browser siempre solicita el `index.html` fresco antes de cargar assets; tras un redeploy obtiene los nuevos hashes de inmediato. Los assets de `/assets/` reciben `Cache-Control: public, max-age=31536000, immutable` — cache agresivo seguro porque el hash en el nombre cambia con el contenido.
+- `functions/[[route]].ts`: para rutas `/assets/*`, si el asset no existe en ASSETS, se devuelve `new Response('Not found', { status: 404, headers: { 'Cache-Control': 'no-store' } })` en lugar de la página HTML de Cloudflare. El `no-store` previene que tanto el browser como el CDN de Cloudflare cacheen la respuesta 404 — sin esto, una respuesta 404 queda cacheada hasta 4 horas y el browser la sirve `from disk cache` sin contactar el servidor, lo que perpetúa el error incluso después de un redeploy correcto.
 
 **Áreas revisadas que no aplican:** endpoints de API, aislamiento por negocio, autenticación, autorización. El cambio es exclusivamente de routing de archivos estáticos sin lógica de datos.
 

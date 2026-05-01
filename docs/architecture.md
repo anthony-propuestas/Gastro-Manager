@@ -9,19 +9,17 @@ Navegador
    │
    │  HTTPS
    ▼
-Cloudflare Pages (React SPA — archivos estáticos)
-   │  public/_redirects → index.html para SPA routing
-   └── /api/* → functions/[[route]].ts (Pages Function)
-                    │
-                    ▼
-               Hono Worker (src/worker/index.ts)
-                    ├── authMiddleware           → lee rol fresco de D1
-                    ├── negocioMiddleware        → valida X-Negocio-ID
-                    ├── moduleRestrictionMiddleware → bloquea gerentes de módulos restringidos
-                    ├── usageLimitMiddleware     → cuotas atómicas
-                    └── Route handlers → D1 (SQLite)
-                                         ├── R2 producción (comprobantes)
-                                         └── Google Gemini API (chatbot)
+Cloudflare Pages — functions/[[route]].ts intercepta TODAS las rutas
+   ├── /api/*     → Hono Worker (src/worker/index.ts)
+   │                    ├── authMiddleware           → lee rol fresco de D1
+   │                    ├── negocioMiddleware        → valida X-Negocio-ID
+   │                    ├── moduleRestrictionMiddleware → bloquea gerentes de módulos restringidos
+   │                    ├── usageLimitMiddleware     → cuotas atómicas
+   │                    └── Route handlers → D1 (SQLite)
+   │                                         ├── R2 producción (comprobantes)
+   │                                         └── Google Gemini API (chatbot)
+   ├── /assets/*  → ASSETS (404 + Cache-Control: no-store si el archivo no existe)
+   └── demás      → ASSETS con fallback a /index.html para SPA routing
 
 Google OAuth (accounts.google.com) ← intercambio de código en POST /api/sessions
 
@@ -228,7 +226,8 @@ gastro-manager/
 ├── functions/
 │   └── [[route]].ts      # Pages Function: /api/* → Hono Worker; /assets/* → ASSETS (404 limpio si falta); demás → ASSETS con fallback a index.html
 ├── public/
-│   └── _redirects        # Requerido para SPA routing en Cloudflare Pages
+│   ├── _redirects        # Placeholder vacío; el SPA routing lo maneja [[route]].ts
+│   └── _headers          # Cache-Control por ruta: no-cache en index.html; immutable en /assets/*
 ├── src/
 │   ├── worker/
 │   │   ├── index.ts      # Todos los endpoints y middlewares
