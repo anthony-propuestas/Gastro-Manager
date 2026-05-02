@@ -4,7 +4,7 @@ export const onRequest: PagesFunction<{ ASSETS: Fetcher }> = async (context) => 
   const url = new URL(context.request.url);
 
   if (url.pathname.startsWith('/api/')) {
-    return app.fetch(context.request, context.env as never, context.waitUntil.bind(context));
+    return app.fetch(context.request, context.env as never, context as unknown as ExecutionContext);
   }
 
   // Assets must never fall back to index.html — return 404 directly if missing
