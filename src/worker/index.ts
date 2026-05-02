@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { Hono, type MiddlewareHandler } from "hono";
+import { cors } from "hono/cors";
 import { getCookie } from "hono/cookie";
 import { SignJWT, jwtVerify } from "jose";
 import { Resend } from "resend";
@@ -24,6 +25,7 @@ import {
   chatHistoryArraySchema,
 } from "./validation";
 import { USAGE_TOOLS, type UsageTool } from "./usageTools";
+import { checkRateLimit } from "./rateLimitAuth";
 
 type Env = {
   DB: D1Database;
@@ -308,6 +310,17 @@ function createModuleRestrictionMiddleware(moduleKey: 'calendario' | 'personal' 
 
 const app = new Hono<{ Bindings: Env; Variables: Variables }>();
 
+app.use("/api/*", async (c, next) => {
+  const allowed = c.env.APP_URL;
+  return cors({
+    origin: (origin) => (allowed && origin === allowed) ? origin : null,
+    allowMethods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
+    allowHeaders: ["Content-Type", "X-Negocio-ID"],
+    credentials: true,
+    maxAge: 600,
+  })(c, next);
+});
+
 // Helper for standardized API responses
 const apiResponse = <T>(data: T) => ({ success: true, data });
 const apiError = (code: string, message: string) => ({ success: false, error: { code, message } });
@@ -342,8 +355,7 @@ async function logUsage(db: D1Database, userId: string, negocioId: number | null
 // ============================================
 
 app.get("/api/oauth/google/redirect_url", (c) => {
-  const origin = new URL(c.req.url).origin;
-  const redirectUri = `${origin}/auth/callback`;
+  const redirectUri = `${c.env.APP_URL ?? new URL(c.req.url).origin}/auth/callback`;
   const url =
     `https://accounts.google.com/o/oauth2/v2/auth?` +
     `client_id=${encodeURIComponent(c.env.GOOGLE_CLIENT_ID)}` +
@@ -355,6 +367,11 @@ app.get("/api/oauth/google/redirect_url", (c) => {
 
 app.post("/api/sessions", async (c) => {
   try {
+    const ip = c.req.header("CF-Connecting-IP") ?? "unknown";
+    if (!await checkRateLimit(ip, "sessions", c.env.DB)) {
+      return c.json(apiError("TOO_MANY_REQUESTS", "Demasiados intentos. Esperá 15 minutos."), 429);
+    }
+
     const body = await c.req.json();
     if (!body.code) {
       return c.json(
@@ -363,8 +380,7 @@ app.post("/api/sessions", async (c) => {
       );
     }
 
-    const origin = new URL(c.req.url).origin;
-    const redirectUri = `${origin}/auth/callback`;
+    const redirectUri = `${c.env.APP_URL ?? new URL(c.req.url).origin}/auth/callback`;
 
     const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
       method: "POST",
@@ -436,8 +452,7 @@ app.post("/api/sessions", async (c) => {
         .bind(googleUser.id, tokenHash, expiresAt)
         .run();
 
-      const origin = new URL(c.req.url).origin;
-      const verifyUrl = `${origin}/verify-email?token=${plainToken}`;
+      const verifyUrl = `${c.env.APP_URL ?? new URL(c.req.url).origin}/verify-email?token=${plainToken}`;
 
       await sendVerificationEmail(c.env.RESEND_API_KEY, googleUser.email, googleUser.name, verifyUrl);
 
@@ -458,6 +473,7 @@ app.post("/api/sessions", async (c) => {
     );
 
     c.header("Set-Cookie", `${COOKIE_NAME}=${jwt}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=604800`);
+    await logUsage(c.env.DB, googleUser.id, null, "login_success", "auth");
     return c.json({ success: true }, 200);
   } catch (error) {
     console.error("Error exchanging code for session:", error);
@@ -469,6 +485,11 @@ app.post("/api/sessions", async (c) => {
 });
 
 app.get("/api/auth/verify-email", async (c) => {
+  const ip = c.req.header("CF-Connecting-IP") ?? "unknown";
+  if (!await checkRateLimit(ip, "verify-email", c.env.DB, 5, 60)) {
+    return c.redirect("/login?error=too_many_requests");
+  }
+
   const token = c.req.query("token");
   if (!token) return c.redirect("/login?error=invalid_token");
 
@@ -502,6 +523,7 @@ app.get("/api/auth/verify-email", async (c) => {
     );
 
     c.header("Set-Cookie", `${COOKIE_NAME}=${jwt}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=604800`);
+    await logUsage(c.env.DB, row.user_id, null, "email_verify_success", "auth");
     return c.json({ success: true }, 200);
   } catch (error) {
     console.error("Error verifying email:", error);
@@ -2979,13 +3001,13 @@ app.post("/api/chat", authMiddleware, negocioMiddleware, createUsageLimitMiddlew
     }
 
     // ── Llamada a Gemini ────────────────────────────────────────────────────
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${c.env.GEMINI_API_KEY}`;
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent`;
 
     let geminiResponse;
     try {
       geminiResponse = await fetch(geminiUrl, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "x-goog-api-key": c.env.GEMINI_API_KEY ?? "" },
         body: JSON.stringify({
           contents,
           generationConfig: { temperature: 1.0, maxOutputTokens: 500 },

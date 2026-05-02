@@ -31,7 +31,10 @@ Todos los endpoints de datos operativos (empleados, sueldos, eventos, etc.) requ
 X-Negocio-ID: <id_del_negocio_activo>
 ```
 
-Si el header está ausente o el usuario no es miembro del negocio, la respuesta es `403 FORBIDDEN`.
+Respuestas posibles si falla la validación:
+- `400 NEGOCIO_REQUIRED` — header ausente o no numérico.
+- `403 NEGOCIO_ACCESS_DENIED` — el usuario no es miembro del negocio.
+- `404 NEGOCIO_NOT_FOUND` — el negocio no existe en la base de datos.
 
 **Convención de frontend:** las pantallas y hooks React deben enviar este header usando `apiFetch(url, options, negocioId)` desde `src/react-app/lib/api.ts`, en lugar de construir el header manualmente o usar `fetch` directo.
 
@@ -66,6 +69,8 @@ Intercambia el código OAuth por una cookie de sesión. Persiste al usuario en l
 
 **Comportamiento especial:** si el usuario todavía no está verificado, este endpoint no crea sesión. En su lugar genera un token de verificación, envía un correo y responde con `error.code = "PENDING_VERIFICATION"`.
 
+**Rate limiting:** máximo 10 intentos por IP en ventanas de 15 minutos. Al excederse devuelve `429 TOO_MANY_REQUESTS` (distinto de `429 USAGE_LIMIT_EXCEEDED` de cuota). El frontend no muestra el modal de upgrade para este código.
+
 #### `GET /api/auth/verify-email`
 Valida el token de verificación recibido por email. Si el token es válido, marca al usuario como verificado, crea la cookie `session_token` y devuelve éxito.
 
@@ -73,6 +78,8 @@ Valida el token de verificación recibido por email. Si el token es válido, mar
 // Query string
 ?token=token_plano_recibido_por_email
 ```
+
+**Rate limiting:** máximo 5 intentos por IP por hora. Al excederse redirige a `/login?error=too_many_requests` en lugar de procesar el token.
 
 #### `GET /api/logout`
 Cierra la sesión del usuario actual. Elimina la cookie `session_token`.
@@ -827,16 +834,23 @@ El contexto enviado a Gemini incluye: empleados activos, sueldos del mes, antici
 
 | Código | HTTP | Descripción |
 |---|---|---|
-| `UNAUTHORIZED` | 401 | Sin sesión válida |
-| `FORBIDDEN` | 403 | Sin permisos para esta acción |
+| `UNAUTHORIZED` | 401 | Sin sesión válida (sin cookie) |
+| `INVALID_SESSION` | 401 | Cookie presente pero JWT inválido o expirado |
+| `FORBIDDEN` | 403 | Sin permisos para esta acción (ej. demote del propio admin) |
+| `MODULE_RESTRICTED` | 403 | El módulo está restringido para gerentes por el owner |
+| `NEGOCIO_ACCESS_DENIED` | 403 | El usuario no es miembro del negocio indicado |
 | `NOT_FOUND` | 404 | Recurso no encontrado |
+| `NEGOCIO_NOT_FOUND` | 404 | El negocio indicado en `X-Negocio-ID` no existe |
+| `NEGOCIO_REQUIRED` | 400 | Header `X-Negocio-ID` ausente o no numérico |
 | `VALIDATION_ERROR` | 400 | Datos inválidos (detalle en `message`) |
 | `USAGE_LIMIT_EXCEEDED` | 429 | Cuota mensual alcanzada. En el frontend este caso puede abrir el modal global de upgrade a Usuario Inteligente |
+| `TOO_MANY_REQUESTS` | 429 | Rate limit de auth excedido (distinto de `USAGE_LIMIT_EXCEEDED`; no abre el modal de upgrade) |
 | `DUPLICATE_EMAIL` | 409 | Email de admin ya registrado |
+| `AUTH_ERROR` | 500 | Error al intercambiar el código OAuth con Google |
 | `DATABASE_ERROR` | 500 | Error interno de base de datos |
-| `OAUTH_ERROR` | 400 | Error en autenticación OAuth |
 | `GEMINI_API_ERROR` | 500 | Error en API de Gemini |
 | `CONFIG_ERROR` | 500 | `GEMINI_API_KEY` no configurada |
+| `PENDING_VERIFICATION` | 200 | Usuario sin verificar; se envió email de verificación. No es un error de sesión |
 
 ---
 
@@ -898,7 +912,7 @@ El contexto enviado a Gemini incluye: empleados activos, sueldos del mes, antici
 
 - **Total de endpoints**: 83 rutas registradas en el Worker (GET, POST, PUT, DELETE).
 - **Sin paginación**: todos los listados retornan el conjunto completo. Filtrado se realiza en cliente.
-- **Sin rate limiting propio**: Cloudflare Workers aplica 100,000 req/día en Free tier.
+- **Rate limiting**: solo los endpoints de autenticación tienen rate limiting propio (`POST /api/sessions`: 10/15 min por IP; `GET /api/auth/verify-email`: 5/hr por IP). El resto de endpoints no tiene rate limiting a nivel de aplicación; Cloudflare Workers aplica 100,000 req/día en Free tier.
 - **CORS**: no configurado explícitamente; funciona por same-origin (SPA y API servidos por el mismo Worker via `not_found_handling: single-page-application`).
 
 ### Notas sobre cuotas por endpoint

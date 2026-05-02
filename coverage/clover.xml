@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<coverage generated="1777649888098" clover="3.2.0">
-  <project timestamp="1777649888098" name="All files">
-    <metrics statements="633" coveredstatements="408" conditionals="475" coveredconditionals="268" methods="181" coveredmethods="126" elements="1289" coveredelements="802" complexity="0" loc="633" ncloc="633" packages="10" files="22" classes="22"/>
+<coverage generated="1777698286565" clover="3.2.0">
+  <project timestamp="1777698286565" name="All files">
+    <metrics statements="638" coveredstatements="413" conditionals="479" coveredconditionals="273" methods="184" coveredmethods="129" elements="1301" coveredelements="815" complexity="0" loc="638" ncloc="638" packages="10" files="23" classes="23"/>
     <package name="functions">
       <metrics statements="13" coveredstatements="13" conditionals="8" coveredconditionals="8" methods="1" coveredmethods="1"/>
       <file name="[[route]].ts" path="C:\Users\dell\Desktop\PPORGAMACION\proyectos de prueva\Gastro Manager\functions\[[route]].ts">
@@ -488,18 +488,18 @@
       </file>
     </package>
     <package name="src.react-app.lib">
-      <metrics statements="36" coveredstatements="24" conditionals="47" coveredconditionals="13" methods="7" coveredmethods="7"/>
+      <metrics statements="36" coveredstatements="24" conditionals="47" coveredconditionals="14" methods="7" coveredmethods="7"/>
       <file name="api.ts" path="C:\Users\dell\Desktop\PPORGAMACION\proyectos de prueva\Gastro Manager\src\react-app\lib\api.ts">
         <metrics statements="6" coveredstatements="6" conditionals="3" coveredconditionals="3" methods="2" coveredmethods="2"/>
-        <line num="13" count="3" type="stmt"/>
-        <line num="18" count="3" type="cond" truecount="2" falsecount="0"/>
+        <line num="13" count="4" type="stmt"/>
+        <line num="18" count="4" type="cond" truecount="2" falsecount="0"/>
         <line num="19" count="2" type="stmt"/>
-        <line num="22" count="3" type="stmt"/>
-        <line num="23" count="3" type="stmt"/>
-        <line num="24" count="3" type="stmt"/>
+        <line num="22" count="4" type="stmt"/>
+        <line num="23" count="4" type="stmt"/>
+        <line num="24" count="4" type="stmt"/>
       </file>
       <file name="usageLimitModal.ts" path="C:\Users\dell\Desktop\PPORGAMACION\proyectos de prueva\Gastro Manager\src\react-app\lib\usageLimitModal.ts">
-        <metrics statements="29" coveredstatements="17" conditionals="44" coveredconditionals="10" methods="4" coveredmethods="4"/>
+        <metrics statements="29" coveredstatements="17" conditionals="44" coveredconditionals="11" methods="4" coveredmethods="4"/>
         <line num="1" count="2" type="stmt"/>
         <line num="19" count="1" type="stmt"/>
         <line num="20" count="1" type="stmt"/>
@@ -521,14 +521,14 @@
         <line num="45" count="1" type="cond" truecount="1" falsecount="1"/>
         <line num="46" count="1" type="stmt"/>
         <line num="47" count="1" type="cond" truecount="1" falsecount="1"/>
-        <line num="51" count="3" type="cond" truecount="4" falsecount="0"/>
-        <line num="53" count="1" type="stmt"/>
-        <line num="54" count="1" type="stmt"/>
-        <line num="55" count="1" type="cond" truecount="1" falsecount="1"/>
+        <line num="51" count="4" type="cond" truecount="4" falsecount="0"/>
+        <line num="53" count="2" type="stmt"/>
+        <line num="54" count="2" type="stmt"/>
+        <line num="55" count="2" type="cond" truecount="2" falsecount="0"/>
         <line num="57" count="1" type="stmt"/>
         <line num="58" count="1" type="cond" truecount="1" falsecount="1"/>
-        <line num="60" count="3" type="stmt"/>
-        <line num="68" count="3" type="stmt"/>
+        <line num="60" count="4" type="stmt"/>
+        <line num="68" count="4" type="stmt"/>
       </file>
       <file name="utils.ts" path="C:\Users\dell\Desktop\PPORGAMACION\proyectos de prueva\Gastro Manager\src\react-app\lib\utils.ts">
         <metrics statements="1" coveredstatements="1" conditionals="0" coveredconditionals="0" methods="1" coveredmethods="1"/>
@@ -677,7 +677,15 @@
       </file>
     </package>
     <package name="src.worker">
-      <metrics statements="49" coveredstatements="49" conditionals="32" coveredconditionals="32" methods="18" coveredmethods="18"/>
+      <metrics statements="54" coveredstatements="54" conditionals="36" coveredconditionals="36" methods="21" coveredmethods="21"/>
+      <file name="rateLimitAuth.ts" path="C:\Users\dell\Desktop\PPORGAMACION\proyectos de prueva\Gastro Manager\src\worker\rateLimitAuth.ts">
+        <metrics statements="5" coveredstatements="5" conditionals="4" coveredconditionals="4" methods="3" coveredmethods="3"/>
+        <line num="8" count="14" type="stmt"/>
+        <line num="10" count="448" type="stmt"/>
+        <line num="11" count="14" type="stmt"/>
+        <line num="14" count="14" type="stmt"/>
+        <line num="23" count="14" type="cond" truecount="2" falsecount="0"/>
+      </file>
       <file name="validation.ts" path="C:\Users\dell\Desktop\PPORGAMACION\proyectos de prueva\Gastro Manager\src\worker\validation.ts">
         <metrics statements="49" coveredstatements="49" conditionals="32" coveredconditionals="32" methods="18" coveredmethods="18"/>
         <line num="4" count="1" type="stmt"/>

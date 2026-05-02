@@ -74,4 +74,29 @@ describe("apiFetch", () => {
 
     window.removeEventListener(USAGE_LIMIT_EVENT, listener as EventListener);
   });
+
+  it("does not dispatch usage-limit event for TOO_MANY_REQUESTS (rate limit, not quota)", async () => {
+    const listener = vi.fn();
+    const payload = {
+      success: false,
+      error: { code: "TOO_MANY_REQUESTS", message: "Demasiados intentos. Esperá 15 minutos." },
+    };
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify(payload), {
+        status: 429,
+        headers: { "Content-Type": "application/json" },
+      })
+    );
+
+    vi.stubGlobal("fetch", fetchMock);
+    window.addEventListener(USAGE_LIMIT_EVENT, listener as EventListener);
+
+    await apiFetch("/api/sessions", { method: "POST" });
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(listener).not.toHaveBeenCalled();
+
+    window.removeEventListener(USAGE_LIMIT_EVENT, listener as EventListener);
+  });
 });

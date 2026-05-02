@@ -11,6 +11,7 @@ Navegador
    ▼
 Cloudflare Pages — functions/[[route]].ts intercepta TODAS las rutas
    ├── /api/*     → Hono Worker (src/worker/index.ts)
+   │                    ├── corsMiddleware           → valida Origin contra APP_URL
    │                    ├── authMiddleware           → lee rol fresco de D1
    │                    ├── negocioMiddleware        → valida X-Negocio-ID
    │                    ├── moduleRestrictionMiddleware → bloquea gerentes de módulos restringidos
@@ -48,20 +49,46 @@ GitHub Actions (cron diario 03:00 UTC)
 
 ## Middlewares del Worker
 
+### `corsMiddleware` (global `/api/*`)
+
+Primer middleware en ejecutar. Valida que el header `Origin` de la request coincida exactamente con `APP_URL` (variable de entorno). Si no coincide, la respuesta no incluye `Access-Control-Allow-Origin` y el browser bloquea la respuesta. Configurado con `hono/cors`:
+
+- Métodos permitidos: `GET`, `POST`, `PUT`, `DELETE`, `PATCH`
+- Headers permitidos: `Content-Type`, `X-Negocio-ID`
+- `credentials: true` (necesario para cookies)
+- `maxAge: 600`
+
+Si `APP_URL` no está definida (dev local sin proxy), todos los orígenes quedan bloqueados por CORS para requests cross-origin; las requests same-origin (sin header `Origin`) no son afectadas.
+
 ### `authMiddleware`
 
 Ejecuta en todas las rutas `/api/*` (excepto OAuth).
 
 1. Lee la cookie `session_token` y la verifica con `jwtVerify` (jose, JWT_SECRET).
 2. Decodifica el JWT para obtener `user.id`.
-3. **Lee el `role` fresco de la tabla `users` en D1** (no confía en el JWT para el rol).
+3. **Lee `role` y `email_verified` frescos de la tabla `users` en D1** (no confía en el JWT).
 4. Si el usuario no existe en `users`, asigna `role = 'usuario_basico'` por defecto.
+5. Si `role === 'usuario_inteligente'`, consulta `suscripciones` para verificar el período de gracia:
+   - Si la gracia expiró: hace `batch` UPDATE (suscripción → `'pausada'`, usuario → `'usuario_basico'`) y degrada el rol en la request actual.
+   - Si la gracia aún está activa: emite el header `X-Grace-Days-Left` con los días restantes.
 
 ```typescript
-// Corrección 5: rol siempre desde DB, nunca desde JWT
-const dbUser = await db.prepare("SELECT role FROM users WHERE id = ?")
-  .bind(user.id).first<{ role: string }>();
+const dbUser = await db.prepare("SELECT role, email_verified FROM users WHERE id = ?")
+  .bind(user.id).first<{ role: string; email_verified: number }>();
 user.role = dbUser?.role ?? "usuario_basico";
+
+if (user.role === "usuario_inteligente") {
+  const sub = await db.prepare("SELECT estado, grace_deadline FROM suscripciones WHERE user_id = ?")
+    .bind(user.id).first();
+  if (sub?.estado === "en_gracia" && sub.grace_deadline) {
+    if (Date.now() > new Date(sub.grace_deadline).getTime()) {
+      await db.batch([/* UPDATE suscripciones → pausada, UPDATE users → usuario_basico */]);
+      user.role = "usuario_basico";
+    } else {
+      c.header("X-Grace-Days-Left", String(daysLeft));
+    }
+  }
+}
 ```
 
 ### `negocioMiddleware`
@@ -221,18 +248,19 @@ POST /api/chat { message }
 
 ```
 gastro-manager/
-├── migrations/           # 17 migraciones SQL (inmutables)
+├── migrations/           # Migraciones SQL numeradas (inmutables)
 ├── docs/                 # Documentación
 ├── functions/
 │   └── [[route]].ts      # Pages Function: /api/* → Hono Worker; /assets/* → ASSETS (404 limpio si falta); demás → ASSETS con fallback a index.html
 ├── public/
 │   ├── _redirects        # Placeholder vacío; el SPA routing lo maneja [[route]].ts
-│   └── _headers          # Cache-Control por ruta: no-cache en index.html; immutable en /assets/*
+│   └── _headers          # Headers HTTP por ruta: security headers globales (X-Frame-Options, CSP, etc.); Cache-Control por ruta
 ├── src/
 │   ├── worker/
-│   │   ├── index.ts      # Todos los endpoints y middlewares
-│   │   ├── usageTools.ts # Constantes USAGE_TOOLS y DEFAULT_USAGE_LIMITS
-│   │   └── validation.ts # Esquemas Zod
+│   │   ├── index.ts         # Todos los endpoints y middlewares
+│   │   ├── rateLimitAuth.ts # checkRateLimit() — rate limiting D1 para endpoints de auth
+│   │   ├── usageTools.ts    # Constantes USAGE_TOOLS y DEFAULT_USAGE_LIMITS
+│   │   └── validation.ts    # Esquemas Zod
 │   └── react-app/
 │       ├── context/
 │       │   ├── AuthContext.tsx        # user, role, currentNegocio
@@ -274,11 +302,14 @@ gastro-manager/
 
 | Capa | Mecanismo | Dónde |
 |---|---|---|
+| 0. CORS | Valida `Origin` contra `APP_URL`; rechaza orígenes no autorizados | `corsMiddleware` (hono/cors) |
 | 1. Autenticación | Google OAuth + cookie httpOnly | `authMiddleware` |
-| 2. Rol fresco | Rol leído de DB, nunca del JWT | `authMiddleware` |
+| 2. Rol fresco | `role` y `email_verified` leídos de DB, nunca del JWT. Downgrade automático si gracia de suscripción expiró | `authMiddleware` |
 | 3. Aislamiento de datos | Todas las queries filtran por `negocio_id` | `negocioMiddleware` + handlers |
 | 4. Validación de entrada | Zod schemas en servidor | `validateData()` |
 | 5. Cuotas atómicas | Increment-then-revert sin TOCTOU | `createUsageLimitMiddleware` |
+| 6. Rate limiting en auth | Max 10 req/15 min (`/api/sessions`), 5 req/hr (`/api/auth/verify-email`) por IP hasheada | `checkRateLimit()` en `rateLimitAuth.ts` |
+| 7. Headers de seguridad HTTP | CSP, X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy | `public/_headers` |
 
 **Principios aplicados:**
 - *Least privilege*: `usuario_basico` tiene cuotas; solo admin gestiona roles.
@@ -303,7 +334,7 @@ Todos los endpoints devuelven `{ success: true, data }` o `{ success: false, err
 
 ### Middleware chain en Hono
 ```
-authMiddleware → negocioMiddleware → moduleRestrictionMiddleware → usageLimitMiddleware → handler
+corsMiddleware → authMiddleware → negocioMiddleware → moduleRestrictionMiddleware → usageLimitMiddleware → handler
 ```
 Cada middleware puede cortocircuitar la cadena devolviendo una respuesta sin llamar a `next()`.
 

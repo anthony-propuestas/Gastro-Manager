@@ -11,6 +11,7 @@ Usuario → Click "Login con Google"
         ↓
 GET /api/oauth/google/redirect_url
         ↓ Construye URL de Google OAuth con GOOGLE_CLIENT_ID
+        ↓ redirect_uri = APP_URL + "/auth/callback" (fallback a origin de la request si APP_URL no está)
 Redirect a accounts.google.com/o/oauth2/v2/auth
         ↓
 Usuario autoriza la app
@@ -18,6 +19,7 @@ Usuario autoriza la app
 Google redirect a /auth/callback?code=XXX
         ↓
 POST /api/sessions { code }
+        ↓ Rate limit: max 10 intentos / 15 min por IP (429 TOO_MANY_REQUESTS si se excede)
         ↓ Valida que code esté presente (400 si no)
         ↓ Worker intercambia code con Google (oauth2.googleapis.com/token)
         ↓ Fetch info del usuario (googleapis.com/oauth2/v2/userinfo)
@@ -28,6 +30,7 @@ POST /api/sessions { code }
         │    ↓ Lee role fresco de la DB
         │    ↓ Crea JWT firmado con JWT_SECRET (jose, HS256, TTL 7 días)
         │  Cookie session_token=<jwt> (HttpOnly, Secure, SameSite=Lax)
+        │    ↓ Registra evento login_success en usage_logs
         │    ↓
         │  { success: true } — frontend redirige a /
         ↓
@@ -45,12 +48,14 @@ POST /api/sessions { code }
 Usuario abre enlace /verify-email?token=<plainToken>
         ↓
 GET /api/auth/verify-email?token=<plainToken>
+        ↓ Rate limit: max 5 intentos / 60 min por IP (redirect a /login?error=too_many_requests si se excede)
         ↓ Hashea el token y busca en email_verification_tokens
         ↓ Valida: existe, not used_at, not expirado
         ↓ Batch atómico:
         │    UPDATE email_verification_tokens SET used_at = now
         │    UPDATE users SET email_verified = 1
         ↓ Crea sesión JWT y setea cookie
+        ↓ Registra evento email_verify_success en usage_logs
         ↓ { success: true } — frontend redirige a /
 ```
 
@@ -157,8 +162,8 @@ async function hashToken(token: string): Promise<string> {
 
 ```typescript
 app.get("/api/oauth/google/redirect_url", (c) => {
-  const origin = new URL(c.req.url).origin;
-  const redirectUri = `${origin}/auth/callback`;
+  // APP_URL fija el redirect_uri; fallback al origin de la request solo si APP_URL no está configurada
+  const redirectUri = `${c.env.APP_URL ?? new URL(c.req.url).origin}/auth/callback`;
   const url =
     `https://accounts.google.com/o/oauth2/v2/auth?` +
     `client_id=${encodeURIComponent(c.env.GOOGLE_CLIENT_ID)}` +
@@ -173,12 +178,19 @@ app.get("/api/oauth/google/redirect_url", (c) => {
 
 ```typescript
 app.post("/api/sessions", async (c) => {
+  // Rate limiting: 10 intentos / 15 min por IP
+  const ip = c.req.header("CF-Connecting-IP") ?? "unknown";
+  if (!await checkRateLimit(ip, "sessions", c.env.DB)) {
+    return c.json(apiError("TOO_MANY_REQUESTS", "Demasiados intentos. Esperá 15 minutos."), 429);
+  }
+
   const body = await c.req.json();
   if (!body.code) {
     return c.json({ success: false, error: { code: "VALIDATION_ERROR", message: "..." } }, 400);
   }
 
-  const origin = new URL(c.req.url).origin;
+  // redirect_uri usa APP_URL para evitar Host Header Injection
+  const redirectUri = `${c.env.APP_URL ?? new URL(c.req.url).origin}/auth/callback`;
 
   // 1. Intercambiar code con Google
   const tokenRes = await fetch("https://oauth2.googleapis.com/token", { /* ... */ });
@@ -216,7 +228,7 @@ app.post("/api/sessions", async (c) => {
       .bind(googleUser.id, tokenHash, expiresAt).run();
 
     await sendVerificationEmail(c.env.RESEND_API_KEY, googleUser.email, googleUser.name,
-      `${origin}/verify-email?token=${plainToken}`);
+      `${c.env.APP_URL ?? new URL(c.req.url).origin}/verify-email?token=${plainToken}`);
 
     return c.json(
       { success: false, error: { code: "PENDING_VERIFICATION", message: `Revisá tu email...` } },
@@ -234,6 +246,7 @@ app.post("/api/sessions", async (c) => {
   );
 
   c.header("Set-Cookie", `${COOKIE_NAME}=${jwt}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=604800`);
+  await logUsage(c.env.DB, googleUser.id, null, "login_success", "auth");
   return c.json({ success: true }, 200);
 });
 ```
@@ -242,6 +255,12 @@ app.post("/api/sessions", async (c) => {
 
 ```typescript
 app.get("/api/auth/verify-email", async (c) => {
+  // Rate limiting: 5 intentos / 60 min por IP
+  const ip = c.req.header("CF-Connecting-IP") ?? "unknown";
+  if (!await checkRateLimit(ip, "verify-email", c.env.DB, 5, 60)) {
+    return c.redirect("/login?error=too_many_requests");
+  }
+
   const token = c.req.query("token");
   if (!token) return c.redirect("/login?error=invalid_token");
 
@@ -271,6 +290,7 @@ app.get("/api/auth/verify-email", async (c) => {
   );
 
   c.header("Set-Cookie", `${COOKIE_NAME}=${jwt}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=604800`);
+  await logUsage(c.env.DB, row.user_id, null, "email_verify_success", "auth");
   return c.json({ success: true }, 200);
 });
 ```
@@ -304,6 +324,27 @@ const authMiddleware = async (c, next) => {
       .bind(user.id)
       .first();
     user.role = dbUser?.role ?? "usuario_basico";
+
+    // Subscription grace period: if usuario_inteligente but grace expired → downgrade immediately
+    if (user.role === "usuario_inteligente") {
+      const sub = await c.env.DB
+        .prepare("SELECT estado, grace_deadline FROM suscripciones WHERE user_id = ?")
+        .bind(user.id)
+        .first();
+      if (sub?.estado === "en_gracia" && sub.grace_deadline) {
+        if (Date.now() > new Date(sub.grace_deadline).getTime()) {
+          await c.env.DB.batch([
+            c.env.DB.prepare("UPDATE suscripciones SET estado='pausada', updated_at=datetime('now') WHERE user_id=?").bind(user.id),
+            c.env.DB.prepare("UPDATE users SET role='usuario_basico', updated_at=datetime('now') WHERE id=?").bind(user.id),
+          ]);
+          user.role = "usuario_basico";
+        } else {
+          const daysLeft = Math.ceil((new Date(sub.grace_deadline).getTime() - Date.now()) / 86_400_000);
+          c.header("X-Grace-Days-Left", String(daysLeft));
+        }
+      }
+    }
+
     (user as any).email_verified = dbUser?.email_verified === 1;
 
     c.set("user", user);
@@ -341,6 +382,9 @@ const negocioMiddleware = async (c, next) => {
   }
 
   const negocio = await c.env.DB.prepare("SELECT id, name FROM negocios WHERE id = ?").bind(negocioId).first();
+  if (!negocio) {
+    return c.json({ success: false, error: { code: "NEGOCIO_NOT_FOUND" } }, 404);
+  }
   c.set("negocio", { id: negocio.id, name: negocio.name, member_role: member.negocio_role });
   await next();
 };
@@ -496,6 +540,9 @@ async function isAdmin(email: string, db: D1Database, env: Env): Promise<boolean
 | Token hash | Los tokens de verificación se almacenan hasheados (SHA-256); el plain text solo viaja por email |
 | Token invalidation | Login de usuario no verificado invalida tokens anteriores antes de emitir uno nuevo |
 | Batch atómico | La verificación de email marca token y usuario en una sola operación batch |
+| Rate limiting | `POST /api/sessions`: 10 intentos/15 min por IP. `GET /api/auth/verify-email`: 5 intentos/hr por IP. IP almacenada como hash SHA-256 en tabla `rate_limit_auth`. |
+| `redirect_uri` fija | `APP_URL` determina el `redirect_uri` enviado a Google; evita Host Header Injection si hay un proxy mal configurado. |
+| Auditoría de auth | Eventos `login_success` y `email_verify_success` registrados en `usage_logs` con `negocio_id = null`. |
 
 ---
 

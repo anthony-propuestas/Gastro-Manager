@@ -132,6 +132,31 @@ Los endpoints de admin (`/api/admin/suscripciones*`) verifican `isAdmin()` en ca
 
 ---
 
+## Headers de seguridad HTTP
+
+Los siguientes headers se aplican a todas las rutas via `public/_headers`:
+
+| Header | Valor |
+|---|---|
+| `X-Content-Type-Options` | `nosniff` |
+| `X-Frame-Options` | `DENY` |
+| `Referrer-Policy` | `strict-origin-when-cross-origin` |
+| `Permissions-Policy` | `camera=(), microphone=(), geolocation=()` |
+
+Adicionalmente, `index.html` recibe un `Content-Security-Policy` que restringe scripts y conexiones al mismo origen, y `frame-ancestors 'none'` como refuerzo del `X-Frame-Options`.
+
+**HSTS** debe activarse en el dashboard de Cloudflare → SSL/TLS → Edge Certificates → "Enable HSTS" (`max-age=31536000; includeSubDomains`).
+
+## CORS explícito
+
+El middleware `hono/cors` valida que el `Origin` de cada request a `/api/*` coincida con `APP_URL`. Requests con origen no autorizado no reciben el header `Access-Control-Allow-Origin`.
+
+## Auditoría de eventos de autenticación
+
+Los eventos `login_success` y `email_verify_success` se registran en `usage_logs` con `action_type` correspondiente y `negocio_id = null`, permitiendo auditar autenticaciones sin requerir contexto de negocio.
+
+---
+
 ## Variables de entorno sensibles
 
 | Variable | Uso |
@@ -185,7 +210,7 @@ Vite genera archivos con hash en el nombre (ej. `index-BFSxencr.js`). Tras un re
 | Campos de salida del empleado (`ausencia_desde`, `informo`, `cuando_informo`, `sueldo_pendiente`) | Solo modificables vía `PUT /api/employees/:id`, protegido por `authMiddleware` + `negocioMiddleware` + `createModuleRestrictionMiddleware('personal')`. El query sigue usando `WHERE id = ? AND negocio_id = ?` — no hay acceso cross-negocio. Los 4 campos se validan con Zod: tipos, rango de `sueldo_pendiente ≥ 0`, nullable permitido. |
 | Prompt injection via `history` del chat | Autocontenido (solo afecta al atacante); contexto del negocio es server-controlled; ítems validados con `chatHistoryArraySchema` (role + longitud) |
 | Agotamiento de tokens de Gemini vía history largo | `history` cortado a 20 ítems server-side; cada ítem validado (role + longitud) |
-| Rate limiting en endpoints de auth (`/api/auth/*`) | No implementado — pendiente agregar a nivel IP en el Worker |
+| Rate limiting en endpoints de auth (`/api/auth/*`) | Implementado: `checkRateLimit()` en `POST /api/sessions` (10 req / 15 min por IP) y `GET /api/auth/verify-email` (5 req / 60 min por IP). IP hasheada con SHA-256. Tabla `rate_limit_auth` en D1. |
 | Datos de negocio en caché tras expulsión de miembro | Caché expira en 30 min; acceso a la API ya bloqueado por `negocioMiddleware` desde el momento de la expulsión |
 | XSS | React escapa por defecto; no se usa `dangerouslySetInnerHTML` |
 | CSRF | Cookies `HttpOnly` + validación de origen en el Worker |
