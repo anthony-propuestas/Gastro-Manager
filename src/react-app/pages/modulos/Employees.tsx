@@ -22,6 +22,7 @@ import { useMyUsage } from "@/react-app/hooks/useMyUsage";
 import { UsageBanner } from "@/react-app/components/UsageBanner";
 import EmployeeModal from "@/react-app/components/employees/EmployeeModal";
 import EmployeeDetailModal from "@/react-app/components/employees/EmployeeDetailModal";
+import EmployeeViewModal from "@/react-app/components/employees/EmployeeViewModal";
 import JobRolesModal from "@/react-app/components/employees/JobRolesModal";
 
 type FilterType = "all" | "active" | "inactive";
@@ -37,6 +38,7 @@ export default function Employees() {
   const [menuOpenId, setMenuOpenId] = useState<number | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
   const [detailEmployee, setDetailEmployee] = useState<Employee | null>(null);
+  const [viewEmployee, setViewEmployee] = useState<Employee | null>(null);
   const [isJobRolesModalOpen, setIsJobRolesModalOpen] = useState(false);
 
   const filteredEmployees = employees.filter((emp) => {
@@ -83,6 +85,37 @@ export default function Employees() {
     setEditingEmployee(employee);
     setIsModalOpen(true);
     setMenuOpenId(null);
+  };
+
+  const handleView = (employee: Employee) => {
+    setViewEmployee(employee);
+    setMenuOpenId(null);
+  };
+
+  const handleEditFromView = (employee: Employee) => {
+    setViewEmployee(null);
+    handleEdit(employee);
+  };
+
+  const handleToggleStatus = async (employee: Employee, isActive: boolean) => {
+    try {
+      await updateEmployee(employee.id, {
+        name: employee.name,
+        role: employee.role,
+        phone: employee.phone || "",
+        email: employee.email || "",
+        hire_date: employee.hire_date || "",
+        is_active: isActive,
+        monthly_salary: employee.monthly_salary || 0,
+        ausencia_desde: employee.ausencia_desde || "",
+        informo: employee.informo === 1,
+        cuando_informo: employee.cuando_informo || "",
+        sueldo_pendiente: employee.sueldo_pendiente || 0,
+      });
+      toast.success(isActive ? "Empleado marcado como activo" : "Empleado marcado como inactivo");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Error al actualizar estado");
+    }
   };
 
   const handleDelete = async (id: number) => {
@@ -191,7 +224,8 @@ export default function Employees() {
           {filteredEmployees.map((employee) => (
             <Card
               key={employee.id}
-              className="border-0 shadow-sm hover:shadow-md transition-shadow group relative"
+              className="border-0 shadow-sm hover:shadow-md transition-shadow group relative cursor-pointer"
+              onClick={() => handleView(employee)}
             >
               <CardContent className="p-5">
                 <div className="flex items-start justify-between mb-4">
@@ -216,14 +250,14 @@ export default function Employees() {
                   </div>
                   <div className="relative">
                     <button
-                      onClick={() => setMenuOpenId(menuOpenId === employee.id ? null : employee.id)}
+                      onClick={(e) => { e.stopPropagation(); setMenuOpenId(menuOpenId === employee.id ? null : employee.id); }}
                       className="p-2.5 rounded-md opacity-100 sm:opacity-0 sm:group-hover:opacity-100 hover:bg-muted transition-all min-h-[44px] min-w-[44px] flex items-center justify-center"
                     >
                       <MoreVertical className="w-4 h-4 text-muted-foreground" />
                     </button>
                     
                     {menuOpenId === employee.id && (
-                      <div className="absolute right-0 top-8 bg-card rounded-lg shadow-lg border border-border py-1 min-w-32 z-10">
+                      <div className="absolute right-0 top-8 bg-card rounded-lg shadow-lg border border-border py-1 min-w-32 z-10" onClick={(e) => e.stopPropagation()}>
                         <button
                           onClick={() => handleEdit(employee)}
                           className="w-full flex items-center gap-2 px-3 py-3 text-sm hover:bg-muted transition-colors min-h-[44px]"
@@ -258,29 +292,41 @@ export default function Employees() {
                   )}
                 </div>
 
-                <div className="flex items-center justify-between pt-4 border-t border-border">
-                  <div className="flex items-center gap-2">
-                    <Badge
-                      variant={employee.is_active === 1 ? "default" : "secondary"}
-                      className={
-                        employee.is_active === 1
-                          ? "bg-success/10 text-success hover:bg-success/20"
-                          : ""
-                      }
-                    >
-                      {employee.is_active === 1 ? "Activo" : "Inactivo"}
-                    </Badge>
+                <div className="pt-4 border-t border-border space-y-3">
+                  <div className="flex rounded-lg border border-border overflow-hidden text-xs" onClick={(e) => e.stopPropagation()}>
                     <button
-                      onClick={() => setDetailEmployee(employee)}
+                      onClick={() => handleToggleStatus(employee, true)}
+                      className={`flex-1 px-2 py-2 transition-colors font-medium ${
+                        employee.is_active === 1
+                          ? "bg-success/10 text-success"
+                          : "hover:bg-muted text-muted-foreground"
+                      }`}
+                    >
+                      Empleado activo
+                    </button>
+                    <button
+                      onClick={() => handleToggleStatus(employee, false)}
+                      className={`flex-1 px-2 py-2 border-l border-border transition-colors font-medium ${
+                        employee.is_active === 0
+                          ? "bg-destructive/10 text-destructive"
+                          : "hover:bg-muted text-muted-foreground"
+                      }`}
+                    >
+                      Empleado inactivo
+                    </button>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setDetailEmployee(employee); }}
                       className="flex items-center gap-1 px-2 py-1 text-xs rounded-md bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
                     >
                       <MessageSquare className="w-3 h-3" />
                       {(employee.topics_count ?? 0) > 0 ? `${employee.topics_count} temas` : "Notas"}
                     </button>
+                    <span className="text-xs text-muted-foreground">
+                      Desde {formatDate(employee.hire_date)}
+                    </span>
                   </div>
-                  <span className="text-xs text-muted-foreground">
-                    Desde {formatDate(employee.hire_date)}
-                  </span>
                 </div>
 
                 {employee.is_active === 0 && (employee.ausencia_desde || employee.informo === 1 || employee.sueldo_pendiente > 0) && (
@@ -391,6 +437,14 @@ export default function Employees() {
         isOpen={detailEmployee !== null}
         onClose={() => setDetailEmployee(null)}
         employee={detailEmployee}
+      />
+
+      {/* Employee View Modal */}
+      <EmployeeViewModal
+        isOpen={viewEmployee !== null}
+        onClose={() => setViewEmployee(null)}
+        employee={viewEmployee}
+        onEdit={handleEditFromView}
       />
     </div>
   );

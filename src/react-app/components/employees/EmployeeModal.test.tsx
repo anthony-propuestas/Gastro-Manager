@@ -36,6 +36,29 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
+describe("EmployeeModal — segmented status control", () => {
+  it("renders both status buttons", () => {
+    render(<EmployeeModal {...defaultProps} />);
+
+    expect(screen.getByRole("button", { name: /empleado activo/i })).toBeDefined();
+    expect(screen.getByRole("button", { name: /empleado inactivo/i })).toBeDefined();
+  });
+
+  it("Empleado activo button is selected by default for new employee", () => {
+    render(<EmployeeModal {...defaultProps} />);
+
+    const activeBtn = screen.getByRole("button", { name: /empleado activo/i });
+    expect(activeBtn.className).toContain("text-success");
+  });
+
+  it("Empleado inactivo button is selected when editing an inactive employee", () => {
+    render(<EmployeeModal {...defaultProps} employee={inactiveEmployee} />);
+
+    const inactiveBtn = screen.getByRole("button", { name: /empleado inactivo/i });
+    expect(inactiveBtn.className).toContain("text-destructive");
+  });
+});
+
 describe("EmployeeModal — exit info fields", () => {
   it("does not show exit fields when employee is active (default)", () => {
     render(<EmployeeModal {...defaultProps} />);
@@ -46,10 +69,10 @@ describe("EmployeeModal — exit info fields", () => {
     expect(screen.queryByLabelText(/cuánto falta de su sueldo/i)).toBeNull();
   });
 
-  it("shows exit fields when is_active checkbox is unchecked", () => {
+  it("shows exit fields when Empleado inactivo is selected", () => {
     render(<EmployeeModal {...defaultProps} />);
 
-    fireEvent.click(screen.getByLabelText(/empleado activo/i));
+    fireEvent.click(screen.getByRole("button", { name: /empleado inactivo/i }));
 
     expect(screen.getByLabelText(/desde cuándo no se presenta/i)).toBeDefined();
     expect(screen.getByLabelText(/informó su salida/i)).toBeDefined();
@@ -59,7 +82,7 @@ describe("EmployeeModal — exit info fields", () => {
   it("hides cuando_informo when informo is unchecked", () => {
     render(<EmployeeModal {...defaultProps} />);
 
-    fireEvent.click(screen.getByLabelText(/empleado activo/i));
+    fireEvent.click(screen.getByRole("button", { name: /empleado inactivo/i }));
 
     expect(screen.queryByLabelText(/cuándo informó/i)).toBeNull();
   });
@@ -67,18 +90,17 @@ describe("EmployeeModal — exit info fields", () => {
   it("shows cuando_informo when informo is checked", () => {
     render(<EmployeeModal {...defaultProps} />);
 
-    fireEvent.click(screen.getByLabelText(/empleado activo/i));
+    fireEvent.click(screen.getByRole("button", { name: /empleado inactivo/i }));
     fireEvent.click(screen.getByLabelText(/informó su salida/i));
 
     expect(screen.getByLabelText(/cuándo informó/i)).toBeDefined();
   });
 
-  it("hides exit fields again when is_active is re-checked", () => {
+  it("hides exit fields again when Empleado activo is re-selected", () => {
     render(<EmployeeModal {...defaultProps} />);
 
-    const activeCheckbox = screen.getByLabelText(/empleado activo/i);
-    fireEvent.click(activeCheckbox);
-    fireEvent.click(activeCheckbox);
+    fireEvent.click(screen.getByRole("button", { name: /empleado inactivo/i }));
+    fireEvent.click(screen.getByRole("button", { name: /empleado activo/i }));
 
     expect(screen.queryByLabelText(/desde cuándo no se presenta/i)).toBeNull();
   });

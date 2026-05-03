@@ -281,19 +281,32 @@ export default function EmployeeModal({
             />
           </div>
 
-          <div className="flex items-center gap-3">
-            <input
-              type="checkbox"
-              id="is_active"
-              checked={formData.is_active}
-              onChange={(e) =>
-                setFormData({ ...formData, is_active: e.target.checked })
-              }
-              className="h-4 w-4 rounded border-input"
-            />
-            <Label htmlFor="is_active" className="cursor-pointer">
-              Empleado activo
-            </Label>
+          <div className="space-y-2">
+            <Label>Estado del empleado</Label>
+            <div className="flex rounded-lg border border-border overflow-hidden text-sm">
+              <button
+                type="button"
+                onClick={() => setFormData({ ...formData, is_active: true })}
+                className={`flex-1 px-3 py-2.5 transition-colors font-medium ${
+                  formData.is_active
+                    ? "bg-success/10 text-success"
+                    : "hover:bg-muted text-muted-foreground"
+                }`}
+              >
+                Empleado activo
+              </button>
+              <button
+                type="button"
+                onClick={() => setFormData({ ...formData, is_active: false })}
+                className={`flex-1 px-3 py-2.5 border-l border-border transition-colors font-medium ${
+                  !formData.is_active
+                    ? "bg-destructive/10 text-destructive"
+                    : "hover:bg-muted text-muted-foreground"
+                }`}
+              >
+                Empleado inactivo
+              </button>
+            </div>
           </div>
 
           {!formData.is_active && (
