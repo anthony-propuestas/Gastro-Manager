@@ -43,6 +43,12 @@ const BASE_MOCK = {
   suscripciones: [],
   fetchSuscripciones: vi.fn(),
   fetchPagosUsuario: vi.fn(() => Promise.resolve([])),
+  sellers: [],
+  fetchSellers: vi.fn(),
+  referidos: [],
+  fetchReferidos: vi.fn(),
+  markComisionPagada: vi.fn(() => Promise.resolve(true)),
+  markReembolsoPagado: vi.fn(() => Promise.resolve(true)),
 };
 
 beforeEach(() => {
@@ -422,5 +428,176 @@ describe("Tarjeta de Usuarios Registrados", () => {
     expect(screen.queryByText("Correos Registrados")).toBeNull();
     expect(screen.queryByText("Promedio Empleados")).toBeNull();
     expect(screen.queryByText("Promedio Eventos")).toBeNull();
+  });
+});
+
+// ─── Programa de Referidos ────────────────────────────────────────────────────
+
+const REFERIDO_BASE = {
+  id: 1,
+  vendedor_id: "v1",
+  vendedor_name: "Ana Seller",
+  vendedor_email: "ana@test.com",
+  referido_user_id: "r1",
+  referido_name: "Bob Buyer",
+  referido_email: "bob@test.com",
+  suscripcion_id: null as number | null,
+  suscripcion_estado: null as string | null,
+  estado: "pendiente",
+  comision_monto: null as number | null,
+  reembolso_monto: null as number | null,
+  comision_pagada: 0,
+  reembolso_pagado: 0,
+  created_at: "2026-01-01T00:00:00Z",
+  confirmed_at: null as string | null,
+};
+
+const REFERIDO_CONFIRMADO = {
+  ...REFERIDO_BASE,
+  id: 2,
+  estado: "confirmado",
+  suscripcion_id: 10,
+  suscripcion_estado: "autorizada",
+  comision_monto: 7500,
+  reembolso_monto: 6000,
+  confirmed_at: "2026-02-01T00:00:00Z",
+};
+
+const SELLER_BASE = {
+  user_id: "v1",
+  codigo: "ANA123XX",
+  activo: 1,
+  created_at: "2026-01-01",
+  name: "Ana Vendedora",
+  email: "ana@test.com",
+  total_referidos: 5,
+  confirmados: 3,
+  comision_total: 22500,
+  comision_pendiente: 7500,
+};
+
+describe("Admin — Programa de Referidos", () => {
+  it("muestra el título 'Programa de Referidos'", () => {
+    mockUseAdmin.mockReturnValue({ ...BASE_MOCK });
+    render(<Admin />);
+    expect(screen.getByText("Programa de Referidos")).toBeInTheDocument();
+  });
+
+  it("muestra los tabs 'Referidos' y 'Vendedores'", () => {
+    mockUseAdmin.mockReturnValue({ ...BASE_MOCK });
+    render(<Admin />);
+    expect(screen.getByText("Referidos")).toBeInTheDocument();
+    expect(screen.getByText("Vendedores")).toBeInTheDocument();
+  });
+
+  it("muestra mensaje vacío cuando no hay referidos en el tab por defecto", () => {
+    mockUseAdmin.mockReturnValue({ ...BASE_MOCK, referidos: [] });
+    render(<Admin />);
+    expect(screen.getByText("No hay referidos registrados.")).toBeInTheDocument();
+  });
+
+  it("muestra el email del vendedor y del referido en las tarjetas", () => {
+    mockUseAdmin.mockReturnValue({ ...BASE_MOCK, referidos: [REFERIDO_BASE] });
+    render(<Admin />);
+    expect(screen.getByText("ana@test.com")).toBeInTheDocument();
+    expect(screen.getByText("bob@test.com")).toBeInTheDocument();
+  });
+
+  it("muestra badge 'pendiente' para referido pendiente", () => {
+    mockUseAdmin.mockReturnValue({ ...BASE_MOCK, referidos: [REFERIDO_BASE] });
+    render(<Admin />);
+    expect(screen.getByText("pendiente")).toBeInTheDocument();
+  });
+
+  it("no muestra botones de comisión/reembolso para referido pendiente", () => {
+    mockUseAdmin.mockReturnValue({ ...BASE_MOCK, referidos: [REFERIDO_BASE] });
+    render(<Admin />);
+    expect(screen.queryByText("Marcar pagada")).toBeNull();
+    expect(screen.queryByText("Marcar procesado")).toBeNull();
+  });
+
+  it("muestra 'Marcar pagada' y 'Marcar procesado' para referido confirmado sin pagar", () => {
+    mockUseAdmin.mockReturnValue({ ...BASE_MOCK, referidos: [REFERIDO_CONFIRMADO] });
+    render(<Admin />);
+    expect(screen.getByText("Marcar pagada")).toBeInTheDocument();
+    expect(screen.getByText("Marcar procesado")).toBeInTheDocument();
+  });
+
+  it("clic en 'Marcar pagada' llama markComisionPagada con el id correcto", async () => {
+    const markComisionPagada = vi.fn(() => Promise.resolve(true));
+    mockUseAdmin.mockReturnValue({
+      ...BASE_MOCK,
+      markComisionPagada,
+      referidos: [{ ...REFERIDO_CONFIRMADO, id: 42 }],
+    });
+    render(<Admin />);
+
+    await act(async () => {
+      fireEvent.click(screen.getByText("Marcar pagada"));
+    });
+
+    expect(markComisionPagada).toHaveBeenCalledWith(42);
+  });
+
+  it("clic en 'Marcar procesado' llama markReembolsoPagado con el id correcto", async () => {
+    const markReembolsoPagado = vi.fn(() => Promise.resolve(true));
+    mockUseAdmin.mockReturnValue({
+      ...BASE_MOCK,
+      markReembolsoPagado,
+      referidos: [{ ...REFERIDO_CONFIRMADO, id: 99 }],
+    });
+    render(<Admin />);
+
+    await act(async () => {
+      fireEvent.click(screen.getByText("Marcar procesado"));
+    });
+
+    expect(markReembolsoPagado).toHaveBeenCalledWith(99);
+  });
+
+  it("muestra badge 'Pagada' y oculta botón cuando comision_pagada=1", () => {
+    mockUseAdmin.mockReturnValue({
+      ...BASE_MOCK,
+      referidos: [{ ...REFERIDO_CONFIRMADO, comision_pagada: 1 }],
+    });
+    render(<Admin />);
+    expect(screen.getByText("Pagada")).toBeInTheDocument();
+    expect(screen.queryByText("Marcar pagada")).toBeNull();
+  });
+
+  it("muestra badge 'Procesado' y oculta botón cuando reembolso_pagado=1", () => {
+    mockUseAdmin.mockReturnValue({
+      ...BASE_MOCK,
+      referidos: [{ ...REFERIDO_CONFIRMADO, reembolso_pagado: 1 }],
+    });
+    render(<Admin />);
+    expect(screen.getByText("Procesado")).toBeInTheDocument();
+    expect(screen.queryByText("Marcar procesado")).toBeNull();
+  });
+
+  it("cambiar al tab 'Vendedores' muestra mensaje vacío si no hay sellers", () => {
+    mockUseAdmin.mockReturnValue({ ...BASE_MOCK, sellers: [] });
+    render(<Admin />);
+    fireEvent.click(screen.getByText("Vendedores"));
+    expect(screen.getByText("No hay vendedores activos.")).toBeInTheDocument();
+  });
+
+  it("cambiar al tab 'Vendedores' muestra nombre, código y stats del seller", () => {
+    mockUseAdmin.mockReturnValue({ ...BASE_MOCK, sellers: [SELLER_BASE] });
+    render(<Admin />);
+    fireEvent.click(screen.getByText("Vendedores"));
+    expect(screen.getByText("Ana Vendedora")).toBeInTheDocument();
+    expect(screen.getByText("ANA123XX")).toBeInTheDocument();
+    expect(screen.getByText("5")).toBeInTheDocument();
+    expect(screen.getByText("3")).toBeInTheDocument();
+  });
+
+  it("llama fetchSellers y fetchReferidos cuando isAdmin es true", () => {
+    const fetchSellers = vi.fn();
+    const fetchReferidos = vi.fn();
+    mockUseAdmin.mockReturnValue({ ...BASE_MOCK, fetchSellers, fetchReferidos });
+    render(<Admin />);
+    expect(fetchSellers).toHaveBeenCalledTimes(1);
+    expect(fetchReferidos).toHaveBeenCalledTimes(1);
   });
 });

@@ -49,10 +49,14 @@ export function useSuscripcion() {
 
   useEffect(() => { fetchEstado(); }, [fetchEstado]);
 
-  const crear = useCallback(async (): Promise<string | null> => {
+  const crear = useCallback(async (refCode?: string): Promise<string | null> => {
     setIsLoading(true);
     try {
-      const res = await fetch("/api/suscripciones/crear", { method: "POST" });
+      const res = await fetch("/api/suscripciones/crear", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(refCode ? { ref_code: refCode } : {}),
+      });
       const data = await res.json();
       if (!res.ok) {
         const err = data.error as { code?: string; message?: string; mp_status?: number | null; mp_detail?: string | null } | undefined;

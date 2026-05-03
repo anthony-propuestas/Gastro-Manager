@@ -106,6 +106,38 @@ Un usuario autenticado puede craftear ítems en `history` para intentar manipula
 
 ---
 
+## Sellers / Programa de Referidos
+
+### Endpoints de usuario
+
+- **`POST /api/sellers/activate`** y **`GET /api/sellers/me`** requieren JWT válido via `authMiddleware`. Sin JWT: 401. Cada endpoint filtra datos por el `user_id` extraído del token — no es posible acceder al perfil o referidos de otro vendedor.
+
+### Validación de entrada
+
+- El campo `ref_code` en `POST /api/suscripciones/crear` se valida con Zod: `min(1), max(20)`. Sin `ref_code`: flujo normal sin referido. Campo vacío o supera 20 chars: rechazado antes de tocar DB.
+
+### Aislamiento por negocio_id
+
+- **Sellers es una feature platform-level, no particionada por `negocio_id`.** Los vendedores y referidos son globales al usuario, independientes del negocio activo. Decisión de diseño intencional: el vínculo es entre usuarios, no entre negocios.
+
+### Autorización / roles
+
+- Los cuatro endpoints `/api/admin/sellers` y `/api/admin/referidos/*` (GET + dos PUT) verifican `isAdmin()` explícitamente antes de cualquier operación. Un usuario normal recibe 403.
+
+### Prevención de auto-referido
+
+- En `POST /api/suscripciones/crear`, el worker verifica que `seller.user_id !== currentUser.id`. Si coinciden, rechaza la operación con error antes de insertar el registro.
+
+### Prevención de referido duplicado
+
+- Constraint `UNIQUE(referido_user_id)` en la tabla `referidos` — un comprador solo puede ser referido una vez, a nivel de base de datos.
+
+### Generación de código de vendedor
+
+- Algoritmo con retry (hasta 5 intentos) ante colisión de `UNIQUE` en `vendedores.codigo`. El código es alfanumérico (~8 chars) con componente de timestamp. La colisión forzada via brute force requeriría conocer el espacio de claves activas, que no es un endpoint público.
+
+---
+
 ## Suscripciones (MercadoPago)
 
 ### Webhook público `POST /api/webhooks/mercadopago`
@@ -180,7 +212,7 @@ Ninguna variable sensible se incluye en el build del frontend (Vite). El Worker 
 - `src/react-app/lib/api.test.ts`: verifica que `apiFetch` emita `USAGE_LIMIT_EVENT` ante `429 USAGE_LIMIT_EXCEEDED` y que agregue `X-Negocio-ID` correctamente.
 - `src/react-app/context/UsageLimitModalContext.test.tsx`: verifica que el modal de upgrade se active ante el evento global y no pueda ser ignorado.
 - `src/react-app/components/auth/ProtectedRoute.test.tsx`: verifica redirecciones para usuarios no autenticados.
-- `src/worker/validation.test.ts`: verifica que los schemas Zod rechacen entradas inválidas en todos los módulos. Incluye 8 casos para `chatHistoryItemSchema` y `chatHistoryArraySchema`: acepta roles válidos (`user`/`model`) y content dentro del límite; rechaza roles arbitrarios, content vacío y content > 2000 chars. Incluye 5 casos para los nuevos campos de salida del empleado: acepta valores válidos y null; rechaza `sueldo_pendiente` negativo tanto en create como en update.
+- `src/worker/validation.test.ts`: verifica que los schemas Zod rechacen entradas inválidas en todos los módulos. Incluye 8 casos para `chatHistoryItemSchema` y `chatHistoryArraySchema`: acepta roles válidos (`user`/`model`) y content dentro del límite; rechaza roles arbitrarios, content vacío y content > 2000 chars. Incluye 5 casos para los campos de salida del empleado: acepta valores válidos y null; rechaza `sueldo_pendiente` negativo tanto en create como en update. Incluye casos para `crearSuscripcionSchema`: acepta `ref_code` ausente, string de 1-20 chars; rechaza string vacío y string de más de 20 chars.
 - `src/react-app/components/employees/EmployeeModal.test.tsx`: verifica el control segmentado de estado y el formulario condicional de baja. Cubre que ambos botones se renderizan; selección por defecto; selección correcta al editar un empleado inactivo; que los campos de baja no aparecen en estado activo; que aparecen al seleccionar inactivo; visibilidad condicional de `cuando_informo` según el checkbox `informo`; ocultamiento al re-activar; pre-relleno de los 4 campos al editar un empleado inactivo; y que desmarcar `informo` limpia `cuando_informo`.
 - `src/react-app/components/employees/EmployeeViewModal.test.tsx`: verifica que el modal de vista es de solo lectura (no expone acciones de escritura) y que no renderiza cuando `employee` es null.
 - `src/react-app/pages/modulos/Employees.test.tsx`: verifica que el toggle de estado (activo/inactivo) llama a `updateEmployee` correctamente y que el clic en el botón de estado no abre el modal de vista (separación de intenciones).
@@ -214,5 +246,8 @@ Vite genera archivos con hash en el nombre (ej. `index-BFSxencr.js`). Tras un re
 | Agotamiento de tokens de Gemini vía history largo | `history` cortado a 20 ítems server-side; cada ítem validado (role + longitud) |
 | Rate limiting en endpoints de auth (`/api/auth/*`) | Implementado: `checkRateLimit()` en `POST /api/sessions` (10 req / 15 min por IP) y `GET /api/auth/verify-email` (5 req / 60 min por IP). IP hasheada con SHA-256. Tabla `rate_limit_auth` en D1. |
 | Datos de negocio en caché tras expulsión de miembro | Caché expira en 30 min; acceso a la API ya bloqueado por `negocioMiddleware` desde el momento de la expulsión |
+| Auto-referido en Sellers | Worker verifica `seller.user_id !== currentUser.id` antes de crear el registro |
+| Referido duplicado en Sellers | Constraint `UNIQUE(referido_user_id)` en tabla `referidos` a nivel de base de datos |
+| Acceso a endpoints admin de Sellers sin privilegios | `isAdmin()` verificado en los 4 endpoints `/api/admin/sellers` y `/api/admin/referidos/*` |
 | XSS | React escapa por defecto; no se usa `dangerouslySetInnerHTML` |
 | CSRF | Cookies `HttpOnly` + validación de origen en el Worker |

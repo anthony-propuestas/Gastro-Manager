@@ -23,6 +23,7 @@ import {
   createFacturaSchema,
   updateFacturaSchema,
   chatHistoryArraySchema,
+  crearSuscripcionSchema,
 } from "./validation";
 import { USAGE_TOOLS, type UsageTool } from "./usageTools";
 import { checkRateLimit } from "./rateLimitAuth";
@@ -3517,6 +3518,13 @@ app.post("/api/suscripciones/crear", authMiddleware, async (c) => {
     .first();
   if (existing) return c.json(apiError("ALREADY_SUBSCRIBED", "Ya tienes una suscripción activa"), 400);
 
+  let refCode: string | undefined;
+  try {
+    const body = await c.req.json().catch(() => ({}));
+    const parsed = crearSuscripcionSchema.safeParse(body);
+    if (parsed.success) refCode = parsed.data.ref_code;
+  } catch { /* ref_code es opcional */ }
+
   const backUrl = `${c.env.APP_URL ?? ""}/suscripcion/estado`;
 
   let mpRes: Response;
@@ -3578,6 +3586,30 @@ app.post("/api/suscripciones/crear", authMiddleware, async (c) => {
                 updated_at = datetime('now')`)
     .bind(user.id, mpData.id, user.email)
     .run();
+
+  if (refCode) {
+    try {
+      const vendedor = await c.env.DB
+        .prepare("SELECT user_id FROM vendedores WHERE codigo = ? AND activo = 1")
+        .bind(refCode)
+        .first<{ user_id: string }>();
+      if (vendedor && vendedor.user_id !== user.id) {
+        const yaReferido = await c.env.DB
+          .prepare("SELECT id FROM referidos WHERE referido_user_id = ?")
+          .bind(user.id)
+          .first();
+        if (!yaReferido) {
+          await c.env.DB
+            .prepare("INSERT INTO referidos (vendedor_id, referido_user_id) VALUES (?, ?)")
+            .bind(vendedor.user_id, user.id)
+            .run();
+        }
+      }
+    } catch (refErr) {
+      console.error("Error registrando referido:", refErr);
+    }
+  }
+
   return c.json(apiResponse({ init_point: mpData.init_point }), 201);
 });
 
@@ -3661,6 +3693,14 @@ app.post("/api/webhooks/mercadopago", async (c) => {
           c.env.DB.prepare("UPDATE suscripciones SET estado='autorizada', grace_deadline=NULL, ultimo_pago_ok=datetime('now'), updated_at=datetime('now') WHERE user_id=?").bind(userId),
           c.env.DB.prepare("UPDATE users SET role='usuario_inteligente', updated_at=datetime('now') WHERE id=?").bind(userId),
         ]);
+        const subRow = await c.env.DB.prepare("SELECT id FROM suscripciones WHERE user_id = ?").bind(userId).first<{ id: number }>();
+        if (subRow) {
+          await c.env.DB
+            .prepare(`UPDATE referidos SET estado='confirmado', suscripcion_id=?, comision_monto=7500, reembolso_monto=6000, confirmed_at=datetime('now')
+                      WHERE referido_user_id=? AND estado='pendiente'`)
+            .bind(subRow.id, userId)
+            .run();
+        }
       } else if (pm.status === "rejected") {
         const base = sub.ultimo_pago_ok ? new Date(sub.ultimo_pago_ok) : new Date();
         base.setDate(base.getDate() + 7);
@@ -3739,6 +3779,108 @@ app.get("/api/admin/suscripciones/:userId/pagos", authMiddleware, async (c) => {
     .bind(userId)
     .all();
   return c.json(apiResponse(rows.results));
+});
+
+// ============================================
+// Sellers / Referidos Routes
+// ============================================
+
+app.post("/api/sellers/activate", authMiddleware, async (c) => {
+  const user = c.get("user");
+  const db = c.env.DB;
+  const existing = await db.prepare("SELECT user_id FROM vendedores WHERE user_id = ?").bind(user.id).first();
+  if (existing) return c.json(apiError("ALREADY_SELLER", "Ya eres vendedor"), 400);
+
+  const base = user.id.replace(/[^a-zA-Z0-9]/g, "").slice(0, 6).toUpperCase();
+  let code = `${base}${Date.now().toString(36).slice(-2).toUpperCase()}`;
+  for (let i = 0; i < 5; i++) {
+    try {
+      await db.prepare("INSERT INTO vendedores (user_id, codigo) VALUES (?, ?)").bind(user.id, code).run();
+      return c.json(apiResponse({ codigo: code }), 201);
+    } catch {
+      code = `${base}${(Date.now() + i + 1).toString(36).slice(-2).toUpperCase()}`;
+    }
+  }
+  return c.json(apiError("CODE_CONFLICT", "No se pudo generar código único"), 500);
+});
+
+app.get("/api/sellers/me", authMiddleware, async (c) => {
+  const user = c.get("user");
+  const db = c.env.DB;
+  const vendedor = await db
+    .prepare("SELECT * FROM vendedores WHERE user_id = ?")
+    .bind(user.id)
+    .first<{ user_id: string; codigo: string; activo: number; created_at: string }>();
+  if (!vendedor) return c.json(apiResponse(null));
+
+  const refs = await db
+    .prepare(`SELECT r.*, u.name AS referido_name, u.email AS referido_email,
+              s.estado AS suscripcion_estado
+              FROM referidos r
+              JOIN users u ON u.id = r.referido_user_id
+              LEFT JOIN suscripciones s ON s.id = r.suscripcion_id
+              WHERE r.vendedor_id = ? ORDER BY r.created_at DESC`)
+    .bind(user.id)
+    .all();
+
+  const rows = refs.results as any[];
+  const stats = {
+    total_referidos: rows.length,
+    confirmados: rows.filter(r => r.estado === "confirmado").length,
+    comision_total: rows.reduce((acc, r) => acc + (r.comision_monto || 0), 0),
+    comision_pendiente: rows.filter(r => r.estado === "confirmado" && !r.comision_pagada)
+      .reduce((acc, r) => acc + (r.comision_monto || 0), 0),
+  };
+
+  return c.json(apiResponse({ vendedor, referidos: rows, stats }));
+});
+
+app.get("/api/admin/sellers", authMiddleware, async (c) => {
+  const user = c.get("user");
+  if (!await isAdmin(user.email, c.env.DB, c.env)) return c.json(apiError("FORBIDDEN", "No autorizado"), 403);
+  const rows = await c.env.DB
+    .prepare(`SELECT v.*, u.name, u.email,
+              COUNT(r.id) AS total_referidos,
+              SUM(CASE WHEN r.estado='confirmado' THEN 1 ELSE 0 END) AS confirmados,
+              SUM(CASE WHEN r.estado='confirmado' THEN COALESCE(r.comision_monto,0) ELSE 0 END) AS comision_total,
+              SUM(CASE WHEN r.estado='confirmado' AND r.comision_pagada=0 THEN COALESCE(r.comision_monto,0) ELSE 0 END) AS comision_pendiente
+              FROM vendedores v
+              JOIN users u ON u.id = v.user_id
+              LEFT JOIN referidos r ON r.vendedor_id = v.user_id
+              GROUP BY v.user_id ORDER BY confirmados DESC`)
+    .all();
+  return c.json(apiResponse(rows.results));
+});
+
+app.get("/api/admin/referidos", authMiddleware, async (c) => {
+  const user = c.get("user");
+  if (!await isAdmin(user.email, c.env.DB, c.env)) return c.json(apiError("FORBIDDEN", "No autorizado"), 403);
+  const rows = await c.env.DB
+    .prepare(`SELECT r.*,
+              uv.name AS vendedor_name, uv.email AS vendedor_email,
+              ur.name AS referido_name, ur.email AS referido_email,
+              s.estado AS suscripcion_estado
+              FROM referidos r
+              JOIN users uv ON uv.id = r.vendedor_id
+              JOIN users ur ON ur.id = r.referido_user_id
+              LEFT JOIN suscripciones s ON s.id = r.suscripcion_id
+              ORDER BY r.created_at DESC`)
+    .all();
+  return c.json(apiResponse(rows.results));
+});
+
+app.put("/api/admin/referidos/:id/comision", authMiddleware, async (c) => {
+  const user = c.get("user");
+  if (!await isAdmin(user.email, c.env.DB, c.env)) return c.json(apiError("FORBIDDEN", "No autorizado"), 403);
+  await c.env.DB.prepare("UPDATE referidos SET comision_pagada=1 WHERE id=?").bind(c.req.param("id")).run();
+  return c.json(apiResponse({ updated: true }));
+});
+
+app.put("/api/admin/referidos/:id/reembolso", authMiddleware, async (c) => {
+  const user = c.get("user");
+  if (!await isAdmin(user.email, c.env.DB, c.env)) return c.json(apiError("FORBIDDEN", "No autorizado"), 403);
+  await c.env.DB.prepare("UPDATE referidos SET reembolso_pagado=1 WHERE id=?").bind(c.req.param("id")).run();
+  return c.json(apiResponse({ updated: true }));
 });
 
 export default app;

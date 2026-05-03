@@ -24,6 +24,7 @@ import NegocioSetup from "@/react-app/pages/NegocioSetup";
 import InvitePage from "@/react-app/pages/InvitePage";
 import SuscripcionPage from "@/react-app/pages/Suscripcion";
 import SuscripcionEstadoPage from "@/react-app/pages/SuscripcionEstado";
+import SellersPage from "@/react-app/pages/Sellers";
 
 export default function App() {
   return (
@@ -190,6 +191,18 @@ export default function App() {
                     <MainLayout>
                       <PageErrorBoundary>
                         <SuscripcionEstadoPage />
+                      </PageErrorBoundary>
+                    </MainLayout>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/sellers"
+                element={
+                  <ProtectedRoute>
+                    <MainLayout>
+                      <PageErrorBoundary>
+                        <SellersPage />
                       </PageErrorBoundary>
                     </MainLayout>
                   </ProtectedRoute>

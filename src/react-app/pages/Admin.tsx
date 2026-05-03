@@ -6,8 +6,8 @@ import { Input } from "@/react-app/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/react-app/components/ui/table";
 import { Badge } from "@/react-app/components/ui/badge";
 import { useToast } from "@/react-app/components/ui/toast";
-import { Shield, Users, Mail, TrendingUp, UserPlus, Trash2, AlertCircle, Settings2, Crown, UserMinus, Search, X, RefreshCw, CreditCard, ChevronDown, ChevronUp } from "lucide-react";
-import type { AdminSuscripcion, AdminPagoSuscripcion } from "@/react-app/hooks/useAdmin";
+import { Shield, Users, Mail, TrendingUp, UserPlus, Trash2, AlertCircle, Settings2, Crown, UserMinus, Search, X, RefreshCw, CreditCard, ChevronDown, ChevronUp, Megaphone, DollarSign, CheckCircle } from "lucide-react";
+import type { AdminSuscripcion, AdminPagoSuscripcion, AdminVendedor, AdminReferido } from "@/react-app/hooks/useAdmin";
 
 const TOOL_LABELS = [
   { key: "employees",       label: "Empleados",  color: "bg-green-500" },
@@ -27,7 +27,8 @@ export default function Admin() {
   const { isAdmin, loading, stats, emails, fetchStats, fetchEmails, addEmail, deleteEmail,
           usageData, limits, fetchUsage, fetchLimits, updateLimits,
           users, fetchUsers, promoteUser, demoteUser,
-          suscripciones, fetchSuscripciones, fetchPagosUsuario } = useAdmin();
+          suscripciones, fetchSuscripciones, fetchPagosUsuario,
+          sellers, fetchSellers, referidos, fetchReferidos, markComisionPagada, markReembolsoPagado } = useAdmin();
   const { showToast } = useToast();
   const [newEmail, setNewEmail] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -44,6 +45,9 @@ export default function Admin() {
   const [susFilter, setSusFilter] = useState("");
   const [expandedSus, setExpandedSus] = useState<Record<string, AdminPagoSuscripcion[]>>({});
   const [loadingPagos, setLoadingPagos] = useState<Record<string, boolean>>({});
+  const [sellersTab, setSellersTab] = useState<"vendedores" | "referidos">("referidos");
+  const [markingComision, setMarkingComision] = useState<Record<number, boolean>>({});
+  const [markingReembolso, setMarkingReembolso] = useState<Record<number, boolean>>({});
 
   const loadUsage = async () => {
     setUsageLoading(true);
@@ -64,6 +68,8 @@ export default function Admin() {
       fetchUsers();
       loadUsage();
       fetchSuscripciones();
+      fetchSellers();
+      fetchReferidos();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAdmin]);
@@ -658,6 +664,140 @@ export default function Admin() {
                 );
               })}
             </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Programa de Referidos */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Megaphone className="h-5 w-5" />
+            Programa de Referidos
+          </CardTitle>
+          <CardDescription>Vendedores activos y comisiones pendientes</CardDescription>
+          <div className="flex gap-2 pt-2">
+            {(["referidos", "vendedores"] as const).map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setSellersTab(tab)}
+                className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
+                  sellersTab === tab
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "border-border text-muted-foreground hover:bg-muted"
+                }`}
+              >
+                {tab.charAt(0).toUpperCase() + tab.slice(1)}
+              </button>
+            ))}
+          </div>
+        </CardHeader>
+        <CardContent>
+          {sellersTab === "vendedores" ? (
+            sellers.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-4 text-center">No hay vendedores activos.</p>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Vendedor</TableHead>
+                    <TableHead>Código</TableHead>
+                    <TableHead className="text-right">Referidos</TableHead>
+                    <TableHead className="text-right">Confirmados</TableHead>
+                    <TableHead className="text-right">Comisión total</TableHead>
+                    <TableHead className="text-right">Pendiente</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {(sellers as AdminVendedor[]).map((s) => (
+                    <TableRow key={s.user_id}>
+                      <TableCell>
+                        <p className="text-sm font-medium">{s.name}</p>
+                        <p className="text-xs text-muted-foreground">{s.email}</p>
+                      </TableCell>
+                      <TableCell className="font-mono text-sm">{s.codigo}</TableCell>
+                      <TableCell className="text-right text-sm">{s.total_referidos}</TableCell>
+                      <TableCell className="text-right text-sm text-green-600 font-medium">{s.confirmados}</TableCell>
+                      <TableCell className="text-right text-sm">ARS {(s.comision_total || 0).toLocaleString("es-AR")}</TableCell>
+                      <TableCell className="text-right text-sm text-amber-600 font-medium">ARS {(s.comision_pendiente || 0).toLocaleString("es-AR")}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )
+          ) : (
+            referidos.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-4 text-center">No hay referidos registrados.</p>
+            ) : (
+              <div className="space-y-2">
+                {(referidos as AdminReferido[]).map((r) => (
+                  <div key={r.id} className="border rounded-lg p-3 space-y-2">
+                    <div className="flex flex-wrap items-center gap-3">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs text-muted-foreground">Vendedor</p>
+                        <p className="text-sm font-medium truncate">{r.vendedor_email}</p>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs text-muted-foreground">Referido</p>
+                        <p className="text-sm font-medium truncate">{r.referido_email}</p>
+                      </div>
+                      <div>
+                        <Badge className={`text-xs ${r.estado === "confirmado" ? "bg-green-100 text-green-800" : r.estado === "cancelado" ? "bg-red-100 text-red-800" : "bg-blue-100 text-blue-800"}`}>
+                          {r.estado}
+                        </Badge>
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        {new Date(r.created_at).toLocaleDateString("es-AR")}
+                      </div>
+                    </div>
+                    {r.estado === "confirmado" && (
+                      <div className="flex flex-wrap gap-2 pt-1 border-t">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-muted-foreground">Comisión ARS {(r.comision_monto || 0).toLocaleString("es-AR")}:</span>
+                          {r.comision_pagada ? (
+                            <Badge className="text-xs bg-green-100 text-green-800"><CheckCircle className="w-3 h-3 mr-1" />Pagada</Badge>
+                          ) : (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-6 text-xs px-2"
+                              disabled={markingComision[r.id]}
+                              onClick={async () => {
+                                setMarkingComision(p => ({ ...p, [r.id]: true }));
+                                await markComisionPagada(r.id);
+                                setMarkingComision(p => ({ ...p, [r.id]: false }));
+                              }}
+                            >
+                              <DollarSign className="w-3 h-3 mr-1" />Marcar pagada
+                            </Button>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-muted-foreground">Reembolso ARS {(r.reembolso_monto || 0).toLocaleString("es-AR")}:</span>
+                          {r.reembolso_pagado ? (
+                            <Badge className="text-xs bg-green-100 text-green-800"><CheckCircle className="w-3 h-3 mr-1" />Procesado</Badge>
+                          ) : (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-6 text-xs px-2"
+                              disabled={markingReembolso[r.id]}
+                              onClick={async () => {
+                                setMarkingReembolso(p => ({ ...p, [r.id]: true }));
+                                await markReembolsoPagado(r.id);
+                                setMarkingReembolso(p => ({ ...p, [r.id]: false }));
+                              }}
+                            >
+                              <DollarSign className="w-3 h-3 mr-1" />Marcar procesado
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )
           )}
         </CardContent>
       </Card>

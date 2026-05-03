@@ -65,6 +65,38 @@ export interface AdminSuscripcion {
   created_at: string;
 }
 
+export interface AdminVendedor {
+  user_id: string;
+  codigo: string;
+  activo: number;
+  created_at: string;
+  name: string;
+  email: string;
+  total_referidos: number;
+  confirmados: number;
+  comision_total: number;
+  comision_pendiente: number;
+}
+
+export interface AdminReferido {
+  id: number;
+  vendedor_id: string;
+  vendedor_name: string;
+  vendedor_email: string;
+  referido_user_id: string;
+  referido_name: string;
+  referido_email: string;
+  suscripcion_id: number | null;
+  suscripcion_estado: string | null;
+  estado: string;
+  comision_monto: number | null;
+  reembolso_monto: number | null;
+  comision_pagada: number;
+  reembolso_pagado: number;
+  created_at: string;
+  confirmed_at: string | null;
+}
+
 export interface AdminPagoSuscripcion {
   id: number;
   mp_payment_id: string | null;
@@ -85,6 +117,8 @@ export function useAdmin() {
   const [limits, setLimits] = useState<UsageLimits>({});
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [suscripciones, setSuscripciones] = useState<AdminSuscripcion[]>([]);
+  const [sellers, setSellers] = useState<AdminVendedor[]>([]);
+  const [referidos, setReferidos] = useState<AdminReferido[]>([]);
 
   useEffect(() => {
     checkAdminStatus();
@@ -246,6 +280,40 @@ export function useAdmin() {
     }
   };
 
+  const fetchSellers = async () => {
+    try {
+      const res = await fetch("/api/admin/sellers");
+      const data = await res.json();
+      if (data.success) setSellers(data.data);
+    } catch { /* silent */ }
+  };
+
+  const fetchReferidos = async () => {
+    try {
+      const res = await fetch("/api/admin/referidos");
+      const data = await res.json();
+      if (data.success) setReferidos(data.data);
+    } catch { /* silent */ }
+  };
+
+  const markComisionPagada = async (id: number): Promise<boolean> => {
+    try {
+      const res = await fetch(`/api/admin/referidos/${id}/comision`, { method: "PUT" });
+      const data = await res.json();
+      if (data.success) { await fetchReferidos(); return true; }
+      return false;
+    } catch { return false; }
+  };
+
+  const markReembolsoPagado = async (id: number): Promise<boolean> => {
+    try {
+      const res = await fetch(`/api/admin/referidos/${id}/reembolso`, { method: "PUT" });
+      const data = await res.json();
+      if (data.success) { await fetchReferidos(); return true; }
+      return false;
+    } catch { return false; }
+  };
+
   return {
     isAdmin,
     loading,
@@ -267,5 +335,11 @@ export function useAdmin() {
     suscripciones,
     fetchSuscripciones,
     fetchPagosUsuario,
+    sellers,
+    fetchSellers,
+    referidos,
+    fetchReferidos,
+    markComisionPagada,
+    markReembolsoPagado,
   };
 }

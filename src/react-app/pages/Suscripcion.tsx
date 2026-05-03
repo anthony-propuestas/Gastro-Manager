@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { useNavigate } from "react-router";
+import { useNavigate, useSearchParams } from "react-router";
 import { useSuscripcion } from "@/react-app/hooks/useSuscripcion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/react-app/components/ui/card";
 import { Button } from "@/react-app/components/ui/button";
@@ -24,13 +24,23 @@ const PAGO_BADGE: Record<string, string> = {
 
 export default function SuscripcionPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { suscripcion, pagos, isLoading, error, crear, cancelar, fetchPagos } = useSuscripcion();
+
+  useEffect(() => {
+    const ref = searchParams.get("ref");
+    if (ref) localStorage.setItem("ref_code", ref);
+  }, [searchParams]);
 
   useEffect(() => { fetchPagos(); }, [fetchPagos]);
 
   const handleSuscribirse = async () => {
-    const initPoint = await crear();
-    if (initPoint) window.location.assign(initPoint);
+    const refCode = localStorage.getItem("ref_code") ?? undefined;
+    const initPoint = await crear(refCode);
+    if (initPoint) {
+      localStorage.removeItem("ref_code");
+      window.location.assign(initPoint);
+    }
   };
 
   const handleCancelar = async () => {

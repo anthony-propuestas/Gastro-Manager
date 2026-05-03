@@ -810,6 +810,30 @@ Regresa a `usuario_basico`. No puede aplicarse al propio admin (devuelve `403`).
 
 ---
 
+#### `GET /api/admin/sellers`
+
+- **Auth:** JWT + admin
+- **Respuesta `200`:** lista de vendedores activos con estadísticas agregadas (total_referidos, confirmados, comision_total, comision_pendiente, nombre y email del vendedor).
+
+#### `GET /api/admin/referidos`
+
+- **Auth:** JWT + admin
+- **Respuesta `200`:** todos los referidos con contexto completo (email y nombre del vendedor, email y nombre del referido, estado del referido, estado de la suscripción, montos de comisión/reembolso, flags de pago).
+
+#### `PUT /api/admin/referidos/:id/comision`
+
+- **Auth:** JWT + admin
+- **Body:** ninguno
+- **Respuesta `200`:** marca `comision_pagada = 1` en el registro `referidos` indicado.
+
+#### `PUT /api/admin/referidos/:id/reembolso`
+
+- **Auth:** JWT + admin
+- **Body:** ninguno
+- **Respuesta `200`:** marca `reembolso_pagado = 1` en el registro `referidos` indicado.
+
+---
+
 ### Chatbot IA
 *Requiere `X-Negocio-ID`* ⚠️ *Sujeto a cuota `chat`*
 
@@ -854,12 +878,55 @@ El contexto enviado a Gemini incluye: empleados activos, sueldos del mes, antici
 
 ---
 
+### Sellers / Programa de Referidos
+*Solo requieren autenticación (sin `X-Negocio-ID`)*
+
+#### `POST /api/sellers/activate`
+Registra al usuario autenticado como vendedor y genera su código único de referido.
+
+- **Auth:** JWT
+- **Body:** ninguno
+- **Respuesta exitosa `201`:** `{ "success": true, "data": { "codigo": "ANA123XX" } }`
+- **Error `409`:** el usuario ya es vendedor.
+
+#### `GET /api/sellers/me`
+Devuelve el perfil de vendedor, lista de referidos y estadísticas acumuladas.
+
+- **Auth:** JWT
+- **Respuesta `200`:**
+```json
+{
+  "vendedor": { "user_id": "...", "codigo": "ANA123XX", "activo": 1, "created_at": "..." },
+  "referidos": [{
+    "id": 1,
+    "referido_user_id": "...",
+    "referido_name": "Juan Pérez",
+    "referido_email": "juan@example.com",
+    "estado": "pendiente",
+    "comision_monto": null,
+    "comision_pagada": 0,
+    "reembolso_monto": null,
+    "reembolso_pagado": 0,
+    "suscripcion_estado": "autorizada",
+    "created_at": "..."
+  }],
+  "stats": {
+    "total_referidos": 3,
+    "confirmados": 1,
+    "comision_total": 7500,
+    "comision_pendiente": 7500
+  }
+}
+```
+
+---
+
 ## Suscripciones (MercadoPago)
 
 ### `POST /api/suscripciones/crear`
 
 - **Auth:** JWT requerido
-- **Body:** ninguno
+- **Body:** `{ "ref_code": "ANA123XX" }` *(opcional)* — código de referido. Si se provee, crea un registro en `referidos` con estado `pendiente` vinculando al vendedor con el comprador. Validado con Zod: `min(1), max(20)`.
 - **Respuesta exitosa `201`:**
 ```json
 { "success": true, "data": { "init_point": "https://www.mercadopago.com.ar/subscriptions/checkout?preapproval_plan_id=..." } }
@@ -910,7 +977,7 @@ El contexto enviado a Gemini incluye: empleados activos, sueldos del mes, antici
 
 ## Notas Generales
 
-- **Total de endpoints**: 83 rutas registradas en el Worker (GET, POST, PUT, DELETE).
+- **Total de endpoints**: 89 rutas registradas en el Worker (GET, POST, PUT, DELETE).
 - **Sin paginación**: todos los listados retornan el conjunto completo. Filtrado se realiza en cliente.
 - **Rate limiting**: solo los endpoints de autenticación tienen rate limiting propio (`POST /api/sessions`: 10/15 min por IP; `GET /api/auth/verify-email`: 5/hr por IP). El resto de endpoints no tiene rate limiting a nivel de aplicación; Cloudflare Workers aplica 100,000 req/día en Free tier.
 - **CORS**: no configurado explícitamente; funciona por same-origin (SPA y API servidos por el mismo Worker via `not_found_handling: single-page-application`).

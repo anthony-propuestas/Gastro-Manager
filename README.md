@@ -16,7 +16,8 @@ Sistema de gestión de restaurantes multi-usuario desplegado en Cloudflare Worke
 | Seguimiento | Tópicos y notas por empleado con deadlines y alertas de vencimiento |
 | Negocios compartidos | Múltiples usuarios pueden colaborar en el mismo negocio |
 | Asistente Virtual IA | Chatbot contextual sobre los datos del negocio (Google Gemini) |
-| Panel de Admin | Estadísticas globales, gestión de cuotas, roles de usuario |
+| Vendedores | Programa de referidos con códigos únicos, comisiones (7.500 ARS) y reembolsos (6.000 ARS), tracking en tiempo real |
+| Panel de Admin | Estadísticas globales, gestión de cuotas, roles de usuario, gestión del programa de referidos |
 | Panel Owner | Restricciones de módulos para gerentes, gestión de solicitudes de owner |
 | Modal de upgrade | Modal global al exceder cuota: informa herramienta bloqueada y sugiere upgrade |
 
@@ -253,4 +254,4 @@ npm run cf-typegen      # Generar tipos de Cloudflare
 
 ---
 
-**Versión**: 2.3.0 · **Plataforma**: Cloudflare Workers · **Última actualización**: 2026-04-28
+**Versión**: 2.4.0 · **Plataforma**: Cloudflare Workers · **Última actualización**: 2026-05-03

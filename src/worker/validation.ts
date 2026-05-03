@@ -199,6 +199,11 @@ export const createFacturaSchema = z.object({
 
 export const updateFacturaSchema = createFacturaSchema.partial();
 
+// Sellers / referidos
+export const crearSuscripcionSchema = z.object({
+  ref_code: z.string().min(1).max(20).optional(),
+});
+
 // Chat validation schemas
 export const chatHistoryItemSchema = z.object({
   role: z.enum(["user", "model"]),

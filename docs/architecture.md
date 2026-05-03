@@ -244,6 +244,44 @@ POST /api/chat { message }
 
 ---
 
+## Sellers / Programa de Referidos
+
+Feature platform-level: **no particionada por `negocio_id`**. El vínculo es entre usuarios, independiente del negocio activo.
+
+### Tablas
+
+- **`vendedores`**: un registro por usuario-vendedor. Código único generado al activarse (alfanumérico + timestamp, con retry ante colisión).
+- **`referidos`**: registra el vínculo vendedor → comprador. Estado: `pendiente` al crear la suscripción → `confirmado` cuando MercadoPago aprueba el pago.
+
+### Confirmación automática
+
+El webhook `POST /api/webhooks/mercadopago` dispara `UPDATE referidos SET estado='confirmado', comision_monto=7500, reembolso_monto=6000, confirmed_at=…` cuando el pago es aprobado (`type=payment`, `status=approved`).
+
+### Estructura de comisiones
+
+| Concepto | Monto | Destinatario |
+|---|---|---|
+| Comisión | 7.500 ARS | Vendedor (al confirmar pago) |
+| Reembolso | 6.000 ARS | Comprador referido (al confirmar pago) |
+
+Los flags `comision_pagada` y `reembolso_pagado` permiten al admin registrar el desembolso manual.
+
+### Navegación
+
+El item "Vendedores" en Sidebar y BottomNav no tiene `moduleKey` — siempre visible, no sujeto a restricciones de módulo del owner.
+
+### Flujo
+
+```
+Usuario → POST /api/sellers/activate → genera codigo único → tabla vendedores
+Comprador → GET /suscripcion?ref=CODIGO → POST /api/suscripciones/crear { ref_code }
+         → INSERT referidos (estado: pendiente)
+MercadoPago → POST /api/webhooks/mercadopago (payment approved)
+           → UPDATE referidos SET estado=confirmado, comision_monto=7500, reembolso_monto=6000
+```
+
+---
+
 ## Estructura del Proyecto
 
 ```
@@ -267,7 +305,8 @@ gastro-manager/
 │       │   ├── ModulePrefsContext.tsx # preferencias de módulos
 │       │   └── UsageLimitModalContext.tsx # modal global de upgrade por cuota
 │       ├── hooks/
-│       │   ├── useAdmin.ts        # Panel de admin (14+ funciones)
+│       │   ├── useAdmin.ts        # Panel de admin (incluye sellers, referidos, mark-pagada/reembolso)
+│       │   ├── useSellers.ts      # Programa de referidos: activación, fetchMe, stats
 │       │   ├── useMyUsage.ts      # Cuotas propias
 │       │   ├── useModulePrefs.ts  # Visibilidad de módulos (optimistic)
 │       │   ├── useNegocios.ts     # Multi-tenancy: CRUD negocios
@@ -281,7 +320,8 @@ gastro-manager/
 │       │   ├── ChatWidget.tsx     # Widget flotante del chatbot
 │       │   └── ui/                # shadcn/ui components
 │       └── pages/
-│           ├── Admin.tsx          # Panel de administración (6 secciones)
+│           ├── Admin.tsx          # Panel de administración (7 secciones, incluye Programa de Referidos)
+│           ├── Sellers.tsx        # Programa de referidos: activación, link, stats, tabla
 │           ├── Dashboard.tsx
 │           ├── OwnerPanel.tsx     # Panel de owner (restricciones + owner requests)
 │           ├── Settings.tsx       # Configuración (módulos, miembros)

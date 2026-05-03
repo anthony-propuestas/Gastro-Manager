@@ -19,6 +19,7 @@ import {
   Building2,
   ChevronDown,
   Plus,
+  Megaphone,
 } from "lucide-react";
 import { cn } from "@/react-app/lib/utils";
 import { useState, useEffect } from "react";
@@ -33,6 +34,7 @@ const navItems = [
   { path: "/sueldos",       label: "Sueldos",      icon: Banknote,      moduleKey: "sueldos"     as const },
   { path: "/compras",       label: "Compras",      icon: ShoppingCart,  moduleKey: "compras"     as const },
   { path: "/facturacion",   label: "Facturación",  icon: Receipt,       moduleKey: "facturacion" as const },
+  { path: "/sellers",       label: "Vendedores",   icon: Megaphone },
   { path: "/configuracion", label: "Configuración", icon: Settings },
 ];
 
