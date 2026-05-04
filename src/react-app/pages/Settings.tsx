@@ -297,7 +297,7 @@ export default function Settings() {
             </div>
             <div>
               <CardTitle className="text-lg font-serif">Plan</CardTitle>
-              <CardDescription>Gestiona tu suscripción a Gastro Manager.</CardDescription>
+              <CardDescription>Gestiona tu suscripción a La Hoja.</CardDescription>
             </div>
           </div>
         </CardHeader>

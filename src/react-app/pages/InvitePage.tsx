@@ -86,7 +86,7 @@ export default function InvitePage() {
         <div className="w-14 h-14 rounded-2xl bg-primary flex items-center justify-center">
           <ChefHat className="w-8 h-8 text-primary-foreground" />
         </div>
-        <h1 className="text-2xl font-bold">Gastro Manager</h1>
+        <h1 className="text-2xl font-bold">La Hoja</h1>
       </div>
 
       <div className="w-full max-w-sm">

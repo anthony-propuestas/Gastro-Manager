@@ -141,8 +141,8 @@ export default function Sidebar() {
               <ChefHat className="w-6 h-6 text-sidebar-primary-foreground" />
             </div>
             <div className={cn("transition-opacity duration-200", isCollapsed && "lg:opacity-0 lg:hidden")}>
-              <h1 className="font-serif text-xl font-semibold tracking-tight">Gastro</h1>
-              <p className="text-xs text-sidebar-foreground/60 -mt-0.5">Manager</p>
+              <h1 className="font-serif text-xl font-semibold tracking-tight">La</h1>
+              <p className="text-xs text-sidebar-foreground/60 -mt-0.5">Hoja</p>
             </div>
             <button
               onClick={() => setIsOpen(false)}

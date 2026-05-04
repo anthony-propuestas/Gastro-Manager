@@ -23,7 +23,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
           <div className="w-8 h-8 rounded-lg bg-sidebar-primary flex items-center justify-center">
             <ChefHat className="w-5 h-5 text-sidebar-primary-foreground" />
           </div>
-          <span className="font-serif text-lg font-semibold">Gastro Manager</span>
+          <span className="font-serif text-lg font-semibold">La Hoja</span>
         </div>
       </header>
 

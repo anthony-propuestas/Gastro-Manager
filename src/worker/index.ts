@@ -136,9 +136,9 @@ async function sendVerificationEmail(
 ): Promise<void> {
   const resend = new Resend(apiKey);
   await resend.emails.send({
-    from: "Gastro Manager <no-reply@lahoja.org>",
+    from: "La Hoja <no-reply@lahoja.org>",
     to: toEmail,
-    subject: "Verificá tu cuenta en Gastro Manager",
+    subject: "Verificá tu cuenta en La Hoja",
     html: `
       <p>Hola ${toName},</p>
       <p>Hacé clic en el botón para verificar tu dirección de email:</p>
@@ -2947,7 +2947,7 @@ app.post("/api/chat", authMiddleware, negocioMiddleware, createUsageLimitMiddlew
       const totalAdvances = advances.reduce((s: number, a: any) => s + (a.amount || 0), 0);
 
       contextText = [
-        `Sistema: Gastro Manager. Negocio: "${negocio.name}". Responde en español, de forma concisa.`,
+        `Sistema: La Hoja. Negocio: "${negocio.name}". Responde en español, de forma concisa.`,
         activeEmps.length
           ? `Activos: ${activeEmps.map((e: any) => `${e.name}(${e.role} $${e.monthly_salary || 0})`).join(", ")}`
           : "Sin empleados activos",
@@ -3538,7 +3538,7 @@ app.post("/api/suscripciones/crear", authMiddleware, async (c) => {
       body: JSON.stringify({
         payer_email: user.email,
         status: "pending",
-        reason: "Gastro Manager — Plan Inteligente",
+        reason: "La Hoja — Plan Inteligente",
         external_reference: user.id,
         back_url: backUrl,
         auto_recurring: {

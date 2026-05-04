@@ -43,7 +43,7 @@ export default function Login() {
             </div>
             <div>
               <h1 className="text-3xl font-serif font-semibold text-foreground">
-                Gastro Manager
+                La Hoja
               </h1>
               <p className="text-muted-foreground mt-2">
                 Sistema de Gestión de Restaurantes

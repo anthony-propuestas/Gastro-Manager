@@ -50,7 +50,7 @@ export default function NegocioSetup() {
         <div className="w-14 h-14 rounded-2xl bg-primary flex items-center justify-center">
           <ChefHat className="w-8 h-8 text-primary-foreground" />
         </div>
-        <h1 className="text-2xl font-bold">Gastro Manager</h1>
+        <h1 className="text-2xl font-bold">La Hoja</h1>
         <p className="text-muted-foreground text-center text-sm max-w-xs">
           Selecciona o crea un negocio para continuar
         </p>

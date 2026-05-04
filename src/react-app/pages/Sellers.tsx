@@ -56,7 +56,7 @@ export default function Sellers() {
         <Megaphone className="w-8 h-8 text-primary" />
         <div>
           <h1 className="text-2xl font-bold">Programa de Vendedores</h1>
-          <p className="text-muted-foreground text-sm">Compartí Gastro Manager y ganá comisiones</p>
+          <p className="text-muted-foreground text-sm">Compartí La Hoja y ganá comisiones</p>
         </div>
       </div>
 
@@ -68,7 +68,7 @@ export default function Sellers() {
         <Card>
           <CardHeader>
             <CardTitle>Convertite en vendedor</CardTitle>
-            <CardDescription>Activá tu cuenta de vendedor y empezá a generar ingresos compartiendo Gastro Manager.</CardDescription>
+            <CardDescription>Activá tu cuenta de vendedor y empezá a generar ingresos compartiendo La Hoja.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
