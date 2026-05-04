@@ -119,18 +119,18 @@ describe("useChat", () => {
     expect(assistantEntry?.role).toBe("model");
   });
 
-  it("caps history at 20 messages when the conversation is long", async () => {
+  it("caps history at 5 messages when the conversation is long", async () => {
     mockApiFetch.mockImplementation(() => Promise.resolve(ok("ok")));
     const { result } = renderHook(() => useChat());
 
-    // 11 exchanges produce 22 messages; the 12th call should send at most 20 in history
-    for (let i = 0; i < 11; i++) {
+    // 4 exchanges produce 8 messages; the 5th call should send at most 5 in history
+    for (let i = 0; i < 4; i++) {
       await act(async () => { await result.current.sendMessage(`Pregunta ${i}`); });
     }
     await act(async () => { await result.current.sendMessage("última"); });
 
-    const lastBody = JSON.parse(((mockApiFetch.mock.calls[11]?.[1] as RequestInit).body as string));
-    expect(lastBody.history).toHaveLength(20);
+    const lastBody = JSON.parse(((mockApiFetch.mock.calls[4]?.[1] as RequestInit).body as string));
+    expect(lastBody.history).toHaveLength(5);
   });
 
   it("sets error when the API returns a failure response", async () => {

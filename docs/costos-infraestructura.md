@@ -226,7 +226,8 @@ Ordenada por **impacto en costo / esfuerzo de implementación**.
 
 - [x] **Reducir tokens de contexto por query** ✅ — implementado en `src/worker/index.ts` (~línea 2910). Employees: `ORDER BY is_active DESC, id DESC LIMIT 30` (activos primero, máx 30 total). Topics: `ORDER BY due_date ASC LIMIT 15` (más urgentes primero). Events: `ORDER BY event_date ASC LIMIT 20`. Impacto estimado: **-20 a -40% en input tokens** en negocios con datos históricos acumulados.
 
-- [ ] **Truncar historial del chat en sesión** — si el frontend envía toda la conversación en cada mensaje, el context crece con cada turn. Limitar a los últimos 5-10 mensajes del hilo. Revisar cómo se pasa `messages` al endpoint.
+- [ ] **Truncar historial del chat en sesión** — si el frontend envía toda la conversación en cada mensaje, el context crece con cada turn. Limitar a los últimos 4-5 mensajes del hilo. Revisar cómo se pasa `messages` al endpoint.
+
 
 ### R2 (impacto bajo pero creciente)
 

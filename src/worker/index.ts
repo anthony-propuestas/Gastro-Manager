@@ -2883,7 +2883,7 @@ app.post("/api/chat", authMiddleware, negocioMiddleware, createUsageLimitMiddlew
       return c.json(apiError("CONFIG_ERROR", "API key de Gemini no configurada"), 500);
     }
 
-    const sliced = (history as unknown[]).slice(-20);
+    const sliced = (history as unknown[]).slice(-5);
     const historyResult = validateData(chatHistoryArraySchema, sliced);
     if (!historyResult.success) {
       return c.json(apiError("VALIDATION_ERROR", `History inválido: ${historyResult.error}`), 400);
