@@ -27,6 +27,7 @@ import {
 } from "./validation";
 import { USAGE_TOOLS, type UsageTool } from "./usageTools";
 import { checkRateLimit } from "./rateLimitAuth";
+import { getOrCreateGeminiCache } from "./geminiCache";
 
 type Env = {
   DB: D1Database;
@@ -2972,11 +2973,13 @@ app.post("/api/chat", authMiddleware, negocioMiddleware, createUsageLimitMiddlew
 
       await db
         .prepare(
-          `INSERT INTO chat_context_cache (user_id, negocio_id, context_text, fetched_at)
-           VALUES (?, ?, ?, datetime('now'))
+          `INSERT INTO chat_context_cache (user_id, negocio_id, context_text, fetched_at, gemini_cache_name, gemini_cache_expires_at)
+           VALUES (?, ?, ?, datetime('now'), NULL, NULL)
            ON CONFLICT(user_id, negocio_id) DO UPDATE SET
-             context_text = excluded.context_text,
-             fetched_at   = excluded.fetched_at`
+             context_text            = excluded.context_text,
+             fetched_at              = excluded.fetched_at,
+             gemini_cache_name       = NULL,
+             gemini_cache_expires_at = NULL`
         )
         .bind(user.id, negocio.id, contextText)
         .run();
@@ -2984,15 +2987,23 @@ app.post("/api/chat", authMiddleware, negocioMiddleware, createUsageLimitMiddlew
       contextText = cached.context_text;
     }
 
+    const geminiCacheName = await getOrCreateGeminiCache(db, c.env.GEMINI_API_KEY, user.id, negocio.id, contextText);
+
     // ── Construir contents[] para Gemini (multi-turno) ─────────────────────
     type GeminiPart = { role: string; parts: { text: string }[] };
     let contents: GeminiPart[];
 
-    if (trimmedHistory.length === 0) {
-      // Primera pregunta — contexto embebido en este único turno
+    if (geminiCacheName) {
+      // Contexto en systemInstruction cacheada — contents solo lleva la conversación
+      contents = trimmedHistory.length === 0
+        ? [{ role: "user", parts: [{ text: message }] }]
+        : [
+            ...trimmedHistory.map((m) => ({ role: m.role, parts: [{ text: m.content }] })),
+            { role: "user", parts: [{ text: message }] },
+          ];
+    } else if (trimmedHistory.length === 0) {
       contents = [{ role: "user", parts: [{ text: `${contextText}\n\nUsuario: ${message}` }] }];
     } else {
-      // Historial existente — contexto solo en el primer turno histórico
       const [firstTurn, ...restTurns] = trimmedHistory;
       contents = [
         { role: firstTurn.role, parts: [{ text: `${contextText}\n\nUsuario: ${firstTurn.content}` }] },
@@ -3004,15 +3015,18 @@ app.post("/api/chat", authMiddleware, negocioMiddleware, createUsageLimitMiddlew
     // ── Llamada a Gemini ────────────────────────────────────────────────────
     const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent`;
 
+    const geminiBody: Record<string, unknown> = {
+      contents,
+      generationConfig: { temperature: 1.0, maxOutputTokens: 500 },
+    };
+    if (geminiCacheName) geminiBody.cachedContent = geminiCacheName;
+
     let geminiResponse;
     try {
       geminiResponse = await fetch(geminiUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json", "x-goog-api-key": c.env.GEMINI_API_KEY ?? "" },
-        body: JSON.stringify({
-          contents,
-          generationConfig: { temperature: 1.0, maxOutputTokens: 500 },
-        }),
+        body: JSON.stringify(geminiBody),
       });
     } catch (fetchError: any) {
       console.error("Fetch failed:", fetchError);

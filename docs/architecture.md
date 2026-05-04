@@ -181,8 +181,16 @@ Las cuotas son **por usuario por negocio por mes** (`UNIQUE(user_id, negocio_id,
 - **10 herramientas** sujetas a cuota: `employees`, `job_roles`, `topics`, `notes`, `advances`, `salary_payments`, `events`, `chat`, `compras`, `facturacion`.
 - Los límites son globales (una fila por tool en `usage_limits`) y editables desde el panel de admin.
 - El endpoint `mark-all-paid` consume **N usos** (uno por empleado marcado), con lógica inline (no usa el middleware estándar).
-- Los endpoints `PUT /api/compras/:id`, `PUT /api/facturacion/:id` y `DELETE /api/facturacion/:id` **también consumen cuota**, a diferencia de otros módulos donde solo POST consume.
 - `compras` y `facturacion` tienen límite default de 50 seedeado en migración 16.
+
+**⚠️ DISCREPANCIA CRÍTICA - Consumo de cuota en PUT/DELETE:**
+La documentación anterior indicaba que `PUT /api/compras`, `PUT /api/facturacion` y `DELETE /api/facturacion` consumían cuota. **El código real NO incluye `createUsageLimitMiddleware` en estos endpoints**. Por lo tanto:
+- **PUT /api/compras/:id** → NO consume cuota (inconsistencia)
+- **DELETE /api/compras/:id** → NO consume cuota (inconsistencia)
+- **PUT /api/facturacion/:id** → NO consume cuota (inconsistencia)
+- **DELETE /api/facturacion/:id** → NO consume cuota (inconsistencia)
+
+Además, las operaciones DELETE en otros módulos (`employees`, `topics`, `notes`, `job-roles`, `advances`) también **NO consumen cuota**, a pesar de que solo POST está documentado como sujeto a límites. Esto permite a usuarios básicos eliminar datos ilimitadamente.
 
 ---
 
@@ -231,13 +239,18 @@ POST /api/chat { message }
   ├── authMiddleware + negocioMiddleware + usageLimitMiddleware("chat")
   │   ⚠️ NO tiene createModuleRestrictionMiddleware
   └── handler:
-        ├── SELECT empleados activos del negocio
-        ├── SELECT eventos del mes
-        ├── SELECT tópicos pendientes
-        ├── SELECT anticipos y pagos
-        ├── Construir system prompt con contexto
+        ├── SELECT chat_context_cache (TTL 30 min)
+        │     └── miss: SELECT empleados + eventos + temas + adelantos + sueldos
+        │                └── UPSERT chat_context_cache (limpia gemini_cache_name = NULL)
+        ├── getOrCreateGeminiCache() [geminiCache.ts]
+        │     ├── hit: gemini_cache_name válido (<2h) → retorna nombre existente
+        │     └── miss: POST /v1beta/cachedContents (systemInstruction, TTL 2h)
+        │                └── UPDATE chat_context_cache (gemini_cache_name, gemini_cache_expires_at)
+        │                └── null si API falla (fallback transparente)
         └── POST → Gemini 2.5 Flash API
-              └── Respuesta → { response: "..." }
+              ├── con cache: { cachedContent: "cachedContents/xyz", contents: [history + message] }
+              └── sin cache (fallback): { contents: [contextText + history + message] }
+              └── Respuesta → { reply: "..." }
 ```
 
 ⚠️ **Implicación de seguridad:** El chatbot accede a datos de todos los módulos sin respetar restricciones del owner. Un gerente con módulos restringidos puede obtener información de esos módulos a través del chat.
@@ -296,6 +309,7 @@ gastro-manager/
 ├── src/
 │   ├── worker/
 │   │   ├── index.ts         # Todos los endpoints y middlewares
+│   │   ├── geminiCache.ts   # getOrCreateGeminiCache() — Gemini API-level context caching
 │   │   ├── rateLimitAuth.ts # checkRateLimit() — rate limiting D1 para endpoints de auth
 │   │   ├── usageTools.ts    # Constantes USAGE_TOOLS y DEFAULT_USAGE_LIMITS
 │   │   └── validation.ts    # Esquemas Zod

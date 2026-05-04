@@ -531,7 +531,7 @@ admin_emails  (standalone — consultado por isAdmin())
 | Aislamiento de datos | Todas las queries de datos filtran por `negocio_id` |
 | Timestamps | `created_at` + `updated_at` en todas las tablas; `updated_at` se actualiza manualmente |
 | Booleanos | `INTEGER` 0/1 con prefijo `is_` o `has_` |
-| Migraciones | Numeradas `1.sql`–`18.sql`, inmutables en producción |
+| Migraciones | Numeradas `1.sql`–`25.sql`, inmutables en producción |
 
 ---
 
@@ -605,17 +605,25 @@ Adicionalmente, el endpoint `PUT /api/admin/usage-limits` fue actualizado para u
 
 ### `chat_context_cache`
 
-Caché de contexto para el chatbot IA. Almacena el contexto de conversación por usuario y negocio para reducir llamadas a la API de IA. Creada en **migración 18**.
+Caché de contexto para el chatbot IA. Almacena el contexto de conversación por usuario y negocio para reducir queries a D1 y llamadas a la API de Gemini. Creada en **migración 18**; columnas de Gemini caching agregadas en **migración 25**.
 
 ```sql
 CREATE TABLE chat_context_cache (
-  user_id      TEXT NOT NULL,
-  negocio_id   TEXT NOT NULL,
-  context_text TEXT NOT NULL,
-  fetched_at   TEXT NOT NULL,
+  user_id                 TEXT NOT NULL,
+  negocio_id              TEXT NOT NULL,
+  context_text            TEXT NOT NULL,
+  fetched_at              TEXT NOT NULL,
+  gemini_cache_name       TEXT,     -- nombre del cachedContent en Gemini API (NULL si no aplica)
+  gemini_cache_expires_at INTEGER,  -- timestamp epoch ms de expiración del cache de Gemini
   PRIMARY KEY (user_id, negocio_id)
 );
 ```
+
+**Comportamiento crítico:**
+- `context_text` + `fetched_at` tienen TTL de **30 minutos**. Al expirar, se re-fetcha el contexto del negocio desde las 5 tablas operativas.
+- Al refrescar el contexto D1, `gemini_cache_name` se limpia a `NULL` en el mismo upsert, forzando la creación de un nuevo `cachedContent` en la siguiente query al chat.
+- `gemini_cache_name` contiene el identificador del `cachedContent` creado en la API de Google (ej. `"cachedContents/abc123"`). TTL de 2 horas en Gemini.
+- Si `gemini_cache_name` es `NULL` o `gemini_cache_expires_at` ya pasó, el handler crea un nuevo `cachedContent` via `POST /v1beta/cachedContents` y actualiza ambas columnas.
 
 ---
 

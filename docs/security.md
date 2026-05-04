@@ -89,6 +89,16 @@ Un usuario autenticado puede craftear ítems en `history` para intentar manipula
 - El contexto se genera **después** de que `negocioMiddleware` valida la membresía, por lo que los datos almacenados ya están autorizados.
 - **Staleness:** si un miembro es expulsado del negocio, su caché puede contener datos del negocio por hasta **30 minutos** hasta que expire. Riesgo bajo dado que el acceso a la API ya estará bloqueado por `negocioMiddleware` en el momento de la expulsión.
 
+### Gemini API-level caching (`gemini_cache_name`)
+
+El handler guarda en `chat_context_cache` el nombre del `cachedContent` creado en la API de Google (`cachedContents/xyz`) junto con su expiración (`gemini_cache_expires_at`).
+
+- **Aislamiento:** el nombre del cache de Gemini es por `(user_id, negocio_id)` — mismo scope que el caché de contexto D1. No hay riesgo de cross-negocio.
+- **Invalidación coordinada:** cuando el contexto D1 expira (30 min) y se reconstruye, el campo `gemini_cache_name` se limpia a `NULL` en el mismo upsert. El siguiente request crea un nuevo `cachedContent` con los datos frescos. La ventana de datos desactualizados en el cache de Gemini es, por tanto, idéntica a la del caché D1 (30 min).
+- **Fallback graceful:** si la API de Gemini rechaza la creación del cache (ej. contexto demasiado corto, error de red), la función retorna `null` y el endpoint continúa con el comportamiento previo (contexto embebido en `contents[0]`). No hay degradación de seguridad.
+- **Prompt injection:** el contexto ahora se envía como `systemInstruction` del `cachedContent`, en lugar del primer turno de `contents`. Desde el punto de vista de inyección, esto es ligeramente más robusto: las instrucciones de sistema tienen mayor peso en el modelo y son más difíciles de sobreescribir vía historial del usuario.
+- **API key:** la misma `GEMINI_API_KEY` ya existente se usa para crear el `cachedContent`. No hay exposición adicional de credenciales.
+
 ---
 
 ## Validación de entrada

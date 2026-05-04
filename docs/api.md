@@ -95,10 +95,11 @@ Información del usuario autenticado.
   "name": "Juan Pérez",
   "picture": "https://...",
   "role": "usuario_basico",
-  "email_verified": true,
-  "suscripcion": { "estado": "autorizada", "grace_days_left": null }
+  "email_verified": true
 }
 ```
+
+⚠️ **Nota:** El campo `suscripcion` NO se devuelve actualmente en esta respuesta. Para obtener información de suscripción, usa `GET /api/suscripciones/estado`.
 
 ---
 
@@ -551,15 +552,17 @@ Registra una nueva compra.
 
 **Valores válidos de `categoria`:** `"carnes"` | `"verduras"` | `"bebidas"` | `"limpieza"` | `"descartables"` | `"servicios"` | `"mantenimiento"` | `"alquiler"` | `"otros"`
 
-#### `PUT /api/compras/:id` ⚠️ *Sujeto a cuota `compras` · Restringible por owner*
+#### `PUT /api/compras/:id` ⚠️ *Restringible por owner*
 Actualiza una compra (todos los campos opcionales, mismos valores válidos que POST).
 
-⚠️ **Nota:** A diferencia de otros módulos (employees, events, topics, notes) donde solo `POST` consume cuota, en compras **tanto `POST` como `PUT` consumen cuota**. Cada actualización cuenta como un uso adicional del tool `compras`.
+**DISCREPANCIA DOCUMENTADA:** La documentación anterior indicaba que `PUT` consume cuota, pero **el código actual NO incluye `createUsageLimitMiddleware`**. Por lo tanto, las actualizaciones de compras **NO consumen cuota** (inconsistencia con la documentación).
 
 #### `DELETE /api/compras/:id` ⚠️ *Restringible por owner*
 Elimina una compra. Si tiene `comprobante_key`, también elimina el archivo de R2.
 
-#### `POST /api/compras/upload` ⚠️ *Restringible por owner*
+**DISCREPANCIA DOCUMENTADA:** El código actual **NO incluye `createUsageLimitMiddleware`**. Las eliminaciones de compras **NO consumen cuota**.
+
+#### `POST /api/compras/upload` ⚠️ *Requiere autenticación + negocio · Restringible por owner*
 Sube una imagen de comprobante a Cloudflare R2.
 
 ```
@@ -577,6 +580,8 @@ Body: file (campo "file")
 ```
 
 La key devuelta se usa como `comprobante_key` al crear o actualizar la compra.
+
+**NOTA IMPORTANTE:** Este endpoint **NO consume cuota**, aunque cree registros en la base de datos.
 
 #### `GET /api/compras/files/*` ⚠️ *Requiere `X-Negocio-ID`*
 Sirve una imagen de comprobante desde R2. La ruta debe estar scoped al negocio actual.
@@ -660,18 +665,20 @@ Registra una nueva venta.
 
 **Lógica de `metodo_pago` en el backend:** si `pagos_detalle` está presente en el body, el servidor lo parsea y calcula `metodo_pago` automáticamente: 1 método → ese método; 2+ métodos → `"mixto"`. Si el parse de `pagos_detalle` falla, se usa el `metodo_pago` enviado por el cliente tal cual.
 
-#### `PUT /api/facturacion/:id` ⚠️ *Sujeto a cuota `facturacion` · Restringible por owner*
+#### `PUT /api/facturacion/:id` ⚠️ *Restringible por owner*
 Actualiza una venta existente. Solo actualiza los campos proporcionados. Verifica que la venta pertenezca al negocio activo.
 
-⚠️ **Nota:** Al igual que en `compras`, **tanto `POST` como `PUT` y `DELETE` consumen cuota** del tool `facturacion`.
+**DISCREPANCIA DOCUMENTADA:** La documentación anterior indicaba que `PUT` consume cuota, pero **el código actual NO incluye `createUsageLimitMiddleware`**. Por lo tanto, las actualizaciones de facturas **NO consumen cuota** (inconsistencia con la documentación).
 
-#### `DELETE /api/facturacion/:id` ⚠️ *Sujeto a cuota `facturacion` · Restringible por owner*
+#### `DELETE /api/facturacion/:id` ⚠️ *Restringible por owner*
 Elimina una venta. Verifica que pertenezca al negocio activo antes de borrar.
 
 ```json
 // Response data
 { "deleted": true }
 ```
+
+**DISCREPANCIA DOCUMENTADA:** La documentación anterior indicaba que `DELETE` consume cuota, pero **el código actual NO incluye `createUsageLimitMiddleware`**. Las eliminaciones de facturas **NO consumen cuota** (inconsistencia con la documentación).
 
 ---
 

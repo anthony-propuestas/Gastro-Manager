@@ -208,7 +208,7 @@ Es el **único costo que escala significativamente**. Si no hay límite en el pl
 
 - **Conteo de uso:** `src/worker/usageTools.ts` define las herramientas; el middleware `createUsageLimitMiddleware` incrementa y verifica en cada write. Para `usuario_inteligente`, la verificación se saltea completamente.
 - **Contexto Gemini por query:** el endpoint `POST /api/chat` hace ~6 queries a D1 antes de llamar a Gemini para armar el contexto del negocio (empleados, eventos, temas, adelantos, sueldos). Esto explica el alto ratio de D1 reads por query de chat.
-- **Gemini sin caché de contexto:** cada query reconstruye el contexto completo. Si el volumen de Gemini crece, implementar prompt caching de Gemini podría reducir el costo de input tokens en ~50-75% para usuarios que hacen múltiples preguntas en la misma sesión.
+- **Gemini context caching activo:** el system prompt + datos del negocio se cachean en la API de Gemini con TTL de 2 horas (`cachedContent`). El cache name se persiste en `chat_context_cache` (columnas `gemini_cache_name` / `gemini_cache_expires_at`, migración 25). Queries en la misma sesión reutilizan el cache, reduciendo input tokens en ~60-75%.
 - **R2 y ciclo de vida:** actualmente no hay TTL ni limpieza automática de recibos. Agregar un job de limpieza (o política de retención configurable por negocio) evitaría el crecimiento lineal del storage.
 
 ---
@@ -219,9 +219,7 @@ Ordenada por **impacto en costo / esfuerzo de implementación**.
 
 ### Gemini (mayor impacto — $82,50/mes)
 
-- [ ] **Activar Gemini context caching** — el system prompt + datos del negocio son casi iguales entre queries del mismo usuario en la misma sesión. Cachear ese bloque reduce el costo de input tokens en ~60-75%. Impacto estimado: **-$40 a -$60/mes** a 100 usuarios inteligentes.
-  - API: `cachedContent` en Gemini API, TTL mínimo 1 hora.
-  - Archivo a modificar: endpoint `POST /api/chat` en `src/worker/index.ts`.
+- [x] **Activar Gemini context caching** ✅ — implementado en `src/worker/geminiCache.ts` con TTL de 2 horas (7200s). El cache name se persiste en D1 (`chat_context_cache`, migración 25); `src/worker/index.ts:2990-3022` lo usa como `cachedContent` en cada llamada a Gemini. Queries en la misma sesión omiten el envío del contexto completo, reduciendo input tokens en ~60-75%. Impacto estimado: **-$40 a -$60/mes** a 100 usuarios inteligentes. Fallback transparente a contexto completo si la API de Gemini falla.
 
 - [ ] **Cap de queries Gemini para `usuario_inteligente`** — actualmente no tiene límite. Un cap de 3.000-5.000 queries/mes/negocio protege contra bots o uso abusivo sin afectar el uso normal (1.000/mes en el perfil heavy). El sistema ya tiene `usage_counters` — solo hay que no excluir `chat` del check en plan pago.
   - Impacto estimado: protección ante edge cases, no reducción en uso normal.
