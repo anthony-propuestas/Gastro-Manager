@@ -68,7 +68,7 @@ export default function AuthCallback() {
             <p className="text-lg text-foreground font-medium">Error de autenticación</p>
             <p className="text-muted-foreground">{errorMessage}</p>
             <button
-              onClick={() => navigate("/login", { replace: true })}
+              onClick={() => navigate("/", { replace: true })}
               className="mt-4 px-6 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
             >
               Volver a intentar

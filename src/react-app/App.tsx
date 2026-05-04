@@ -17,7 +17,7 @@ import Facturacion from "@/react-app/pages/modulos/Facturacion";
 import Settings from "@/react-app/pages/Settings";
 import Admin from "@/react-app/pages/Admin";
 import OwnerPanel from "@/react-app/pages/OwnerPanel";
-import Login from "@/react-app/pages/Login";
+import LandingPage from "@/react-app/pages/LandingPage";
 import AuthCallback from "@/react-app/pages/AuthCallback";
 import VerifyEmailPage from "@/react-app/pages/VerifyEmailPage";
 import NegocioSetup from "@/react-app/pages/NegocioSetup";
@@ -38,7 +38,7 @@ export default function App() {
               <ChatWidget />
               <Routes>
           {/* Public routes */}
-          <Route path="/login" element={<Login />} />
+          <Route path="/" element={<LandingPage />} />
           <Route path="/auth/callback" element={<AuthCallback />} />
           <Route path="/verify-email" element={<VerifyEmailPage />} />
           <Route path="/invite/:token" element={<InvitePage />} />
@@ -55,7 +55,7 @@ export default function App() {
 
           {/* Protected routes */}
               <Route
-                path="/"
+                path="/dashboard"
                 element={
                   <ProtectedRoute>
                     <MainLayout>

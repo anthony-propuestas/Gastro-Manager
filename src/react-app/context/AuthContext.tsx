@@ -98,7 +98,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
     setNegocios([]);
     setCurrentNegocio(null);
-    window.location.assign("/login");
+    window.location.assign("/");
   };
 
   return (

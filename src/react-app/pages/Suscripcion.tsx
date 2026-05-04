@@ -205,7 +205,7 @@ export default function SuscripcionPage() {
         </Card>
       )}
 
-      <Button variant="ghost" size="sm" onClick={() => navigate("/")} className="text-muted-foreground">
+      <Button variant="ghost" size="sm" onClick={() => navigate("/dashboard")} className="text-muted-foreground">
         ← Volver al inicio
       </Button>
     </div>

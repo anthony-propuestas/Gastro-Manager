@@ -13,7 +13,8 @@
       "Bash(git diff *)",
       "PowerShell(cd \"c:\\\\Users\\\\dell\\\\Desktop\\\\PPORGAMACION\\\\proyectos de prueva\\\\Gastro Manager\"; git diff -- \"functions/[[route]].ts\" vitest.config.ts tsconfig.worker.json | Select-Object -First 300)",
       "PowerShell(Set-Location \"c:\\\\Users\\\\dell\\\\Desktop\\\\PPORGAMACION\\\\proyectos de prueva\\\\Gastro Manager\"; git diff HEAD -- vitest.config.ts tsconfig.worker.json 2>&1 | Select-Object -First 200)",
-      "PowerShell(Set-Location \"c:\\\\Users\\\\dell\\\\Desktop\\\\PPORGAMACION\\\\proyectos de prueva\\\\Gastro Manager\"; git diff HEAD -- \"functions/[[route]].ts\" 2>&1 | Select-Object -First 300)"
+      "PowerShell(Set-Location \"c:\\\\Users\\\\dell\\\\Desktop\\\\PPORGAMACION\\\\proyectos de prueva\\\\Gastro Manager\"; git diff HEAD -- \"functions/[[route]].ts\" 2>&1 | Select-Object -First 300)",
+      "Bash(Remove-Item \"c:\\\\Users\\\\dell\\\\Desktop\\\\PPORGAMACION\\\\proyectos de prueva\\\\Gastro Manager\\\\src\\\\react-app\\\\pages\\\\Login.tsx\")"
     ],
     "additionalDirectories": [
       "c:\\Users\\dell\\Desktop\\PPORGAMACION\\proyectos de prueva\\Gastro Manager\\src\\react-app\\pages"

@@ -37,26 +37,26 @@ describe("ProtectedRoute", () => {
     expect(screen.getByText("Cargando...")).toBeInTheDocument();
   });
 
-  it("redirects anonymous users to login", () => {
+  it("redirects anonymous users to the home page", () => {
     mockUseAuth.mockReturnValue({ user: null, isPending: false, currentNegocio: null });
 
     render(
-      <MemoryRouter initialEntries={["/"]}>
+      <MemoryRouter initialEntries={["/dashboard"]}>
         <Routes>
           <Route
-            path="/"
+            path="/dashboard"
             element={
               <ProtectedRoute>
                 <div>private page</div>
               </ProtectedRoute>
             }
           />
-          <Route path="/login" element={<div>login page</div>} />
+          <Route path="/" element={<div>home page</div>} />
         </Routes>
       </MemoryRouter>
     );
 
-    expect(screen.getByText("login page")).toBeInTheDocument();
+    expect(screen.getByText("home page")).toBeInTheDocument();
   });
 
   it("redirects unverified users to verify-email", () => {
@@ -172,7 +172,7 @@ describe("RestrictedModuleRoute", () => {
     });
   });
 
-  it("redirects gerente users when the module is restricted", () => {
+  it("redirects gerente users to /dashboard when the module is restricted", () => {
     mockUseModulePrefsContext.mockReturnValue({
       negocioRestrictions: { calendario: false, personal: true, sueldos: false },
       isGerente: true,
@@ -189,12 +189,12 @@ describe("RestrictedModuleRoute", () => {
               </RestrictedModuleRoute>
             }
           />
-          <Route path="/" element={<div>home page</div>} />
+          <Route path="/dashboard" element={<div>dashboard page</div>} />
         </Routes>
       </MemoryRouter>
     );
 
-    expect(screen.getByText("home page")).toBeInTheDocument();
+    expect(screen.getByText("dashboard page")).toBeInTheDocument();
   });
 
   it("renders children when the module is available", () => {

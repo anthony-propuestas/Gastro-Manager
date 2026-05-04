@@ -71,7 +71,7 @@ export default function InvitePage() {
 
   const handleLoginRedirect = () => {
     // Preserve the invite URL so after login they come back here
-    navigate(`/login?next=/invite/${token}`);
+    navigate("/");
   };
 
   const formatExpiry = (expiresAt: string) => {
@@ -109,7 +109,7 @@ export default function InvitePage() {
                 <p className="font-medium">Invitación no disponible</p>
                 <p className="text-sm text-muted-foreground">{errorMsg}</p>
               </div>
-              <Button variant="outline" onClick={() => navigate("/")}>
+              <Button variant="outline" onClick={() => navigate("/dashboard")}>
                 Ir al inicio
               </Button>
             </CardContent>
@@ -179,7 +179,7 @@ export default function InvitePage() {
                   Ya puedes acceder a {preview?.negocio_name}
                 </p>
               </div>
-              <Button onClick={() => navigate("/")}>Ir al dashboard</Button>
+              <Button onClick={() => navigate("/dashboard")}>Ir al dashboard</Button>
             </CardContent>
           </Card>
         )}

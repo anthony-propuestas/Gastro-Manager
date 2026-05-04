@@ -28,7 +28,7 @@ import { useModulePrefsContext } from "@/react-app/context/ModulePrefsContext";
 import type { Negocio } from "@/shared/types";
 
 const navItems = [
-  { path: "/",              label: "Dashboard",    icon: LayoutDashboard },
+  { path: "/dashboard",     label: "Dashboard",    icon: LayoutDashboard },
   { path: "/calendario",    label: "Calendario",   icon: Calendar,      moduleKey: "calendario"  as const },
   { path: "/empleados",     label: "Personal",     icon: Users,         moduleKey: "personal"    as const },
   { path: "/sueldos",       label: "Sueldos",      icon: Banknote,      moduleKey: "sueldos"     as const },
@@ -199,8 +199,8 @@ export default function Sidebar() {
         <nav className="flex-1 p-3 lg:p-4 space-y-1 overflow-y-auto">
           {visibleNavItems.map((item) => {
             const isActive =
-              item.path === "/"
-                ? location.pathname === "/"
+              item.path === "/dashboard"
+                ? location.pathname === "/dashboard"
                 : location.pathname.startsWith(item.path);
             const Icon = item.icon;
 

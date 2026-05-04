@@ -48,7 +48,7 @@ POST /api/sessions { code }
 Usuario abre enlace /verify-email?token=<plainToken>
         ↓
 GET /api/auth/verify-email?token=<plainToken>
-        ↓ Rate limit: max 5 intentos / 60 min por IP (redirect a /login?error=too_many_requests si se excede)
+        ↓ Rate limit: max 5 intentos / 60 min por IP (redirect a /verify-email?error=too_many_requests si se excede)
         ↓ Hashea el token y busca en email_verification_tokens
         ↓ Valida: existe, not used_at, not expirado
         ↓ Batch atómico:
@@ -87,7 +87,7 @@ GET /api/logout
         ↓
 Cookie session_token eliminada (Max-Age=0)
         ↓
-{ success: true } — AuthContext limpia estado y redirige a /login
+{ success: true } — AuthContext limpia estado y redirige a /
 ```
 
 ---
@@ -258,11 +258,11 @@ app.get("/api/auth/verify-email", async (c) => {
   // Rate limiting: 5 intentos / 60 min por IP
   const ip = c.req.header("CF-Connecting-IP") ?? "unknown";
   if (!await checkRateLimit(ip, "verify-email", c.env.DB, 5, 60)) {
-    return c.redirect("/login?error=too_many_requests");
+    return c.redirect("/verify-email?error=too_many_requests");
   }
 
   const token = c.req.query("token");
-  if (!token) return c.redirect("/login?error=invalid_token");
+  if (!token) return c.redirect("/verify-email?error=invalid_token");
 
   const tokenHash = await hashToken(token);
 
@@ -274,7 +274,7 @@ app.get("/api/auth/verify-email", async (c) => {
     WHERE evt.token_hash = ?
   `).bind(tokenHash).first();
 
-  if (!row) return c.redirect("/login?error=invalid_token");
+  if (!row) return c.redirect("/verify-email?error=invalid_token");
   if (row.used_at !== null) return c.redirect("/verify-email?error=token_used");
   if (new Date(row.expires_at) < new Date()) return c.redirect("/verify-email?error=token_expired");
 
@@ -298,7 +298,7 @@ app.get("/api/auth/verify-email", async (c) => {
 #### Cerrar sesión
 
 ```typescript
-// El redirect a /login lo hace AuthContext.logout() en el cliente
+// El redirect a / (landing) lo hace AuthContext.logout() en el cliente
 app.get("/api/logout", (c) => {
   c.header("Set-Cookie", `${COOKIE_NAME}=; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=0`);
   return c.json({ success: true }, 200);
@@ -415,7 +415,7 @@ export default function ProtectedRoute({ children }) {
   const location = useLocation();
 
   if (isPending) return <LoadingScreen />;
-  if (!user) return <Navigate to="/login" replace />;
+  if (!user) return <Navigate to="/" replace />;
   if (!user.email_verified) return <Navigate to="/verify-email" replace />;
 
   // Si no tiene negocio activo, redirige a setup (excepto en /negocio/setup e /invite/*)
@@ -431,15 +431,17 @@ export default function ProtectedRoute({ children }) {
 // Para rutas que gerentes pueden tener restringidas por el owner
 export function RestrictedModuleRoute({ moduleKey, children }) {
   const { negocioRestrictions, isGerente } = useModulePrefsContext();
-  if (isGerente && negocioRestrictions[moduleKey]) return <Navigate to="/" replace />;
+  if (isGerente && negocioRestrictions[moduleKey]) return <Navigate to="/dashboard" replace />;
   return <>{children}</>;
 }
 ```
 
-### Login Page
+### Landing Page / Login
 
 ```tsx
-// src/react-app/pages/Login.tsx
+// src/react-app/pages/LandingPage.tsx
+// Página pública en "/". Si el usuario ya está autenticado, redirige automáticamente a /dashboard.
+// Contiene el botón "Continuar con Google" que llama a /api/oauth/google/redirect_url.
 const handleLogin = async () => {
   const response = await fetch("/api/oauth/google/redirect_url");
   const { data } = await response.json();

@@ -97,13 +97,14 @@ Navegación lateral adaptativa.
 ```tsx
 // Navegación — items con moduleKey se filtran según preferencias de módulo
 const navItems = [
-  { label: "Dashboard", icon: LayoutDashboard, path: "/" },
-  { label: "Calendario", icon: Calendar,      path: "/calendario", moduleKey: "calendario" },
-  { label: "Personal",   icon: Users,          path: "/empleados",  moduleKey: "personal" },
-  { label: "Sueldos",    icon: Banknote,        path: "/sueldos",    moduleKey: "sueldos" },
-  { label: "Compras",      icon: ShoppingCart,    path: "/compras",       moduleKey: "compras" },
-  { label: "Facturación",  icon: Receipt,         path: "/facturacion",   moduleKey: "facturacion" },
-  { label: "Configuración", icon: Settings,       path: "/configuracion" },
+  { label: "Inicio",        icon: LayoutDashboard, path: "/dashboard" },
+  { label: "Calendario",    icon: Calendar,        path: "/calendario",   moduleKey: "calendario" },
+  { label: "Personal",      icon: Users,           path: "/empleados",    moduleKey: "personal" },
+  { label: "Sueldos",       icon: Banknote,        path: "/sueldos",      moduleKey: "sueldos" },
+  { label: "Compras",       icon: ShoppingCart,    path: "/compras",      moduleKey: "compras" },
+  { label: "Facturación",   icon: Receipt,         path: "/facturacion",  moduleKey: "facturacion" },
+  { label: "Vendedores",    icon: Megaphone,       path: "/sellers" },
+  { label: "Configuración", icon: Settings,        path: "/configuracion" },
 ];
 
 // El enlace Admin se renderiza condicionalmente fuera de navItems
@@ -125,8 +126,8 @@ const navItems = [
 Navegación inferior para dispositivos móviles (`components/layout/BottomNav.tsx`).
 
 **Comportamiento:**
-- Visible solo en pantallas pequeñas (`md:hidden`)
-- Muestra los mismos items de navegación que el Sidebar (Dashboard, Calendario, Personal, Sueldos, Compras, Facturación)
+- Visible solo en pantallas pequeñas (`lg:hidden`)
+- Muestra los mismos items de navegación que el Sidebar (Inicio, Calendario, Personal, Sueldos, Compras, Facturación, Vendedores, Config)
 - Respeta las mismas reglas de filtrado por `moduleKey` y restricciones del owner
 - Íconos compactos con label debajo
 - Indicador visual del item activo
@@ -278,7 +279,7 @@ Flujo de invitación accesible desde `/invite/:token`.
 2. **Preview** → muestra nombre del negocio, quién invita, fecha de expiración
 3. **Redeeming** → si el usuario está autenticado, botón "Unirme" canjea el token
 4. **Success** → refresca negocios, establece el nuevo como actual
-5. Si no está autenticado → redirige a login con `?next=/invite/:token`
+5. Si no está autenticado → muestra botón "Iniciar sesión para unirme" que navega a `/` (LandingPage)
 
 ### Settings (`pages/Settings.tsx`)
 
@@ -310,13 +311,16 @@ Panel de gestión de negocio para owners. Accesible desde `/owner`. Si el usuari
 - **Solicitudes de owner:** Lista de solicitudes pendientes con botones para aprobar o rechazar
 - Usa `useOwnerPanel` para las llamadas API
 
-### Login (`pages/Login.tsx`)
+### LandingPage (`pages/LandingPage.tsx`)
 
-Página de inicio de sesión.
+Página pública en `/`. Reemplaza la antigua `Login.tsx`.
 
 **Características:**
-- Botón de login con Google
-- Redirección automática si ya está autenticado
+- Redirección automática a `/dashboard` si el usuario ya está autenticado
+- Botón "Continuar con Google" que llama a `/api/oauth/google/redirect_url`
+- Secciones de marketing: hero, pain points (6 cards), módulos (6 cards), pasos, stats, CTA final
+- Banner de email verificado cuando la URL incluye `?verified=true`
+- Animaciones de scroll reveal via `IntersectionObserver`
 
 ### AuthCallback (`pages/AuthCallback.tsx`)
 
@@ -324,9 +328,10 @@ Callback de OAuth.
 
 **Flujo:**
 1. Recibe código OAuth de Google
-2. Intercambia por token de sesión
-3. Guarda token en cookie
-4. Redirige a Dashboard
+2. Intercambia por token de sesión via `POST /api/sessions`
+3. Servidor setea cookie `session_token` (HttpOnly)
+4. Redirige a `/` (LandingPage, que luego redirige a `/dashboard` si está autenticado)
+5. Si el usuario no está verificado → redirige a `/verify-email`
 
 ### VerifyEmailPage (`pages/VerifyEmailPage.tsx`)
 
@@ -335,7 +340,7 @@ Página de verificación de email mediante token.
 **Características:**
 - Usa `BroadcastChannel` (channel: `email-verification`) para sincronización entre tabs
 - Si hay token en query params: verifica via `GET /api/auth/verify-email?token=...`
-- Si no hay token: muestra formulario de reenvío
+- Si no hay token: muestra estado de espera ("Revisá tu correo") — sin formulario de reenvío
 - Redirección automática al dashboard tras verificación exitosa
 - Manejo de errores: token_used, token_expired, invalid_token
 
@@ -957,15 +962,16 @@ Por página individual.
 ```tsx
 <Routes>
   {/* Public */}
-  <Route path="/login" element={<Login />} />
+  <Route path="/" element={<LandingPage />} />
   <Route path="/auth/callback" element={<AuthCallback />} />
+  <Route path="/verify-email" element={<VerifyEmailPage />} />
   <Route path="/invite/:token" element={<InvitePage />} />
 
   {/* Protected — sin requerir negocio */}
   <Route path="/negocio/setup" element={<ProtectedRoute><NegocioSetup /></ProtectedRoute>} />
 
   {/* Protected — requieren negocio activo */}
-  <Route path="/" element={<ProtectedRoute><MainLayout><Dashboard /></MainLayout></ProtectedRoute>} />
+  <Route path="/dashboard" element={<ProtectedRoute><MainLayout><Dashboard /></MainLayout></ProtectedRoute>} />
   <Route path="/empleados" element={<ProtectedRoute><MainLayout><RestrictedModuleRoute moduleKey="personal"><Employees /></RestrictedModuleRoute></MainLayout></ProtectedRoute>} />
   <Route path="/sueldos" element={<ProtectedRoute><MainLayout><RestrictedModuleRoute moduleKey="sueldos"><Salaries /></RestrictedModuleRoute></MainLayout></ProtectedRoute>} />
   <Route path="/calendario" element={<ProtectedRoute><MainLayout><RestrictedModuleRoute moduleKey="calendario"><CalendarPage /></RestrictedModuleRoute></MainLayout></ProtectedRoute>} />
@@ -974,9 +980,12 @@ Por página individual.
   <Route path="/configuracion" element={<ProtectedRoute><MainLayout><Settings /></MainLayout></ProtectedRoute>} />
   <Route path="/owner" element={<ProtectedRoute><MainLayout><OwnerPanel /></MainLayout></ProtectedRoute>} />
   <Route path="/admin" element={<ProtectedRoute><MainLayout><Admin /></MainLayout></ProtectedRoute>} />
+  <Route path="/suscripcion" element={<ProtectedRoute><MainLayout><SuscripcionPage /></MainLayout></ProtectedRoute>} />
+  <Route path="/suscripcion/estado" element={<ProtectedRoute><MainLayout><SuscripcionEstadoPage /></MainLayout></ProtectedRoute>} />
+  <Route path="/sellers" element={<ProtectedRoute><MainLayout><SellersPage /></MainLayout></ProtectedRoute>} />
 </Routes>
 
-{/* Provider hierarchy: ErrorBoundary > AuthProvider > Router > ModulePrefsProvider > SidebarProvider > ChatWidget + Routes */}
+{/* Provider hierarchy: ErrorBoundary > AuthProvider > ToastProvider > UsageLimitModalProvider > Router > ModulePrefsProvider > SidebarProvider > ChatWidget + Routes */}
 {/* ChatWidget se renderiza a nivel de SidebarProvider, fuera de MainLayout, visible en todas las rutas */}
 ```
 

@@ -81,7 +81,7 @@ export default function VerifyEmailPage() {
       channelRef.current = ch;
       ch.onmessage = (e) => {
         if (e.data?.type === "verified") {
-          navigate("/login?verified=true", { replace: true });
+          navigate("/?verified=true", { replace: true });
         }
       };
     } catch {
@@ -123,7 +123,7 @@ export default function VerifyEmailPage() {
           <p className="text-lg text-foreground font-medium">Error de verificación</p>
           <p className="text-muted-foreground">{displayError}</p>
           <button
-            onClick={() => navigate("/login", { replace: true })}
+            onClick={() => navigate("/", { replace: true })}
             className="mt-4 px-6 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
           >
             Volver al inicio de sesión
@@ -149,7 +149,7 @@ export default function VerifyEmailPage() {
           ¿No llegó el correo? Volvé a intentar iniciar sesión y te enviaremos uno nuevo.
         </div>
         <button
-          onClick={() => navigate("/login", { replace: true })}
+          onClick={() => navigate("/", { replace: true })}
           className="mt-4 px-6 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
         >
           Volver al inicio de sesión

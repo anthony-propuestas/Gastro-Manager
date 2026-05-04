@@ -26,7 +26,7 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
   }
 
   if (!user) {
-    return <Navigate to="/login" replace />;
+    return <Navigate to="/" replace />;
   }
 
   if (!user.email_verified) {
@@ -54,7 +54,7 @@ export function RestrictedModuleRoute({ moduleKey, children }: RestrictedModuleR
   const { negocioRestrictions, isGerente } = useModulePrefsContext();
 
   if (isGerente && negocioRestrictions[moduleKey]) {
-    return <Navigate to="/" replace />;
+    return <Navigate to="/dashboard" replace />;
   }
 
   return <>{children}</>;

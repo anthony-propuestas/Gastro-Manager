@@ -211,7 +211,7 @@ Ninguna variable sensible se incluye en el build del frontend (Vite). El Worker 
 
 - `src/react-app/lib/api.test.ts`: verifica que `apiFetch` emita `USAGE_LIMIT_EVENT` ante `429 USAGE_LIMIT_EXCEEDED` y que agregue `X-Negocio-ID` correctamente.
 - `src/react-app/context/UsageLimitModalContext.test.tsx`: verifica que el modal de upgrade se active ante el evento global y no pueda ser ignorado.
-- `src/react-app/components/auth/ProtectedRoute.test.tsx`: verifica redirecciones para usuarios no autenticados.
+- `src/react-app/components/auth/ProtectedRoute.test.tsx`: verifica redirecciones para usuarios no autenticados (redirige a `/`, la landing pública) y para gerentes con módulo restringido (redirige a `/dashboard`).
 - `src/worker/validation.test.ts`: verifica que los schemas Zod rechacen entradas inválidas en todos los módulos. Incluye 8 casos para `chatHistoryItemSchema` y `chatHistoryArraySchema`: acepta roles válidos (`user`/`model`) y content dentro del límite; rechaza roles arbitrarios, content vacío y content > 2000 chars. Incluye 5 casos para los campos de salida del empleado: acepta valores válidos y null; rechaza `sueldo_pendiente` negativo tanto en create como en update. Incluye casos para `crearSuscripcionSchema`: acepta `ref_code` ausente, string de 1-20 chars; rechaza string vacío y string de más de 20 chars.
 - `src/react-app/components/employees/EmployeeModal.test.tsx`: verifica el control segmentado de estado y el formulario condicional de baja. Cubre que ambos botones se renderizan; selección por defecto; selección correcta al editar un empleado inactivo; que los campos de baja no aparecen en estado activo; que aparecen al seleccionar inactivo; visibilidad condicional de `cuando_informo` según el checkbox `informo`; ocultamiento al re-activar; pre-relleno de los 4 campos al editar un empleado inactivo; y que desmarcar `informo` limpia `cuando_informo`.
 - `src/react-app/components/employees/EmployeeViewModal.test.tsx`: verifica que el modal de vista es de solo lectura (no expone acciones de escritura) y que no renderiza cuando `employee` es null.
@@ -251,3 +251,17 @@ Vite genera archivos con hash en el nombre (ej. `index-BFSxencr.js`). Tras un re
 | Acceso a endpoints admin de Sellers sin privilegios | `isAdmin()` verificado en los 4 endpoints `/api/admin/sellers` y `/api/admin/referidos/*` |
 | XSS | React escapa por defecto; no se usa `dangerouslySetInnerHTML` |
 | CSRF | Cookies `HttpOnly` + validación de origen en el Worker |
+
+---
+
+## Análisis de seguridad — Landing Page (routing refactor)
+
+Áreas revisadas:
+
+- **Endpoint nuevo o modificado**: No hay endpoints de API nuevos ni modificados. El cambio es exclusivamente frontend.
+- **Autenticación / sesión**: `ProtectedRoute` sigue rechazando usuarios no autenticados; solo cambia el destino del redirect de `/login` a `/` (ambas son rutas públicas). No hay degradación de protección.
+- **Autorización / roles**: `RestrictedModuleRoute` sigue bloqueando gerentes con módulos restringidos; redirect actualizado de `/` a `/dashboard` (ruta protegida, lo que es más correcto que antes).
+- **Validación de entrada**: No aplica; LandingPage no recibe input del servidor ni envía datos sensibles.
+- **Aislamiento por negocio_id**: No aplica; LandingPage es pública y no accede a datos de negocio.
+
+**Conclusión**: sin riesgo de seguridad. El cambio reduce una ambigüedad anterior (el redirect de módulo restringido apuntaba a `/`, que era la vista protegida; ahora apunta a `/dashboard` explícitamente).
