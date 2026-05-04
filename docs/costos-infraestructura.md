@@ -224,7 +224,7 @@ Ordenada por **impacto en costo / esfuerzo de implementación**.
 - [x] **Cap de queries Gemini para `usuario_inteligente`** ✅ — implementado mediante `incrementAndCheckInteligenteLimit` (`src/worker/usageLimit.ts`) e integrado en `createUsageLimitMiddleware` (`src/worker/index.ts`). Cap de 3.000 queries/mes por `(user_id, negocio_id)`. Usa el mismo patrón atomic increment + revert que `usuario_basico`; responde 429 `USAGE_LIMIT_EXCEEDED` al superarlo. Otros tools del plan inteligente no se ven afectados.
   - Impacto estimado: protección ante edge cases, no reducción en uso normal.
 
-- [ ] **Reducir tokens de contexto por query** — revisar qué datos se envían realmente a Gemini en cada llamada. Si se está enviando el historial completo de empleados, adelantos, notas, etc., limitar a los más recientes (ej. últimos 30 días / top 10 registros). Impacto estimado: **-20 a -40% en input tokens**.
+- [x] **Reducir tokens de contexto por query** ✅ — implementado en `src/worker/index.ts` (~línea 2910). Employees: `ORDER BY is_active DESC, id DESC LIMIT 30` (activos primero, máx 30 total). Topics: `ORDER BY due_date ASC LIMIT 15` (más urgentes primero). Events: `ORDER BY event_date ASC LIMIT 20`. Impacto estimado: **-20 a -40% en input tokens** en negocios con datos históricos acumulados.
 
 - [ ] **Truncar historial del chat en sesión** — si el frontend envía toda la conversación en cada mensaje, el context crece con cada turn. Limitar a los últimos 5-10 mensajes del hilo. Revisar cómo se pasa `messages` al endpoint.
 

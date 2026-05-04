@@ -2909,16 +2909,20 @@ app.post("/api/chat", authMiddleware, negocioMiddleware, createUsageLimitMiddlew
 
       const [employeesResult, eventsResult, topicsResult, advancesResult, salaryPaymentsResult] =
         await Promise.all([
-          db.prepare("SELECT name, role, is_active, monthly_salary FROM employees WHERE negocio_id = ?")
-            .bind(negocio.id).all(),
+          db.prepare(
+            `SELECT name, role, is_active, monthly_salary FROM employees
+             WHERE negocio_id = ? ORDER BY is_active DESC, id DESC LIMIT 30`
+          ).bind(negocio.id).all(),
           db.prepare(
             `SELECT title, event_date, start_time FROM events
-             WHERE negocio_id = ? AND strftime('%m', event_date) = ? AND strftime('%Y', event_date) = ?`
+             WHERE negocio_id = ? AND strftime('%m', event_date) = ? AND strftime('%Y', event_date) = ?
+             ORDER BY event_date ASC LIMIT 20`
           ).bind(negocio.id, monthPad, currentYear.toString()).all(),
           db.prepare(
             `SELECT t.title, t.due_date, e.name as employee_name
              FROM topics t JOIN employees e ON t.employee_id = e.id
-             WHERE e.negocio_id = ? AND t.is_open = 1`
+             WHERE e.negocio_id = ? AND t.is_open = 1
+             ORDER BY t.due_date ASC LIMIT 15`
           ).bind(negocio.id).all(),
           db.prepare(
             `SELECT a.amount, e.name as employee_name
