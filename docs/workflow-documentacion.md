@@ -11,6 +11,11 @@ Ejecutar después de **cualquier** cambio de código antes de cerrar la tarea.
 - [ ] `docs/api.md` refleja endpoints nuevos, modificados o eliminados
 - [ ] `docs/architecture.md` refleja cambios en middlewares, cuotas, módulos o flujos internos
 - [ ] `docs/authentication.md` refleja cambios en el flujo de auth o sesiones
+- [ ] `docs/database.md` refleja tablas nuevas o modificadas y migraciones aplicadas
+- [ ] `docs/validation.md` refleja schemas Zod nuevos o modificados
+- [ ] `docs/roles.md` refleja cambios en módulos restringibles o comportamiento de roles
+- [ ] `docs/frontend.md` refleja rutas, páginas, hooks o componentes nuevos o eliminados
+- [ ] `docs/agregar-nuevo-modulo.md` refleja cambios en el proceso de incorporar módulos
 - [ ] `README.md` describe con precisión el estado actual del sistema
 
 > Solo marcar los que aplican al cambio. Si un archivo no fue afectado, omitirlo.
@@ -103,7 +108,76 @@ Si el cambio fue solo en lógica de negocio (no en auth), no tocar el archivo.
 
 ---
 
-## Paso 6 — README (`README.md`)
+## Paso 7 — Base de datos (`docs/database.md`)
+
+Actualizar si cambió el schema de la base de datos:
+
+| Situación | Acción |
+|---|---|
+| Tabla nueva (`migrations/N.sql`) | Agregar fila en la tabla de esquemas D1: nombre, propósito, columnas clave y número de migración |
+| Columna agregada o eliminada | Actualizar la entrada existente de la tabla afectada |
+| Tabla eliminada | Eliminar la entrada de la tabla en database.md |
+| Solo cambio de lógica (sin DDL) | No aplica |
+
+Si no hubo cambios de schema (ningún archivo `.sql` nuevo o modificado), no tocar el archivo.
+
+---
+
+## Paso 8 — Validaciones (`docs/validation.md`)
+
+Actualizar si cambió `src/worker/validation.ts`:
+
+| Situación | Acción |
+|---|---|
+| Schema Zod nuevo | Agregar entrada con nombre del schema, endpoint que lo usa, campos y constraints clave |
+| Schema modificado (campos, reglas, mensajes) | Actualizar la entrada existente |
+| Schema eliminado | Eliminar la entrada |
+| Sin cambios en validation.ts | No aplica |
+
+---
+
+## Paso 9 — Roles y restricciones (`docs/roles.md`)
+
+Actualizar si cambió el sistema de roles o el control de acceso a módulos:
+
+| Situación | Acción |
+|---|---|
+| Nuevo módulo en `VALID_MODULE_KEYS` | Documentar el módulo en la sección de restricciones owner/gerente |
+| Módulo eliminado de `VALID_MODULE_KEYS` | Eliminar la mención del módulo |
+| Cambio en `createModuleRestrictionMiddleware` | Actualizar la descripción del comportamiento de restricción |
+| Cambio en lógica de negocio sin afectar roles | No aplica |
+
+---
+
+## Paso 10 — Frontend (`docs/frontend.md`)
+
+Actualizar si cambió la arquitectura de rutas, layout o estructura de hooks:
+
+| Situación | Acción |
+|---|---|
+| Nueva página en `/pages/modulos/` | Documentar la ruta, el componente y el hook que consume |
+| Ruta nueva o eliminada en `App.tsx` | Actualizar la lista de rutas |
+| Hook de datos nuevo o eliminado | Actualizar la sección de hooks |
+| Cambio en Sidebar o BottomNav (estructura, ítems) | Actualizar la descripción del layout |
+| Cambio interno a un componente sin alterar rutas o layout | No aplica |
+
+---
+
+## Paso 11 — Guía de módulos (`docs/agregar-nuevo-modulo.md`)
+
+Actualizar solo si cambió el **proceso estándar** de agregar un módulo:
+
+| Situación | Acción |
+|---|---|
+| Nuevo paso obligatorio en el proceso (ej: nuevo archivo a tocar) | Agregar el paso al checklist y al paso a paso |
+| Paso eliminado o fusionado | Eliminar o consolidar la sección correspondiente |
+| Nuevo patrón de componente/hook que aplica a todos los módulos futuros | Actualizar el template del paso 8 o 9 |
+| Cambio en el orden de middlewares en endpoints de módulo | Actualizar el ejemplo del paso 17 |
+| Cambio específico a un módulo concreto (campos, lógica propia) | No aplica — la guía documenta el patrón genérico |
+
+---
+
+## Paso 12 — README (`README.md`)
 
 Actualizar solo las secciones afectadas:
 
