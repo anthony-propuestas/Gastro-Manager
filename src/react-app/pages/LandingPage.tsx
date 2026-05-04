@@ -349,7 +349,7 @@ export default function LandingPage() {
             {/* Connector line (desktop only) */}
             <div className="hidden md:block absolute top-10 left-[calc(16.66%+1rem)] right-[calc(16.66%+1rem)] h-px border-t-2 border-dashed border-primary/30" />
 
-            {steps.map(({ num, icon: _StepIcon, title, desc }, i) => (
+            {steps.map(({ num, title, desc }, i) => (
               <div key={num} className={`reveal reveal-delay-${i + 1} flex-1 flex flex-col items-center text-center px-4 space-y-4`}>
                 <div className="relative z-10 w-20 h-20 rounded-2xl bg-primary flex items-center justify-center shadow-lg shadow-primary/25">
                   <span className="text-primary-foreground text-2xl font-serif font-bold">{num}</span>

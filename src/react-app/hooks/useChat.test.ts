@@ -96,7 +96,7 @@ describe("useChat", () => {
     await act(async () => { await result.current.sendMessage("Pregunta 1"); });
     await act(async () => { await result.current.sendMessage("Pregunta 2"); });
 
-    const secondBody = JSON.parse((mockApiFetch.mock.calls[1]?.[1] as any).body);
+    const secondBody = JSON.parse(((mockApiFetch.mock.calls[1]?.[1] as RequestInit).body as string));
     expect(secondBody.message).toBe("Pregunta 2");
     expect(secondBody.history).toEqual([
       { role: "user", content: "Pregunta 1" },
@@ -114,8 +114,8 @@ describe("useChat", () => {
     await act(async () => { await result.current.sendMessage("Hola"); });
     await act(async () => { await result.current.sendMessage("¿Y?"); });
 
-    const secondBody = JSON.parse((mockApiFetch.mock.calls[1]?.[1] as any).body);
-    const assistantEntry = secondBody.history.find((h: any) => h.content === "Respuesta asistente.");
+    const secondBody = JSON.parse(((mockApiFetch.mock.calls[1]?.[1] as RequestInit).body as string));
+    const assistantEntry = secondBody.history.find((h: { role: string; content: string }) => h.content === "Respuesta asistente.");
     expect(assistantEntry?.role).toBe("model");
   });
 
@@ -129,7 +129,7 @@ describe("useChat", () => {
     }
     await act(async () => { await result.current.sendMessage("última"); });
 
-    const lastBody = JSON.parse((mockApiFetch.mock.calls[11]?.[1] as any).body);
+    const lastBody = JSON.parse(((mockApiFetch.mock.calls[11]?.[1] as RequestInit).body as string));
     expect(lastBody.history).toHaveLength(20);
   });
 
