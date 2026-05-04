@@ -221,7 +221,7 @@ Ordenada por **impacto en costo / esfuerzo de implementación**.
 
 - [x] **Activar Gemini context caching** ✅ — implementado en `src/worker/geminiCache.ts` con TTL de 2 horas (7200s). El cache name se persiste en D1 (`chat_context_cache`, migración 25); `src/worker/index.ts:2990-3022` lo usa como `cachedContent` en cada llamada a Gemini. Queries en la misma sesión omiten el envío del contexto completo, reduciendo input tokens en ~60-75%. Impacto estimado: **-$40 a -$60/mes** a 100 usuarios inteligentes. Fallback transparente a contexto completo si la API de Gemini falla.
 
-- [ ] **Cap de queries Gemini para `usuario_inteligente`** — actualmente no tiene límite. Un cap de 3.000-5.000 queries/mes/negocio protege contra bots o uso abusivo sin afectar el uso normal (1.000/mes en el perfil heavy). El sistema ya tiene `usage_counters` — solo hay que no excluir `chat` del check en plan pago.
+- [x] **Cap de queries Gemini para `usuario_inteligente`** ✅ — implementado mediante `incrementAndCheckInteligenteLimit` (`src/worker/usageLimit.ts`) e integrado en `createUsageLimitMiddleware` (`src/worker/index.ts`). Cap de 3.000 queries/mes por `(user_id, negocio_id)`. Usa el mismo patrón atomic increment + revert que `usuario_basico`; responde 429 `USAGE_LIMIT_EXCEEDED` al superarlo. Otros tools del plan inteligente no se ven afectados.
   - Impacto estimado: protección ante edge cases, no reducción en uso normal.
 
 - [ ] **Reducir tokens de contexto por query** — revisar qué datos se envían realmente a Gemini en cada llamada. Si se está enviando el historial completo de empleados, adelantos, notas, etc., limitar a los más recientes (ej. últimos 30 días / top 10 registros). Impacto estimado: **-20 a -40% en input tokens**.

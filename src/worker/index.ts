@@ -28,6 +28,7 @@ import {
 import { USAGE_TOOLS, type UsageTool } from "./usageTools";
 import { checkRateLimit } from "./rateLimitAuth";
 import { getOrCreateGeminiCache } from "./geminiCache";
+import { incrementAndCheckInteligenteLimit, CHAT_CAP_INTELIGENTE } from "./usageLimit";
 
 type Env = {
   DB: D1Database;
@@ -233,18 +234,13 @@ function createUsageLimitMiddleware(tool: UsageTool): MiddlewareHandler<{ Bindin
     const negocio = c.get("negocio");
     if (user.role === "usuario_inteligente") {
       const period = new Date().toISOString().slice(0, 7);
-      const db = c.env.DB;
-      try {
-        await db
-          .prepare(
-            `INSERT INTO usage_counters (user_id, negocio_id, tool, period, count, updated_at)
-             VALUES (?, ?, ?, ?, 1, datetime('now'))
-             ON CONFLICT(user_id, negocio_id, tool, period)
-             DO UPDATE SET count = count + 1, updated_at = datetime('now')`
-          )
-          .bind(user.id, negocio.id, tool, period)
-          .run();
-      } catch { /* silent — no bloquea la request */ }
+      const { blocked } = await incrementAndCheckInteligenteLimit(c.env.DB, user.id, negocio.id, tool, period);
+      if (blocked) {
+        return c.json(
+          apiError("USAGE_LIMIT_EXCEEDED", `Límite mensual de consultas de chat alcanzado (${CHAT_CAP_INTELIGENTE}). Contactá soporte si necesitás más.`),
+          429
+        );
+      }
       await next();
       return;
     }
