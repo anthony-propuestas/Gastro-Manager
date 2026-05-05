@@ -33,16 +33,17 @@ describe("scheduled handler — R2 cleanup", () => {
 
     await worker.scheduled(event, env as any, {} as any);
 
-    // Should have called SELECT
-    expect(mockDb.prepare).toHaveBeenCalledWith(expect.stringContaining("SELECT id, comprobante_key FROM compras WHERE expires_at <= datetime('now')"));
+    expect(mockDb.prepare).toHaveBeenCalledWith(
+      expect.stringContaining("SELECT id, comprobante_key FROM compras WHERE expires_at <= datetime('now')")
+    );
 
-    // Should have called R2.delete for each expired item
     expect(mockR2.delete).toHaveBeenCalledTimes(2);
     expect(mockR2.delete).toHaveBeenCalledWith("compras/1/old1.jpg");
     expect(mockR2.delete).toHaveBeenCalledWith("compras/1/old2.jpg");
 
-    // Should have called UPDATE for each expired item
-    expect(mockDb.prepare).toHaveBeenCalledWith(expect.stringContaining("UPDATE compras SET comprobante_key = NULL WHERE id = ?"));
+    expect(mockDb.prepare).toHaveBeenCalledWith(
+      expect.stringContaining("UPDATE compras SET comprobante_key = NULL WHERE id = ?")
+    );
   });
 
   it("does nothing if no expired items found", async () => {

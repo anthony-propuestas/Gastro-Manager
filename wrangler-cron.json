@@ -1,13 +1,11 @@
 {
 	"$schema": "node_modules/wrangler/config-schema.json",
-	"name": "gastro-manager",
-	"pages_build_output_dir": "./dist",
+	"name": "gastro-manager-cron",
+	"main": "src/cron/index.ts",
 	"compatibility_date": "2025-06-17",
-	"compatibility_flags": [
-		"nodejs_compat"
-	],
-	"observability": {
-		"enabled": true
+	"compatibility_flags": ["nodejs_compat"],
+	"triggers": {
+		"crons": ["0 3 1 * *"]
 	},
 	"d1_databases": [
 		{
@@ -20,13 +18,6 @@
 		{
 			"binding": "R2_BUCKET",
 			"bucket_name": "gastro-manager-files"
-		}
-	],
-	"kv_namespaces": [
-		{
-			"binding": "CACHE",
-			"id": "45a74613e74f4830ae1e435a7761cf73",
-			"preview_id": "1e0f80d0290e4bd49518855f82281df1"
 		}
 	]
 }

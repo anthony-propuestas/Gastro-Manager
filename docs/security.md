@@ -116,6 +116,20 @@ El handler guarda en `chat_context_cache` el nombre del `cachedContent` creado e
 
 ---
 
+## Cron Worker (`gastro-manager-cron`)
+
+Áreas revisadas:
+
+- **Endpoint nuevo o modificado**: El Worker de cron solo exporta `{ scheduled }` — no tiene ningún endpoint HTTP. No es alcanzable via requests de usuarios.
+- **Autenticación / sesión**: No aplica. El handler `scheduled` lo invoca exclusivamente el scheduler de Cloudflare; no existe vector de acceso externo.
+- **Aislamiento por `negocio_id`**: No aplica. La limpieza usa `expires_at` como criterio temporal, afectando filas de todos los negocios uniformemente. No hay cross-tenancy: solo se eliminan objetos R2 cuyos `comprobante_key` pertenecen a filas ya expiradas de `compras`.
+- **Autorización / roles**: No aplica. No hay usuarios ni roles involucrados.
+- **Validación de entrada**: No aplica. No recibe input externo.
+
+**Conclusión**: sin superficie de ataque nueva. El Worker de cron accede a los mismos D1 y R2 que el Worker principal y ejecuta la misma lógica que antes existía en el `scheduled` handler del Worker principal. La separación no introduce ningún riesgo adicional.
+
+---
+
 ## Sellers / Programa de Referidos
 
 ### Endpoints de usuario

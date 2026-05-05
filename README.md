@@ -43,9 +43,11 @@ Sistema de gestión de restaurantes multi-usuario desplegado en Cloudflare Worke
 
 ```
 Cloudflare Pages (React SPA) → Hono Worker (auth + quota middleware) → D1 (SQLite) + Gemini API
+                                                                                   ↑
+                                             Cron Worker (wrangler-cron.json) ────┘  (limpieza R2 mensual)
 ```
 
-El frontend estático se despliega en Cloudflare Pages (`public/_redirects` requerido para SPA routing). El Worker sirve exclusivamente la API REST.
+El frontend estático se despliega en Cloudflare Pages (`public/_redirects` requerido para SPA routing). El Worker sirve exclusivamente la API REST. El Cron Worker es un Worker independiente que se despliega una vez con `wrangler deploy -c wrangler-cron.json` y se dispara el 1 de cada mes a las 03:00 UTC para limpiar comprobantes expirados de R2.
 
 ---
 
@@ -204,6 +206,7 @@ npm run dev             # Servidor de desarrollo
 npm run build           # Compilar para producción
 npm run check           # Verificar build y configuración
 npm run deploy          # Compilar y desplegar a Cloudflare Workers
+                        # Cron Worker (deploy manual único): npx wrangler deploy -c wrangler-cron.json
 npm run lint            # Ejecutar linter
 npm test                # Ejecutar suite de tests (Vitest)
 npm run test:watch      # Tests en modo interactivo
@@ -254,4 +257,4 @@ npm run cf-typegen      # Generar tipos de Cloudflare
 
 ---
 
-**Versión**: 2.4.0 · **Plataforma**: Cloudflare Workers · **Última actualización**: 2026-05-03
+**Versión**: 2.4.1 · **Plataforma**: Cloudflare Workers · **Última actualización**: 2026-05-05

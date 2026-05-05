@@ -313,14 +313,18 @@ MercadoPago → POST /api/webhooks/mercadopago (payment approved)
 gastro-manager/
 ├── migrations/           # Migraciones SQL numeradas (inmutables)
 ├── docs/                 # Documentación
+├── wrangler.json         # Config Pages (frontend + Worker principal)
+├── wrangler-cron.json    # Config Worker de cron (deploy separado)
 ├── functions/
 │   └── [[route]].ts      # Pages Function: /api/* → Hono Worker; /assets/* → ASSETS (404 limpio si falta); demás → ASSETS con fallback a index.html
 ├── public/
 │   ├── _redirects        # Placeholder vacío; el SPA routing lo maneja [[route]].ts
 │   └── _headers          # Headers HTTP por ruta: security headers globales (X-Frame-Options, CSP, etc.); Cache-Control por ruta
 ├── src/
+│   ├── cron/
+│   │   └── index.ts         # Worker de cron: handler scheduled() — limpieza mensual de R2
 │   ├── worker/
-│   │   ├── index.ts         # Todos los endpoints y middlewares
+│   │   ├── index.ts         # Todos los endpoints y middlewares (solo exporta { fetch })
 │   │   ├── geminiCache.ts   # getOrCreateGeminiCache() — Gemini API-level context caching
 │   │   ├── rateLimitAuth.ts # checkRateLimit() — rate limiting D1 para endpoints de auth
 │   │   ├── usageTools.ts    # Constantes USAGE_TOOLS y DEFAULT_USAGE_LIMITS
@@ -408,7 +412,9 @@ Cada middleware puede cortocircuitar la cadena devolviendo una respuesta sin lla
 
 ## Cron Handler
 
-El Worker exporta `{ fetch, scheduled }` en lugar de `export default app`. El handler `scheduled` se dispara el **1 de cada mes a las 03:00 UTC** (`0 3 1 * *`):
+El cron corre en un **Worker separado** (`wrangler-cron.json`, `src/cron/index.ts`), desplegado independientemente del Worker principal con `wrangler deploy -c wrangler-cron.json`. El Worker principal (`src/worker/index.ts`) solo exporta `{ fetch }`.
+
+El Worker de cron solo exporta `{ scheduled }` — no tiene endpoints HTTP. Se dispara el **1 de cada mes a las 03:00 UTC** (`0 3 1 * *`):
 
 ```
 scheduled():
@@ -418,7 +424,7 @@ scheduled():
     UPDATE compras SET comprobante_key = NULL WHERE id = ?
 ```
 
-Limpia archivos de comprobantes en R2 que llevan más de 24 meses subidos, liberando storage.
+Limpia archivos de comprobantes en R2 que llevan más de 24 meses subidos, liberando storage. Usa los mismos bindings D1 y R2 que el Worker principal (mismo `database_id` y `bucket_name` en `wrangler-cron.json`).
 
 ---
 
