@@ -41,6 +41,7 @@ GitHub Actions (cron diario 03:00 UTC)
 | Runtime | Cloudflare Workers | Edge |
 | Base de datos | Cloudflare D1 (SQLite) | — |
 | Almacenamiento | Cloudflare R2 (comprobantes) | — |
+| Caché en memoria | Cloudflare KV (binding `CACHE`) | — |
 | Autenticación | Google OAuth nativo + JWT (jose) | — |
 | Validación | Zod | — |
 | IA | Google Gemini 2.5 Flash | v1beta |
@@ -106,15 +107,19 @@ Ejecuta antes de los 9 endpoints de escritura con cuota.
 
 **Patrón atómico (increment-then-revert) para evitar TOCTOU:**
 
-- Si `user.role === 'usuario_inteligente'`, no hay bloqueo por cuota. El código actual igualmente intenta registrar `count + 1` en `usage_counters` y luego deja pasar la request.
+- Si `user.role === 'usuario_inteligente'`, aplica cuota propia (cap `CHAT_CAP_INTELIGENTE = 3000`). No usa `usage_limits`.
 
 ```
 1. INSERT usage_counters ... count = count + 1 RETURNING count
 2. Si newCount > limit:
    a. UPDATE usage_counters SET count = count - 1
    b. Devolver 429 USAGE_LIMIT_EXCEEDED
-3. Si newCount <= limit: continuar con el handler
+3. Si newCount === 80% del cap (2400 para inteligente, solo tool=chat):
+   - waitUntil(sendCapAlertEmail()) → email de aviso al usuario
+4. Si newCount <= limit: continuar con el handler
 ```
+
+**Alerta al 80% (solo `usuario_inteligente`, tool `chat`):** cuando el contador cruza exactamente 2400, se envía un email transaccional via Resend (`sendCapAlertEmail`) en `waitUntil`. El cruce exacto evita envíos repetidos.
 
 **Efecto en frontend cuando hay exceso de cuota:**
 
@@ -123,7 +128,7 @@ Ejecuta antes de los 9 endpoints de escritura con cuota.
 3. `UsageLimitModalProvider` muestra un modal global de upgrade a Usuario Inteligente
 4. El usuario puede cerrarlo; la acción original permanece rechazada
 
-Omite todo si `user.role === 'usuario_inteligente'`.
+Omite bloqueo si `user.role === 'usuario_inteligente'` y el counter no supera `CHAT_CAP_INTELIGENTE`.
 
 ### `createModuleRestrictionMiddleware(moduleKey)`
 
@@ -170,7 +175,7 @@ El cambio de negocio se dispara desde el dropdown del sidebar. Al seleccionar ot
 | Rol | Descripción |
 |---|---|
 | `usuario_basico` | Sujeto a cuotas mensuales configurables |
-| `usuario_inteligente` | Sin bloqueo por cuotas; acceso ilimitado. El código actual sigue registrando uso en `usage_counters` |
+| `usuario_inteligente` | Cap de **3.000 queries/mes** para `chat` (via `incrementAndCheckInteligenteLimit`). Sin cuota para los otros 9 tools. Uso registrado en `usage_counters`. |
 
 El rol se almacena en `users.role` y es gestionado por el admin vía `/api/admin/users/:id/promote|demote`. Los cambios son **inmediatos** porque el `authMiddleware` lo lee de DB en cada request.
 
@@ -240,17 +245,24 @@ POST /api/chat { message }
   │   ⚠️ NO tiene createModuleRestrictionMiddleware
   └── handler:
         ├── SELECT chat_context_cache (TTL 30 min)
-        │     └── miss: SELECT empleados + eventos + temas + adelantos + sueldos
+        │     └── miss: db.batch([
+        │                 empleados (activos primero ORDER BY is_active DESC, LIMIT 30),
+        │                 eventos (mes actual ORDER BY event_date ASC, LIMIT 20),
+        │                 temas abiertos (ORDER BY due_date ASC, LIMIT 15),
+        │                 adelantos (mes actual), sueldos (mes actual)
+        │               ])
         │                └── UPSERT chat_context_cache (limpia gemini_cache_name = NULL)
         ├── getOrCreateGeminiCache() [geminiCache.ts]
         │     ├── hit: gemini_cache_name válido (<2h) → retorna nombre existente
         │     └── miss: POST /v1beta/cachedContents (systemInstruction, TTL 2h)
         │                └── UPDATE chat_context_cache (gemini_cache_name, gemini_cache_expires_at)
         │                └── null si API falla (fallback transparente)
-        └── POST → Gemini 2.5 Flash API
-              ├── con cache: { cachedContent: "cachedContents/xyz", contents: [history + message] }
-              └── sin cache (fallback): { contents: [contextText + history + message] }
-              └── Respuesta → { reply: "..." }
+        ├── POST → Gemini 2.5 Flash API
+        │     ├── con cache: { cachedContent: "cachedContents/xyz", contents: [history + message] }
+        │     └── sin cache (fallback): { contents: [contextText + history + message] }
+        │     └── Respuesta → { reply: "..." }
+        └── waitUntil(INSERT gemini_usage_log(prompt_tokens, output_tokens))
+              — registra usageMetadata de la respuesta de Gemini (no bloquea al cliente)
 ```
 
 ⚠️ **Implicación de seguridad:** El chatbot accede a datos de todos los módulos sin respetar restricciones del owner. Un gerente con módulos restringidos puede obtener información de esos módulos a través del chat.
@@ -394,11 +406,41 @@ Cada middleware puede cortocircuitar la cadena devolviendo una respuesta sin lla
 
 ---
 
+## Cron Handler
+
+El Worker exporta `{ fetch, scheduled }` en lugar de `export default app`. El handler `scheduled` se dispara el **1 de cada mes a las 03:00 UTC** (`0 3 1 * *`):
+
+```
+scheduled():
+  SELECT id, comprobante_key FROM compras WHERE expires_at <= datetime('now') AND comprobante_key IS NOT NULL
+  Para cada fila:
+    R2_BUCKET.delete(comprobante_key)
+    UPDATE compras SET comprobante_key = NULL WHERE id = ?
+```
+
+Limpia archivos de comprobantes en R2 que llevan más de 24 meses subidos, liberando storage.
+
+---
+
+## Caché KV (CACHE binding)
+
+Cloudflare KV se usa como caché de lectura con TTL de 60 segundos para dos endpoints de alta frecuencia:
+
+| Endpoint | Clave KV | Invalidación |
+|---|---|---|
+| `GET /api/employees` | `emp:{negocio_id}` | POST / PUT / DELETE employees |
+| `GET /api/events` | `evt:{negocio_id}:{mm}:{yyyy}` | POST / PUT / DELETE events (del mes afectado) + clave sin mes (`evt:{id}::`) |
+
+Las escrituras a KV y las invalidaciones se hacen en `waitUntil` (no bloquean la respuesta).
+
+---
+
 ## Rendimiento
 
 - **Edge computing**: Workers ejecutan en +200 ubicaciones; latencia ~10-50ms.
 - **D1 co-localizado**: SQLite co-ubicado con el Worker; sin latencia de red adicional.
 - **Sin N+1**: los endpoints de overview (sueldos, calendario) usan JOINs y queries agregadas.
+- **db.batch()** en el handler de chat: las 5 queries de contexto se envían en una sola llamada a D1 (antes usaban `Promise.all` con 5 llamadas independientes).
 
 ---
 

@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import imageCompression from "browser-image-compression";
 import { X, Upload } from "lucide-react";
 import { Button } from "@/react-app/components/ui/button";
 import { Input } from "@/react-app/components/ui/input";
@@ -97,7 +98,20 @@ export default function CompraModal({ isOpen, onClose, onSaved, compra }: Compra
       let comprobanteKey = compra?.comprobante_key ?? null;
 
       if (selectedFile) {
-        const key = await uploadComprobante(selectedFile);
+        let fileToUpload: File = selectedFile;
+        if (selectedFile.type.startsWith("image/")) {
+          try {
+            fileToUpload = await imageCompression(selectedFile, {
+              maxSizeMB: 0.5,
+              maxWidthOrHeight: 1920,
+              useWebWorker: true,
+              fileType: "image/webp",
+            });
+          } catch {
+            fileToUpload = selectedFile;
+          }
+        }
+        const key = await uploadComprobante(fileToUpload);
         if (!key) {
           setError("Error al subir el comprobante");
           setIsSubmitting(false);

@@ -96,7 +96,7 @@ describe("incrementAndCheckInteligenteLimit — INSERT SQL", () => {
     const { db } = makeDb(1);
     await incrementAndCheckInteligenteLimit(db, USER_ID, NEGOCIO_ID, USAGE_TOOLS.CHAT, PERIOD);
     const insertCall = (db.prepare as ReturnType<typeof vi.fn>).mock.calls.find(
-      ([sql]: [string]) => sql.includes("INSERT")
+      (args: unknown[]) => typeof args[0] === "string" && args[0].includes("INSERT")
     );
     expect(insertCall).toBeDefined();
   });
@@ -105,8 +105,33 @@ describe("incrementAndCheckInteligenteLimit — INSERT SQL", () => {
     const { db } = makeDb(1);
     await incrementAndCheckInteligenteLimit(db, USER_ID, NEGOCIO_ID, USAGE_TOOLS.CHAT, PERIOD);
     const insertSql = (db.prepare as ReturnType<typeof vi.fn>).mock.calls.find(
-      ([sql]: [string]) => sql.includes("INSERT")
+      (args: unknown[]) => typeof args[0] === "string" && args[0].includes("INSERT")
     )?.[0] as string;
     expect(insertSql).toContain("RETURNING count");
+  });
+});
+
+describe("incrementAndCheckInteligenteLimit — warnAt80 threshold", () => {
+  const WARN_THRESHOLD = Math.floor(CHAT_CAP_INTELIGENTE * 0.8); // 2400
+
+  it("returns warnAt80: true exactly at 80% threshold", async () => {
+    const { db } = makeDb(WARN_THRESHOLD);
+    const result = await incrementAndCheckInteligenteLimit(db, USER_ID, NEGOCIO_ID, USAGE_TOOLS.CHAT, PERIOD);
+    expect(result.blocked).toBe(false);
+    expect(result.warnAt80).toBe(true);
+  });
+
+  it("does not warn one count below threshold", async () => {
+    const { db } = makeDb(WARN_THRESHOLD - 1);
+    const result = await incrementAndCheckInteligenteLimit(db, USER_ID, NEGOCIO_ID, USAGE_TOOLS.CHAT, PERIOD);
+    expect(result.blocked).toBe(false);
+    expect(result.warnAt80).toBeUndefined();
+  });
+
+  it("does not warn one count above threshold", async () => {
+    const { db } = makeDb(WARN_THRESHOLD + 1);
+    const result = await incrementAndCheckInteligenteLimit(db, USER_ID, NEGOCIO_ID, USAGE_TOOLS.CHAT, PERIOD);
+    expect(result.blocked).toBe(false);
+    expect(result.warnAt80).toBeUndefined();
   });
 });

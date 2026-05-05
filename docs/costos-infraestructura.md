@@ -226,33 +226,29 @@ Ordenada por **impacto en costo / esfuerzo de implementación**.
 
 - [x] **Reducir tokens de contexto por query** ✅ — implementado en `src/worker/index.ts` (~línea 2910). Employees: `ORDER BY is_active DESC, id DESC LIMIT 30` (activos primero, máx 30 total). Topics: `ORDER BY due_date ASC LIMIT 15` (más urgentes primero). Events: `ORDER BY event_date ASC LIMIT 20`. Impacto estimado: **-20 a -40% en input tokens** en negocios con datos históricos acumulados.
 
-- [ ] **Truncar historial del chat en sesión** — si el frontend envía toda la conversación en cada mensaje, el context crece con cada turn. Limitar a los últimos 4-5 mensajes del hilo. Revisar cómo se pasa `messages` al endpoint.
+- [x] **Truncar historial del chat en sesión** ✅ — implementado con `slice(-5)` tanto en `src/react-app/hooks/useChat.ts` como en `src/worker/index.ts` (~línea 2883). El frontend envía máximo 5 mensajes previos por request; el worker aplica el mismo corte como segunda línea de defensa. Impacto estimado: **-60 a -80% en tokens de historial** en conversaciones largas (antes era `slice(-20)`).
 
 
 ### R2 (impacto bajo pero creciente)
 
-- [ ] **Comprimir imágenes antes de subir a R2** — redimensionar y comprimir recibos en el cliente (WebP, calidad 70%) antes del upload. Un recibo de 500KB puede bajar a ~80-120KB sin pérdida visible. Impacto: reduce el storage acumulativo en ~75%.
-  - Librería sugerida: `browser-image-compression` (sin dependencias de servidor).
+- [x] **Comprimir imágenes antes de subir a R2** ✅ — implementado en `src/react-app/components/compras/CompraModal.tsx`. Usa `browser-image-compression` con `maxSizeMB: 0.5`, `maxWidthOrHeight: 1920`, `fileType: 'image/webp'`. Fallback al archivo original si la compresión falla. Impacto: reduce el storage acumulativo en ~75%.
 
-- [ ] **Política de retención de recibos** — agregar un campo `expires_at` en la tabla `compras` y un Cloudflare Cron Trigger que borre archivos R2 con más de 13 meses. Mantiene el storage acumulativo estable en vez de crecer indefinidamente.
-  - Cron Workers en Cloudflare son gratuitos (incluidos en el plan Workers).
+- [x] **Política de retención de recibos** ✅ — `migrations/27.sql` agrega `expires_at` a `compras` (default: `created_at + 24 meses`). POST /api/compras inserta `datetime('now', '+24 months')`. `wrangler.json` tiene `triggers.crons: ["0 3 1 * *"]`. El `scheduled` handler en `src/worker/index.ts` borra archivos R2 vencidos y limpia `comprobante_key` del registro.
 
-- [ ] **Eliminar archivos R2 huérfanos** — cuando se borra una compra desde la app, verificar que también se elimine el objeto R2 asociado. Evita acumulación de storage sin referencia en DB.
+- [x] **Eliminar archivos R2 huérfanos** ✅ — el DELETE ya borraba el objeto R2 antes de eliminar el registro (`src/worker/index.ts`, línea 3230). Se agregó limpieza en PUT: si se reemplaza `comprobante_key` con una nueva key, el archivo antiguo se elimina de R2 antes del UPDATE (`src/worker/index.ts`, línea ~3191).
 
 ### Cloudflare Workers (impacto bajo a escala actual)
 
-- [ ] **Cachear respuestas de listas frecuentes con KV** — endpoints de solo lectura frecuentes (lista de empleados, eventos del mes) podrían cachearse en Cloudflare KV con TTL de 60 segundos. Reduce D1 reads y tiempo de respuesta.
-  - KV free tier: 100.000 lecturas/día, 1.000 escrituras/día — suficiente para esta escala.
-  - Solo aplicar a rutas GET que no cambien por cada request.
+- [x] **Cachear respuestas de listas frecuentes con KV** ✅ — KV namespace `CACHE` creado (id: `45a74613e74f4830ae1e435a7761cf73`) y configurado en `wrangler.json`. GET /api/employees cachea con key `emp:{negocio_id}`, TTL 60s; invalida en POST/PUT/DELETE. GET /api/events cachea con key `evt:{negocio_id}:{MM}:{YYYY}`, TTL 60s; invalida en POST/PUT/DELETE del evento correspondiente.
 
-- [ ] **Batching de queries D1 en el endpoint `/api/chat`** — actualmente hace ~6 queries secuenciales para armar el contexto. Usar `db.batch([...])` de D1 para ejecutarlas en paralelo. No reduce el número de reads pero sí la latencia y el CPU time del Worker (que tiene límite de 10ms en free tier).
+- [x] **Batching de queries D1 en el endpoint `/api/chat`** ✅ — las 5 queries de contexto (employees, events, topics, advances, salary_payments) fueron convertidas de `Promise.all([...stmt.all()])` a `db.batch([...stmts])` en `src/worker/index.ts` (~línea 2910). Reduce de 5 round trips HTTP a D1 a 1 solo request.
 
 ### MercadoPago (impacto medio)
 
-- [ ] **Incentivar pago por transferencia/CBU** — la comisión de MP varía: ~0,79% para débito/transferencia vs ~4,99% para tarjeta de crédito. Si el flujo de pago actual no sugiere el método más barato, agregar un banner explicando el ahorro. A 100 usuarios, la diferencia puede ser **$30 USD/mes** en comisiones.
+- [x] **Incentivar pago por transferencia/CBU** ✅ — banner informativo agregado en `src/react-app/pages/Suscripcion.tsx`, visible para usuarios sin suscripción activa. Indica elegir "Dinero en cuenta" o "Transferencia" en el checkout de MercadoPago.
 
 ### Monitoreo (impacto indirecto)
 
-- [ ] **Agregar logging de tokens Gemini por negocio** — loguear `usage_metadata.prompt_token_count` y `candidates_token_count` que devuelve la API de Gemini en cada respuesta. Guardar en D1 o en un log de Analytics Engine (gratuito en Cloudflare) para detectar negocios con consumo anómalo antes de que impacten la factura mensual.
+- [x] **Agregar logging de tokens Gemini por negocio** ✅ — `migrations/26.sql` crea tabla `gemini_usage_log (user_id, negocio_id, prompt_tokens, output_tokens, created_at)`. En el handler POST /api/chat (`src/worker/index.ts` ~línea 3056), se captura `geminiData.usageMetadata` y se inserta con `waitUntil` para no bloquear la respuesta.
 
-- [ ] **Alerta de uso > 80% del cap Gemini** — si se implementa el cap, enviar un email (Resend) o una notificación in-app cuando el negocio supere el 80% de su cuota mensual de chat. Evita sorpresas y mejora la experiencia.
+- [x] **Alerta de uso > 80% del cap Gemini** ✅ — `src/worker/usageLimit.ts` devuelve `{ blocked: false, warnAt80: true }` cuando el count cruza exactamente 2.400 (80% de 3.000). El middleware en `src/worker/index.ts` envía un email via Resend (`sendCapAlertEmail`) con `waitUntil`. El flag se activa solo una vez por mes (en el tick exacto del cruce).

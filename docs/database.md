@@ -8,7 +8,7 @@
 
 ## Esquema General
 
-La base de datos tiene **22 tablas** en 7 grupos funcionales:
+La base de datos tiene **24 tablas** en 7 grupos funcionales:
 
 | Grupo | Tablas |
 |---|---|
@@ -17,7 +17,7 @@ La base de datos tiene **22 tablas** en 7 grupos funcionales:
 | Roles y restricciones | `owner_requests`, `negocio_module_restrictions`, `user_module_prefs` |
 | Cuotas | `usage_counters`, `usage_limits` |
 | Datos operativos | `employees`, `job_roles`, `topics`, `notes`, `advances`, `salary_payments`, `events`, `compras`, `facturas`, `chat_context_cache` |
-| Logging | `usage_logs` |
+| Logging | `usage_logs`, `gemini_usage_log` |
 
 ---
 
@@ -283,6 +283,26 @@ CREATE TABLE usage_logs (
 );
 ```
 
+### `gemini_usage_log`
+
+Registra el consumo de tokens de Gemini por request de chat. Creada en **migración 26**.
+
+```sql
+CREATE TABLE gemini_usage_log (
+  id            INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id       TEXT    NOT NULL,
+  negocio_id    INTEGER NOT NULL,
+  prompt_tokens INTEGER,
+  output_tokens INTEGER,
+  created_at    TEXT DEFAULT (datetime('now'))
+);
+```
+
+Se inserta una fila por cada respuesta exitosa del chatbot usando `usageMetadata.promptTokenCount` y `candidatesTokenCount` de la respuesta de Gemini. El INSERT se hace en `waitUntil` (no bloquea la respuesta).
+
+**Índices:**
+- `idx_gemini_log_negocio` en `(negocio_id, created_at)`
+
 ---
 
 ## Datos Operativos
@@ -429,11 +449,17 @@ CREATE TABLE compras (
   descripcion     TEXT,
   comprobante_key TEXT,
   created_at      TEXT    NOT NULL DEFAULT (datetime('now')),
-  updated_at      TEXT    NOT NULL DEFAULT (datetime('now'))
+  updated_at      TEXT    NOT NULL DEFAULT (datetime('now')),
+  expires_at      TEXT                           -- migración 27: datetime cuando el comprobante R2 expira (24 meses desde created_at)
 );
 ```
 
 **Valores válidos de `categoria`:** `carnes`, `verduras`, `bebidas`, `limpieza`, `descartables`, `servicios`, `mantenimiento`, `alquiler`, `otros`
+
+**Ciclo de vida de comprobantes R2:**
+- `POST /api/compras` asigna `expires_at = datetime('now', '+24 months')`.
+- `PUT /api/compras/:id` elimina el objeto R2 anterior si `comprobante_key` cambia.
+- El cron mensual (`0 3 1 * *`) elimina los objetos R2 de filas donde `expires_at <= datetime('now')` y pone `comprobante_key = NULL`.
 
 ### `facturas`
 
@@ -531,7 +557,7 @@ admin_emails  (standalone — consultado por isAdmin())
 | Aislamiento de datos | Todas las queries de datos filtran por `negocio_id` |
 | Timestamps | `created_at` + `updated_at` en todas las tablas; `updated_at` se actualiza manualmente |
 | Booleanos | `INTEGER` 0/1 con prefijo `is_` o `has_` |
-| Migraciones | Numeradas `1.sql`–`25.sql`, inmutables en producción |
+| Migraciones | Numeradas `1.sql`–`27.sql`, inmutables en producción |
 
 ---
 
@@ -573,6 +599,7 @@ Las migraciones crean **28 índices explícitos** para optimizar las queries má
 | `facturas` | `idx_facturas_fecha` | `negocio_id, fecha` | Normal | 14 |
 | `email_verification_tokens` | `idx_evtokens_user_id` | `user_id` | Normal | 17 |
 | `email_verification_tokens` | `idx_evtokens_token_hash` | `token_hash` | Normal | 17 |
+| `gemini_usage_log` | `idx_gemini_log_negocio` | `negocio_id, created_at` | Normal | 26 |
 
 ### Índices implícitos (por constraints)
 

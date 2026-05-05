@@ -20,6 +20,7 @@ import {
   updateFacturaSchema,
   chatHistoryItemSchema,
   chatHistoryArraySchema,
+  crearSuscripcionSchema,
 } from "./validation";
 
 describe("createEmployeeSchema", () => {
@@ -544,5 +545,27 @@ describe("chatHistoryArraySchema", () => {
   it("rejects array with invalid item", () => {
     const history = [{ role: "admin", content: "hack" }];
     expect(chatHistoryArraySchema.safeParse(history).success).toBe(false);
+  });
+});
+
+describe("crearSuscripcionSchema", () => {
+  it("accepts valid ref_code", () => {
+    const result = crearSuscripcionSchema.safeParse({ ref_code: "ABC123" });
+    expect(result.success).toBe(true);
+  });
+
+  it("accepts empty object (ref_code is optional)", () => {
+    const result = crearSuscripcionSchema.safeParse({});
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects ref_code exceeding 20 characters", () => {
+    const result = crearSuscripcionSchema.safeParse({ ref_code: "A".repeat(21) });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects empty string ref_code", () => {
+    const result = crearSuscripcionSchema.safeParse({ ref_code: "" });
+    expect(result.success).toBe(false);
   });
 });

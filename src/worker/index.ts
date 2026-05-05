@@ -33,6 +33,7 @@ import { incrementAndCheckInteligenteLimit, CHAT_CAP_INTELIGENTE } from "./usage
 type Env = {
   DB: D1Database;
   R2_BUCKET: R2Bucket;
+  CACHE: KVNamespace;
   GOOGLE_CLIENT_ID: string;
   GOOGLE_CLIENT_SECRET: string;
   JWT_SECRET: string;
@@ -156,6 +157,21 @@ async function sendVerificationEmail(
   });
 }
 
+async function sendCapAlertEmail(apiKey: string, toEmail: string, toName: string, used: number, cap: number): Promise<void> {
+  const resend = new Resend(apiKey);
+  await resend.emails.send({
+    from: "La Hoja <no-reply@lahoja.org>",
+    to: toEmail,
+    subject: "Alcanzaste el 80% de tu cuota mensual de chat",
+    html: `
+      <p>Hola ${toName},</p>
+      <p>Llevas <strong>${used} de ${cap}</strong> consultas al asistente este mes (80%).</p>
+      <p>Cuando llegues al límite las consultas se pausarán hasta el próximo mes. Si necesitás más, contactanos.</p>
+      <p>— El equipo de La Hoja</p>
+    `,
+  });
+}
+
 // ============================================
 // Middlewares
 // ============================================
@@ -234,11 +250,16 @@ function createUsageLimitMiddleware(tool: UsageTool): MiddlewareHandler<{ Bindin
     const negocio = c.get("negocio");
     if (user.role === "usuario_inteligente") {
       const period = new Date().toISOString().slice(0, 7);
-      const { blocked } = await incrementAndCheckInteligenteLimit(c.env.DB, user.id, negocio.id, tool, period);
+      const { blocked, warnAt80 } = await incrementAndCheckInteligenteLimit(c.env.DB, user.id, negocio.id, tool, period);
       if (blocked) {
         return c.json(
           apiError("USAGE_LIMIT_EXCEEDED", `Límite mensual de consultas de chat alcanzado (${CHAT_CAP_INTELIGENTE}). Contactá soporte si necesitás más.`),
           429
+        );
+      }
+      if (warnAt80 && c.env.RESEND_API_KEY) {
+        c.executionCtx.waitUntil(
+          sendCapAlertEmail(c.env.RESEND_API_KEY, user.email, user.name, CHAT_CAP_INTELIGENTE * 0.8, CHAT_CAP_INTELIGENTE)
         );
       }
       await next();
@@ -1293,6 +1314,13 @@ app.get("/api/employees", authMiddleware, negocioMiddleware, createModuleRestric
     const user = c.get("user");
     const negocio = c.get("negocio");
     const db = c.env.DB;
+    const cacheKey = `emp:${negocio.id}`;
+
+    const cached = await c.env.CACHE.get(cacheKey, "json");
+    if (cached !== null) {
+      await logUsage(db, user.id, negocio.id, "view", "employee");
+      return c.json(apiResponse(cached as unknown[]), 200);
+    }
 
     const employees = await db
       .prepare(
@@ -1305,6 +1333,9 @@ app.get("/api/employees", authMiddleware, negocioMiddleware, createModuleRestric
       .bind(negocio.id)
       .all();
 
+    c.executionCtx.waitUntil(
+      c.env.CACHE.put(cacheKey, JSON.stringify(employees.results), { expirationTtl: 60 })
+    );
     await logUsage(db, user.id, negocio.id, "view", "employee");
     return c.json(apiResponse(employees.results), 200);
   } catch (error) {
@@ -1379,6 +1410,7 @@ app.post("/api/employees", authMiddleware, negocioMiddleware, createModuleRestri
       .bind(result.meta.last_row_id)
       .first();
 
+    c.executionCtx.waitUntil(c.env.CACHE.delete(`emp:${negocio.id}`));
     await logUsage(db, user.id, negocio.id, "create", "employee");
     return c.json(apiResponse(newEmployee), 201);
   } catch (error) {
@@ -1451,6 +1483,7 @@ app.put("/api/employees/:id", authMiddleware, negocioMiddleware, createModuleRes
       .bind(employeeId)
       .first();
 
+    c.executionCtx.waitUntil(c.env.CACHE.delete(`emp:${negocio.id}`));
     await logUsage(db, user.id, negocio.id, "update", "employee");
     return c.json(apiResponse(updated), 200);
   } catch (error) {
@@ -1482,6 +1515,7 @@ app.delete("/api/employees/:id", authMiddleware, negocioMiddleware, createModule
     await db.prepare("DELETE FROM topics WHERE employee_id = ?").bind(employeeId).run();
     await db.prepare("DELETE FROM employees WHERE id = ?").bind(employeeId).run();
 
+    c.executionCtx.waitUntil(c.env.CACHE.delete(`emp:${negocio.id}`));
     await logUsage(db, user.id, negocio.id, "delete", "employee");
     return c.json(apiResponse({ deleted: true }), 200);
   } catch (error) {
@@ -1931,6 +1965,13 @@ app.get("/api/events", authMiddleware, negocioMiddleware, createModuleRestrictio
     const negocio = c.get("negocio");
     const db = c.env.DB;
     const { month, year } = c.req.query();
+    const monthKey = month ? month.padStart(2, "0") : "";
+    const cacheKey = `evt:${negocio.id}:${monthKey}:${year ?? ""}`;
+
+    const cached = await c.env.CACHE.get(cacheKey, "json");
+    if (cached !== null) {
+      return c.json(apiResponse(cached as unknown[]), 200);
+    }
 
     let query = "SELECT * FROM events WHERE negocio_id = ?";
     const params: (string | number)[] = [negocio.id];
@@ -1945,6 +1986,9 @@ app.get("/api/events", authMiddleware, negocioMiddleware, createModuleRestrictio
     query += " ORDER BY event_date ASC, start_time ASC";
 
     const events = await db.prepare(query).bind(...params).all();
+    c.executionCtx.waitUntil(
+      c.env.CACHE.put(cacheKey, JSON.stringify(events.results), { expirationTtl: 60 })
+    );
     return c.json(apiResponse(events.results), 200);
   } catch (error) {
     console.error("Error fetching events:", error);
@@ -2013,6 +2057,14 @@ app.post("/api/events", authMiddleware, negocioMiddleware, createModuleRestricti
       .bind(result.meta.last_row_id)
       .first();
 
+    const evtM = validData.event_date.slice(5, 7);
+    const evtY = validData.event_date.slice(0, 4);
+    c.executionCtx.waitUntil(
+      Promise.all([
+        c.env.CACHE.delete(`evt:${negocio.id}:${evtM}:${evtY}`),
+        c.env.CACHE.delete(`evt:${negocio.id}::`),
+      ])
+    );
     await logUsage(db, user.id, negocio.id, "create", "event");
     return c.json(apiResponse(newEvent), 201);
   } catch (error) {
@@ -2074,6 +2126,16 @@ app.put("/api/events/:id", authMiddleware, negocioMiddleware, createModuleRestri
 
     const updated = await db.prepare("SELECT * FROM events WHERE id = ?").bind(eventId).first();
 
+    if (validData.event_date) {
+      const evtM = validData.event_date.slice(5, 7);
+      const evtY = validData.event_date.slice(0, 4);
+      c.executionCtx.waitUntil(
+        Promise.all([
+          c.env.CACHE.delete(`evt:${negocio.id}:${evtM}:${evtY}`),
+          c.env.CACHE.delete(`evt:${negocio.id}::`),
+        ])
+      );
+    }
     await logUsage(db, user.id, negocio.id, "update", "event");
     return c.json(apiResponse(updated), 200);
   } catch (error) {
@@ -2090,9 +2152,9 @@ app.delete("/api/events/:id", authMiddleware, negocioMiddleware, createModuleRes
     const db = c.env.DB;
 
     const existing = await db
-      .prepare("SELECT id FROM events WHERE id = ? AND negocio_id = ?")
+      .prepare("SELECT id, event_date FROM events WHERE id = ? AND negocio_id = ?")
       .bind(eventId, negocio.id)
-      .first();
+      .first<{ id: number; event_date: string }>();
 
     if (!existing) {
       return c.json(apiError("NOT_FOUND", "Evento no encontrado"), 404);
@@ -2100,6 +2162,14 @@ app.delete("/api/events/:id", authMiddleware, negocioMiddleware, createModuleRes
 
     await db.prepare("DELETE FROM events WHERE id = ?").bind(eventId).run();
 
+    const evtM = existing.event_date.slice(5, 7);
+    const evtY = existing.event_date.slice(0, 4);
+    c.executionCtx.waitUntil(
+      Promise.all([
+        c.env.CACHE.delete(`evt:${negocio.id}:${evtM}:${evtY}`),
+        c.env.CACHE.delete(`evt:${negocio.id}::`),
+      ])
+    );
     await logUsage(db, user.id, negocio.id, "delete", "event");
     return c.json(apiResponse({ deleted: true }), 200);
   } catch (error) {
@@ -2908,32 +2978,32 @@ app.post("/api/chat", authMiddleware, negocioMiddleware, createUsageLimitMiddlew
       const monthPad = currentMonth.toString().padStart(2, "0");
 
       const [employeesResult, eventsResult, topicsResult, advancesResult, salaryPaymentsResult] =
-        await Promise.all([
+        await db.batch([
           db.prepare(
             `SELECT name, role, is_active, monthly_salary FROM employees
              WHERE negocio_id = ? ORDER BY is_active DESC, id DESC LIMIT 30`
-          ).bind(negocio.id).all(),
+          ).bind(negocio.id),
           db.prepare(
             `SELECT title, event_date, start_time FROM events
              WHERE negocio_id = ? AND strftime('%m', event_date) = ? AND strftime('%Y', event_date) = ?
              ORDER BY event_date ASC LIMIT 20`
-          ).bind(negocio.id, monthPad, currentYear.toString()).all(),
+          ).bind(negocio.id, monthPad, currentYear.toString()),
           db.prepare(
             `SELECT t.title, t.due_date, e.name as employee_name
              FROM topics t JOIN employees e ON t.employee_id = e.id
              WHERE e.negocio_id = ? AND t.is_open = 1
              ORDER BY t.due_date ASC LIMIT 15`
-          ).bind(negocio.id).all(),
+          ).bind(negocio.id),
           db.prepare(
             `SELECT a.amount, e.name as employee_name
              FROM advances a JOIN employees e ON a.employee_id = e.id
              WHERE a.negocio_id = ? AND a.period_month = ? AND a.period_year = ?`
-          ).bind(negocio.id, currentMonth, currentYear).all(),
+          ).bind(negocio.id, currentMonth, currentYear),
           db.prepare(
             `SELECT sp.salary_amount, sp.net_amount, sp.is_paid, e.name as employee_name
              FROM salary_payments sp JOIN employees e ON sp.employee_id = e.id
              WHERE sp.negocio_id = ? AND sp.period_month = ? AND sp.period_year = ?`
-          ).bind(negocio.id, currentMonth, currentYear).all(),
+          ).bind(negocio.id, currentMonth, currentYear),
         ]);
 
       const employees = employeesResult.results as any[];
@@ -3054,6 +3124,19 @@ app.post("/api/chat", authMiddleware, negocioMiddleware, createUsageLimitMiddlew
     const reply = geminiData?.candidates?.[0]?.content?.parts?.[0]?.text || "Lo siento, no pude generar una respuesta.";
 
     await logUsage(db, user.id, negocio.id, "create", "chat");
+
+    const usage = geminiData?.usageMetadata;
+    if (usage) {
+      c.executionCtx.waitUntil(
+        db
+          .prepare(
+            "INSERT INTO gemini_usage_log (user_id, negocio_id, prompt_tokens, output_tokens) VALUES (?, ?, ?, ?)"
+          )
+          .bind(user.id, negocio.id, usage.promptTokenCount ?? null, usage.candidatesTokenCount ?? null)
+          .run()
+      );
+    }
+
     return c.json(apiResponse({ reply }), 200);
   } catch (error: any) {
     console.error("Unexpected error in chat endpoint:", error.message);
@@ -3147,8 +3230,8 @@ app.post("/api/compras",
       const d = validation.data!;
       const now = new Date().toISOString();
       const result = await db
-        .prepare(`INSERT INTO compras (negocio_id, user_id, fecha, monto, item, tipo, categoria, comprador_id, descripcion, comprobante_key, created_at, updated_at)
-                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING *`)
+        .prepare(`INSERT INTO compras (negocio_id, user_id, fecha, monto, item, tipo, categoria, comprador_id, descripcion, comprobante_key, created_at, updated_at, expires_at)
+                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now', '+24 months')) RETURNING *`)
         .bind(negocio.id, user.id, d.fecha, d.monto, d.item, d.tipo, d.categoria, d.comprador_id ?? null, d.descripcion ?? null, d.comprobante_key ?? null, now, now)
         .first();
       await logUsage(db, user.id, negocio.id, "create", "compras");
@@ -3176,7 +3259,7 @@ app.put("/api/compras/:id",
       const existing = await db
         .prepare("SELECT * FROM compras WHERE id = ? AND negocio_id = ?")
         .bind(id, negocio.id)
-        .first();
+        .first<{ comprobante_key: string | null }>();
       if (!existing) return c.json(apiError("NOT_FOUND", "Compra no encontrada"), 404);
 
       const body = await c.req.json();
@@ -3185,6 +3268,10 @@ app.put("/api/compras/:id",
         return c.json(apiError("VALIDATION_ERROR", validation.error || "Datos inválidos"), 400);
       }
       const d = validation.data!;
+      const oldKey = existing.comprobante_key;
+      if (d.comprobante_key && oldKey && d.comprobante_key !== oldKey) {
+        try { await c.env.R2_BUCKET.delete(oldKey); } catch { /* ignore */ }
+      }
       const now = new Date().toISOString();
       const result = await db
         .prepare(`UPDATE compras SET
@@ -3897,4 +3984,18 @@ app.put("/api/admin/referidos/:id/reembolso", authMiddleware, async (c) => {
   return c.json(apiResponse({ updated: true }));
 });
 
-export default app;
+export default {
+  fetch: app.fetch,
+  async scheduled(_event: ScheduledEvent, env: Env, _ctx: ExecutionContext) {
+    const db = env.DB;
+    const expired = await db
+      .prepare(
+        "SELECT id, comprobante_key FROM compras WHERE expires_at <= datetime('now') AND comprobante_key IS NOT NULL"
+      )
+      .all();
+    for (const row of expired.results as { id: number; comprobante_key: string }[]) {
+      await env.R2_BUCKET.delete(row.comprobante_key);
+      await db.prepare("UPDATE compras SET comprobante_key = NULL WHERE id = ?").bind(row.id).run();
+    }
+  },
+};

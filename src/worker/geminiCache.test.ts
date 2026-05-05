@@ -76,6 +76,19 @@ describe("getOrCreateGeminiCache", () => {
       const result = await getOrCreateGeminiCache(db, "key", 1, 2, "ctx");
       expect(result).toBe("cachedContents/refreshed");
     });
+
+    it("creates cache when expires_at is null but name exists", async () => {
+      const db = makeDb({
+        gemini_cache_name: "cachedContents/stale",
+        gemini_cache_expires_at: null,
+      });
+      mockFetch.mockResolvedValueOnce(
+        new Response(JSON.stringify({ name: "cachedContents/renewed" }), { status: 200 })
+      );
+      const result = await getOrCreateGeminiCache(db, "key", 1, 2, "ctx");
+      expect(result).toBe("cachedContents/renewed");
+      expect(mockFetch).toHaveBeenCalledOnce();
+    });
   });
 
   describe("Gemini API payload", () => {

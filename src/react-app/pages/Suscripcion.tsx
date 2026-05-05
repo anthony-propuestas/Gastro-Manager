@@ -104,6 +104,9 @@ export default function SuscripcionPage() {
                 </li>
               </ul>
               <p className="text-2xl font-bold">ARS 15.000 <span className="text-base font-normal text-muted-foreground">/mes</span></p>
+              <div className="bg-blue-50 border border-blue-200 rounded-md px-3 py-2 text-sm text-blue-800">
+                <strong>Pagá con transferencia bancaria (CVU/CBU)</strong> y pagás menos comisión que con tarjeta de crédito. En el checkout de MercadoPago elegí <em>"Dinero en cuenta"</em> o <em>"Transferencia"</em>.
+              </div>
               <Button className="w-full" onClick={handleSuscribirse} disabled={isLoading}>
                 {isLoading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
                 Suscribirse
