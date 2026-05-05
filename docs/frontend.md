@@ -330,7 +330,7 @@ Callback de OAuth.
 1. Recibe código OAuth de Google
 2. Intercambia por token de sesión via `POST /api/sessions`
 3. Servidor setea cookie `session_token` (HttpOnly)
-4. Redirige a `/` (LandingPage, que luego redirige a `/dashboard` si está autenticado)
+4. Llama a `window.location.assign("/dashboard")` — reload completo para que `AuthContext` monte fresco con la cookie ya presente
 5. Si el usuario no está verificado → redirige a `/verify-email`
 
 ### VerifyEmailPage (`pages/VerifyEmailPage.tsx`)

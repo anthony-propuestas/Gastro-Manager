@@ -289,3 +289,17 @@ Vite genera archivos con hash en el nombre (ej. `index-BFSxencr.js`). Tras un re
 - **Aislamiento por negocio_id**: No aplica; LandingPage es pública y no accede a datos de negocio.
 
 **Conclusión**: sin riesgo de seguridad. El cambio reduce una ambigüedad anterior (el redirect de módulo restringido apuntaba a `/`, que era la vista protegida; ahora apunta a `/dashboard` explícitamente).
+
+---
+
+## Análisis de seguridad — AuthCallback: window.location.assign vs navigate
+
+Áreas revisadas:
+
+- **Autenticación / sesión**: El cambio reemplaza `navigate("/", { replace: true })` (navegación SPA client-side) por `window.location.assign("/dashboard")` (recarga completa). La motivación es corregir una race condition: `AuthContext` hace `GET /api/users/me` al montar, antes de que exista sesión; con navegación SPA el contexto ya resuelto tenía `user = null` y la LandingPage volvía a mostrarse. La cookie `session_token` la setea el servidor en `POST /api/sessions`; el cambio no altera cómo se crea ni transmite la cookie.
+- **Endpoint nuevo o modificado**: No hay cambios en endpoints. Solo cambia el comportamiento post-callback en el cliente.
+- **Autorización / roles**: `ProtectedRoute` sigue protegiendo `/dashboard`; si la cookie es inválida o inexistente, `authMiddleware` responde `401` y el cliente redirige a `/`.
+- **Validación de entrada**: No aplica. `AuthCallback` no procesa inputs del usuario directamente.
+- **Aislamiento por `negocio_id`**: No aplica. El callback no accede a datos de negocio.
+
+**Conclusión**: sin riesgo de seguridad. El reload completo es una práctica estándar tras OAuth y elimina una clase de bug de estado stale sin exponer ninguna superficie nueva.

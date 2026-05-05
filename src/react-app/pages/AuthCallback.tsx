@@ -32,7 +32,7 @@ export default function AuthCallback() {
 
         setStatus("success");
         setTimeout(() => {
-          navigate("/", { replace: true });
+          window.location.assign("/dashboard");
         }, 1000);
       } catch (error) {
         console.error("Auth callback error:", error);

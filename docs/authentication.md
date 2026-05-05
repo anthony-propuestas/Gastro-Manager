@@ -32,7 +32,7 @@ POST /api/sessions { code }
         │  Cookie session_token=<jwt> (HttpOnly, Secure, SameSite=Lax)
         │    ↓ Registra evento login_success en usage_logs
         │    ↓
-        │  { success: true } — frontend redirige a /
+        │  { success: true } — frontend llama a window.location.assign("/dashboard") (reload completo)
         ↓
         └─ Si el usuario es nuevo o no está verificado:
              ↓ Invalida tokens anteriores no usados (used_at = now)
@@ -467,7 +467,7 @@ useEffect(() => {
       }
       if (data.success) {
         setStatus("success");
-        setTimeout(() => navigate("/", { replace: true }), 1000);
+        setTimeout(() => window.location.assign("/dashboard"), 1000);
       } else {
         throw new Error(data.error?.message);
       }
