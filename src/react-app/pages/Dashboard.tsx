@@ -185,7 +185,7 @@ export default function Dashboard() {
       {/* Header */}
       <div>
         <h1 className="text-2xl sm:text-3xl font-serif font-semibold text-foreground">
-          Bienvenido de vuelta
+          Bienvenido, {currentNegocio?.name}
         </h1>
         <p className="text-muted-foreground mt-1">
           Aquí está el resumen de tu restaurante
