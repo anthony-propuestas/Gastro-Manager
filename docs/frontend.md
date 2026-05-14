@@ -139,7 +139,7 @@ Navegación inferior para dispositivos móviles (`components/layout/BottomNav.ts
 Página principal del asistente de IA en la ruta `/agente-ia`.
 
 **Características:**
-- Interfaz de chat con el agente Gemini
+- Interfaz de chat con el agente DeepSeek
 - Banner de cuota mensual (`UsageBanner` via `useMyUsage`)
 - Auto-scroll al último mensaje
 - Animación de escritura (puntos rebotando) mientras carga
@@ -726,63 +726,52 @@ Comunicación con el asistente virtual IA.
 export function useChat() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const sendMessage = async (content: string) => {
-    // Agregar mensaje del usuario al historial
+    if (!content.trim()) return;
     setMessages(prev => [...prev, { role: 'user', content, timestamp: new Date() }]);
     setIsLoading(true);
-    
+    setError(null);
+
+    const history = messages.slice(-5).map(m => ({
+      role: m.role === 'assistant' ? 'model' : m.role,
+      content: m.content,
+    }));
+
     try {
-      const response = await fetch('/api/chat', {
+      const data = await apiFetch('/api/chat', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: content }),
-      });
-      
-      const data = await response.json();
-      
+        body: JSON.stringify({ message: content, history }),
+      }, negocioId);
+
       if (data.success) {
-        // Agregar respuesta del asistente
-        setMessages(prev => [...prev, { 
-          role: 'assistant', 
+        setMessages(prev => [...prev, {
+          role: 'assistant',
           content: data.data.response,
-          timestamp: new Date()
+          timestamp: new Date(),
         }]);
       } else {
-        // Mostrar error como mensaje del sistema
-        setMessages(prev => [...prev, { 
-          role: 'error', 
-          content: data.error,
-          timestamp: new Date()
-        }]);
+        setError(data.error?.message || 'Error desconocido');
       }
-    } catch (error) {
-      setMessages(prev => [...prev, { 
-        role: 'error', 
-        content: 'Error de conexión',
-        timestamp: new Date()
-      }]);
+    } catch (err) {
+      setError('Error de red');
     } finally {
       setIsLoading(false);
     }
   };
 
   const clearMessages = () => setMessages([]);
-
-  return {
-    messages,
-    isLoading,
-    sendMessage,
-    clearMessages,
-  };
+  return { messages, isLoading, error, sendMessage, clearMessages };
 }
 ```
 
 **Características:**
-- Manejo de historial de mensajes en la sesión
-- Estados de carga mientras espera respuesta
-- Manejo de errores con mensajes descriptivos
-- Función para limpiar historial
+- Historial de mensajes de la sesión; se envían los últimos 5 al backend (`slice(-5)`)
+- Roles mapeados: `"assistant"` → `"model"` (formato requerido por el modelo IA)
+- `X-Negocio-ID` propagado via `apiFetch` con `negocioId` como tercer argumento
+- Estados de carga y error independientes
+- `clearMessages()` resetea el historial local
 
 ## Context Providers
 
@@ -885,7 +874,7 @@ Modal global que aparece cuando una acción con cuota falla por `429 USAGE_LIMIT
 
 ### ChatWidget (Asistente Virtual IA)
 
-Widget flotante para interactuar con el asistente virtual potenciado por Google Gemini.
+Widget flotante para interactuar con el asistente virtual potenciado por DeepSeek.
 
 **Ubicación:** `components/ChatWidget.tsx`
 

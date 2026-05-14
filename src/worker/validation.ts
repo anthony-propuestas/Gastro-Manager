@@ -206,7 +206,7 @@ export const crearSuscripcionSchema = z.object({
 
 // Chat validation schemas
 export const chatHistoryItemSchema = z.object({
-  role: z.enum(["user", "model"]),
+  role: z.enum(["user", "assistant"]),
   content: z.string().min(1).max(2000),
 });
 

@@ -28,7 +28,7 @@ export function useChat() {
 
     try {
       const history = messages.slice(-5).map((m) => ({
-        role: m.role === "assistant" ? "model" : "user",
+        role: m.role,
         content: m.content,
       }));
 

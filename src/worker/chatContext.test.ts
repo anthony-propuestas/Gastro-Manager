@@ -104,9 +104,8 @@ describe("POST /api/chat SQL Context Queries", () => {
     mockFetch.mockReset();
     mockFetch.mockImplementation(() => {
       return Promise.resolve(new Response(JSON.stringify({
-        name: "cachedContents/xyz",
-        candidates: [{ content: { parts: [{ text: "Hola" }] } }],
-        usageMetadata: { promptTokenCount: 10, candidatesTokenCount: 10 }
+        choices: [{ message: { content: "Hola" } }],
+        usage: { prompt_tokens: 10, completion_tokens: 10 }
       })));
     });
   });
@@ -117,7 +116,7 @@ describe("POST /api/chat SQL Context Queries", () => {
     const env = {
       DB: mockDb,
       JWT_SECRET: "secret",
-      GEMINI_API_KEY: "gemini_key",
+      DEEPSEEK_API_KEY: "deepseek_key",
       APP_URL: "http://localhost",
     };
 
@@ -166,12 +165,12 @@ describe("POST /api/chat SQL Context Queries", () => {
     const env = {
       DB: mockDb,
       JWT_SECRET: "secret",
-      GEMINI_API_KEY: "gemini_key",
+      DEEPSEEK_API_KEY: "deepseek_key",
       APP_URL: "http://localhost",
     };
 
     const longHistory = Array.from({ length: 10 }).map((_, i) => ({
-      role: i % 2 === 0 ? "user" : "model",
+      role: i % 2 === 0 ? "user" : "assistant",
       content: `msg ${i}`
     }));
 
@@ -188,16 +187,13 @@ describe("POST /api/chat SQL Context Queries", () => {
     const res = await app.fetch(req, env as any, execCtx);
     expect(res.status).toBe(200);
 
-    const fetchCall = mockFetch.mock.calls.find((call: any[]) => call[0].includes("generateContent"));
+    const fetchCall = mockFetch.mock.calls.find((call: any[]) => call[0].includes("chat/completions"));
     expect(fetchCall).toBeDefined();
 
     const requestBody = JSON.parse(fetchCall![1].body);
 
-    // The slice(-5) ensures we take only the last 5 messages from the history of 10.
-    // If the cache was used or not, the logic adds the new message to the trimmed history.
-    // However, if the cache was NOT used, the context text is prepended to the first message of the trimmed history.
-    // So if trimmed history has 5 messages, and we add 1 new message, the total length of `contents` should be 6.
-    expect(requestBody.contents).toBeDefined();
-    expect(requestBody.contents.length).toBe(6);
+    // DeepSeek uses `messages`: 1 system (context) + 5 trimmed history + 1 new user = 7.
+    expect(requestBody.messages).toBeDefined();
+    expect(requestBody.messages.length).toBe(7);
   });
 });

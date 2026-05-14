@@ -512,8 +512,8 @@ describe("chatHistoryItemSchema", () => {
     expect(chatHistoryItemSchema.safeParse({ role: "user", content: "hola" }).success).toBe(true);
   });
 
-  it("accepts valid model turn", () => {
-    expect(chatHistoryItemSchema.safeParse({ role: "model", content: "hola" }).success).toBe(true);
+  it("accepts valid assistant turn", () => {
+    expect(chatHistoryItemSchema.safeParse({ role: "assistant", content: "hola" }).success).toBe(true);
   });
 
   it("rejects unknown role", () => {
@@ -537,7 +537,7 @@ describe("chatHistoryArraySchema", () => {
   it("accepts valid history", () => {
     const history = [
       { role: "user", content: "pregunta" },
-      { role: "model", content: "respuesta" },
+      { role: "assistant", content: "respuesta" },
     ];
     expect(chatHistoryArraySchema.safeParse(history).success).toBe(true);
   });

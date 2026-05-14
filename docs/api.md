@@ -844,20 +844,28 @@ Regresa a `usuario_basico`. No puede aplicarse al propio admin (devuelve `403`).
 ### Chatbot IA
 *Requiere `X-Negocio-ID`* ⚠️ *Sujeto a cuota `chat`*
 
-⚠️ **Nota:** El chatbot **no tiene** `createModuleRestrictionMiddleware`. No es restringible por el owner. Además, el contexto que se envía a Gemini incluye datos de **todos** los módulos (empleados, eventos, tópicos, anticipos, pagos) independientemente de si el owner ha restringido algún módulo para gerentes.
+⚠️ **Nota:** El chatbot **no tiene** `createModuleRestrictionMiddleware`. No es restringible por el owner. Además, el contexto que se envía a DeepSeek incluye datos de **todos** los módulos (empleados, eventos, tópicos, anticipos, pagos) independientemente de si el owner ha restringido algún módulo para gerentes.
 
 #### `POST /api/chat`
-Envía un mensaje al asistente virtual (Google Gemini 2.5 Flash).
+Envía un mensaje al asistente virtual IA.
 
 ```json
 // Request
-{ "message": "¿Cuántos empleados activos tengo?" }
+{
+  "message": "¿Cuántos empleados activos tengo?",
+  "history": [
+    { "role": "user", "content": "Mensaje previo" },
+    { "role": "assistant", "content": "Respuesta previa" }
+  ]
+}
 
 // Response data
 { "response": "Actualmente tienes 5 empleados activos..." }
 ```
 
-El contexto enviado a Gemini incluye: empleados activos, sueldos del mes, anticipos, eventos del mes, tópicos pendientes. Todas las respuestas son en español.
+- **`history`**: array opcional de turnos anteriores. El backend usa hasta los últimos 5 items (el frontend envía `slice(-5)`); ítems extra son ignorados. Cada item: `{ role: "user"|"assistant", content: string (1–2000) }`.
+- **Contexto enviado al modelo:** empleados activos (`ORDER BY is_active DESC LIMIT 30`), eventos (`ORDER BY event_date ASC LIMIT 20`), tópicos pendientes (`ORDER BY due_date ASC LIMIT 15`), anticipos y pagos de sueldo del mes. Estas consultas se cachean en D1 (`chat_context_cache`) con TTL de 30 minutos.
+- Todas las respuestas son en español.
 
 ---
 
@@ -879,8 +887,8 @@ El contexto enviado a Gemini incluye: empleados activos, sueldos del mes, antici
 | `DUPLICATE_EMAIL` | 409 | Email de admin ya registrado |
 | `AUTH_ERROR` | 500 | Error al intercambiar el código OAuth con Google |
 | `DATABASE_ERROR` | 500 | Error interno de base de datos |
-| `GEMINI_API_ERROR` | 500 | Error en API de Gemini |
-| `CONFIG_ERROR` | 500 | `GEMINI_API_KEY` no configurada |
+| `DEEPSEEK_API_ERROR` | 500 | Error en API de DeepSeek |
+| `CONFIG_ERROR` | 500 | `DEEPSEEK_API_KEY` no configurada |
 | `PENDING_VERIFICATION` | 200 | Usuario sin verificar; se envió email de verificación. No es un error de sesión |
 
 ---

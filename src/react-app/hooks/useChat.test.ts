@@ -100,11 +100,11 @@ describe("useChat", () => {
     expect(secondBody.message).toBe("Pregunta 2");
     expect(secondBody.history).toEqual([
       { role: "user", content: "Pregunta 1" },
-      { role: "model", content: "Primera respuesta." },
+      { role: "assistant", content: "Primera respuesta." },
     ]);
   });
 
-  it("maps 'assistant' role to 'model' in history sent to the API", async () => {
+  it("preserves 'assistant' role in history sent to the API", async () => {
     mockApiFetch
       .mockResolvedValueOnce(ok("Respuesta asistente."))
       .mockResolvedValueOnce(ok("OK."));
@@ -116,7 +116,7 @@ describe("useChat", () => {
 
     const secondBody = JSON.parse(((mockApiFetch.mock.calls[1]?.[1] as RequestInit).body as string));
     const assistantEntry = secondBody.history.find((h: { role: string; content: string }) => h.content === "Respuesta asistente.");
-    expect(assistantEntry?.role).toBe("model");
+    expect(assistantEntry?.role).toBe("assistant");
   });
 
   it("caps history at 5 messages when the conversation is long", async () => {

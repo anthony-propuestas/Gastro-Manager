@@ -27,7 +27,6 @@ import {
 } from "./validation";
 import { USAGE_TOOLS, type UsageTool } from "./usageTools";
 import { checkRateLimit } from "./rateLimitAuth";
-import { getOrCreateGeminiCache } from "./geminiCache";
 import { incrementAndCheckInteligenteLimit, CHAT_CAP_INTELIGENTE } from "./usageLimit";
 
 type Env = {
@@ -39,7 +38,7 @@ type Env = {
   JWT_SECRET: string;
   RESEND_API_KEY: string;
   INITIAL_ADMIN_EMAIL?: string;
-  GEMINI_API_KEY?: string;
+  DEEPSEEK_API_KEY?: string;
   MERCADO_PAGO_ACCESS_TOKEN: string;
   MERCADO_PAGO_ACCESS_TOKEN_TEST?: string;
   MERCADO_PAGO_WEBHOOK_SECRET: string;
@@ -2949,8 +2948,8 @@ app.post("/api/chat", authMiddleware, negocioMiddleware, createUsageLimitMiddlew
       return c.json(apiError("VALIDATION_ERROR", "History debe ser un array"), 400);
     }
 
-    if (!c.env.GEMINI_API_KEY) {
-      return c.json(apiError("CONFIG_ERROR", "API key de Gemini no configurada"), 500);
+    if (!c.env.DEEPSEEK_API_KEY) {
+      return c.json(apiError("CONFIG_ERROR", "API key de DeepSeek no configurada"), 500);
     }
 
     const sliced = (history as unknown[]).slice(-5);
@@ -3057,82 +3056,67 @@ app.post("/api/chat", authMiddleware, negocioMiddleware, createUsageLimitMiddlew
       contextText = cached.context_text;
     }
 
-    const geminiCacheName = await getOrCreateGeminiCache(db, c.env.GEMINI_API_KEY, user.id, negocio.id, contextText);
+    // ── Construir messages[] para DeepSeek (OpenAI-compatible) ───────────────
+    type DSMessage = { role: "system" | "user" | "assistant"; content: string };
+    const dsMessages: DSMessage[] = [
+      { role: "system", content: contextText },
+      ...trimmedHistory.map((m) => ({ role: m.role as "user" | "assistant", content: m.content })),
+      { role: "user", content: message },
+    ];
 
-    // ── Construir contents[] para Gemini (multi-turno) ─────────────────────
-    type GeminiPart = { role: string; parts: { text: string }[] };
-    let contents: GeminiPart[];
+    // ── Llamada a DeepSeek ──────────────────────────────────────────────────
+    const dsUrl = "https://api.deepseek.com/chat/completions";
 
-    if (geminiCacheName) {
-      // Contexto en systemInstruction cacheada — contents solo lleva la conversación
-      contents = trimmedHistory.length === 0
-        ? [{ role: "user", parts: [{ text: message }] }]
-        : [
-            ...trimmedHistory.map((m) => ({ role: m.role, parts: [{ text: m.content }] })),
-            { role: "user", parts: [{ text: message }] },
-          ];
-    } else if (trimmedHistory.length === 0) {
-      contents = [{ role: "user", parts: [{ text: `${contextText}\n\nUsuario: ${message}` }] }];
-    } else {
-      const [firstTurn, ...restTurns] = trimmedHistory;
-      contents = [
-        { role: firstTurn.role, parts: [{ text: `${contextText}\n\nUsuario: ${firstTurn.content}` }] },
-        ...restTurns.map((m) => ({ role: m.role, parts: [{ text: m.content }] })),
-        { role: "user", parts: [{ text: message }] },
-      ];
-    }
-
-    // ── Llamada a Gemini ────────────────────────────────────────────────────
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent`;
-
-    const geminiBody: Record<string, unknown> = {
-      contents,
-      generationConfig: { temperature: 1.0, maxOutputTokens: 500 },
-    };
-    if (geminiCacheName) geminiBody.cachedContent = geminiCacheName;
-
-    let geminiResponse;
+    let dsResponse;
     try {
-      geminiResponse = await fetch(geminiUrl, {
+      dsResponse = await fetch(dsUrl, {
         method: "POST",
-        headers: { "Content-Type": "application/json", "x-goog-api-key": c.env.GEMINI_API_KEY ?? "" },
-        body: JSON.stringify(geminiBody),
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${c.env.DEEPSEEK_API_KEY ?? ""}`,
+        },
+        body: JSON.stringify({
+          model: "deepseek-chat",
+          messages: dsMessages,
+          max_tokens: 500,
+          temperature: 1.0,
+        }),
       });
     } catch (fetchError: any) {
       console.error("Fetch failed:", fetchError);
       return c.json(apiError("NETWORK_ERROR", "Error de conexión con el asistente. Por favor intenta de nuevo."), 500);
     }
 
-    if (!geminiResponse.ok) {
-      const errorText = await geminiResponse.text();
-      console.error("Gemini API error:", geminiResponse.status, errorText);
+    if (!dsResponse.ok) {
+      const errorText = await dsResponse.text();
+      console.error("DeepSeek API error:", dsResponse.status, errorText);
       let userMessage = "El asistente no está disponible en este momento. Intenta más tarde.";
-      if (geminiResponse.status === 400) userMessage = "Error en la solicitud al asistente (modelo no válido o parámetros incorrectos).";
-      if (geminiResponse.status === 401 || geminiResponse.status === 403) userMessage = "API key de Gemini inválida o sin permisos.";
-      if (geminiResponse.status === 404) userMessage = "Modelo de IA no encontrado. Contacta al administrador.";
-      if (geminiResponse.status === 429) userMessage = "Límite de la API de Gemini alcanzado. Intenta más tarde.";
-      return c.json(apiError("GEMINI_API_ERROR", userMessage), 500);
+      if (dsResponse.status === 400) userMessage = "Error en la solicitud al asistente (modelo no válido o parámetros incorrectos).";
+      if (dsResponse.status === 401 || dsResponse.status === 403) userMessage = "API key de DeepSeek inválida o sin permisos.";
+      if (dsResponse.status === 404) userMessage = "Modelo de IA no encontrado. Contacta al administrador.";
+      if (dsResponse.status === 429) userMessage = "Límite de la API de DeepSeek alcanzado. Intenta más tarde.";
+      return c.json(apiError("DEEPSEEK_API_ERROR", userMessage), 500);
     }
 
-    let geminiData: any;
+    let dsData: any;
     try {
-      geminiData = await geminiResponse.json();
+      dsData = await dsResponse.json();
     } catch {
       return c.json(apiError("PARSE_ERROR", "Error al procesar la respuesta del asistente"), 500);
     }
 
-    const reply = geminiData?.candidates?.[0]?.content?.parts?.[0]?.text || "Lo siento, no pude generar una respuesta.";
+    const reply = dsData?.choices?.[0]?.message?.content || "Lo siento, no pude generar una respuesta.";
 
     await logUsage(db, user.id, negocio.id, "create", "chat");
 
-    const usage = geminiData?.usageMetadata;
+    const usage = dsData?.usage;
     if (usage) {
       c.executionCtx.waitUntil(
         db
           .prepare(
             "INSERT INTO gemini_usage_log (user_id, negocio_id, prompt_tokens, output_tokens) VALUES (?, ?, ?, ?)"
           )
-          .bind(user.id, negocio.id, usage.promptTokenCount ?? null, usage.candidatesTokenCount ?? null)
+          .bind(user.id, negocio.id, usage.prompt_tokens ?? null, usage.completion_tokens ?? null)
           .run()
       );
     }
