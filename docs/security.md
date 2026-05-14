@@ -303,3 +303,17 @@ Vite genera archivos con hash en el nombre (ej. `index-BFSxencr.js`). Tras un re
 - **Aislamiento por `negocio_id`**: No aplica. El callback no accede a datos de negocio.
 
 **Conclusión**: sin riesgo de seguridad. El reload completo es una práctica estándar tras OAuth y elimina una clase de bug de estado stale sin exponer ninguna superficie nueva.
+
+---
+
+## Revisión — Refactor frontend ChatContext + renombre /agente-ia (2026-05-14)
+
+Áreas revisadas:
+
+- **ChatContext nuevo**: `ChatProvider` encapsula `useChat()` existente y lo comparte entre `Dashboard` y `ChatWidget`. No hay nueva superficie de red; el mismo endpoint `POST /api/chat` con las mismas validaciones Zod y la misma autenticación por JWT/cookie. Sin impacto en seguridad.
+- **Chatbot / historial**: el historial sigue truncado a 20 ítems antes de enviarlo a Gemini. El nuevo context solo reorganiza el estado en React; no modifica cómo se construye ni se envía el payload.
+- **Autenticación / sesión**: `ProtectedRoute` y `AuthCallback` solo cambiaron la ruta de redirect post-auth (`/dashboard` → `/agente-ia`). El contrato de seguridad es idéntico: la cookie `session_token` sigue siendo validada por `authMiddleware` en cada request; el reload completo de `AuthCallback` no fue modificado.
+- **Autorización / roles**: `OwnerPanel` y `RestrictedModuleRoute` siguen redirigiendo a `/agente-ia` (antes `/dashboard`) sin cambios en la lógica de verificación de roles.
+- **Suscripcion.tsx / SuscripcionEstado.tsx**: solo consumen el hook `useSuscripcion()` ya existente; no agregan endpoints ni modifican el flujo de webhook de MercadoPago documentado arriba.
+
+**Conclusión**: sin nuevo riesgo de seguridad. Los cambios son de organización de estado React y renombrado de rutas frontend.

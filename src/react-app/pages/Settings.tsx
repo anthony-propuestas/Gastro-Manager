@@ -5,6 +5,14 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/rea
 import { Button } from "@/react-app/components/ui/button";
 import { Separator } from "@/react-app/components/ui/separator";
 import { Switch } from "@/react-app/components/ui/switch";
+import { Label } from "@/react-app/components/ui/label";
+import { Input } from "@/react-app/components/ui/input";
+
+type InvitationResponse = {
+  success: boolean;
+  data?: { invite_url: string };
+  error?: { message?: string };
+};
 
 import { useAuth } from "@/react-app/context/AuthContext";
 import { useNegocios } from "@/react-app/hooks/useNegocios";
@@ -35,6 +43,7 @@ export default function Settings() {
   const [leaving, setLeaving] = useState(false);
   const [ownerStatus, setOwnerStatus] = useState<OwnerStatus>('loading');
   const [requestingOwner, setRequestingOwner] = useState(false);
+  const [invite, setInvite] = useState({ url: "", error: "", loading: false });
 
   useEffect(() => {
     const loadTeam = async () => {
@@ -126,6 +135,31 @@ export default function Settings() {
     setLeaving(false);
   };
 
+  const handleGenerateInvite = async () => {
+    if (!negocioId) {
+      setInvite(prev => ({ ...prev, error: "No hay un negocio seleccionado." }));
+      return;
+    }
+    setInvite({ url: "", error: "", loading: true });
+    try {
+      const response = await apiFetch(`/api/negocios/${negocioId}/invitations`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      }, negocioId);
+      const data = (await response.json()) as InvitationResponse;
+      if (!response.ok || !data.success || !data.data?.invite_url) {
+        throw new Error(data.error?.message || "No se pudo generar la invitacion.");
+      }
+      setInvite({ url: data.data.invite_url, error: "", loading: false });
+    } catch (error) {
+      setInvite({
+        url: "",
+        error: error instanceof Error ? error.message : "Error inesperado al generar la invitacion.",
+        loading: false,
+      });
+    }
+  };
+
   return (
     <div className="space-y-6 max-w-3xl">
       {/* Header */}
@@ -178,6 +212,45 @@ export default function Settings() {
           )}
         </CardContent>
       </Card>
+
+      {/* Invitar miembro */}
+      {currentNegocio && (
+        <Card className="border-0 shadow-sm">
+          <CardHeader>
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-primary/10">
+                <UsersRound className="w-5 h-5 text-primary" />
+              </div>
+              <div>
+                <CardTitle className="text-lg font-serif">Invitar a un miembro</CardTitle>
+                <CardDescription>
+                  Genera un enlace para invitar a alguien a tu negocio y compartir acceso.
+                </CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <button
+              type="button"
+              onClick={handleGenerateInvite}
+              disabled={invite.loading}
+              className="inline-flex h-10 items-center justify-center rounded-4xl border border-border bg-input/30 px-4 text-sm font-medium hover:bg-input/50 disabled:opacity-50"
+            >
+              {invite.loading ? "Generando..." : "Generar link de invitacion"}
+            </button>
+            <div className={invite.url ? "space-y-2" : "hidden"}>
+              <Label htmlFor="settings-invite-url">Link generado</Label>
+              <Input id="settings-invite-url" value={invite.url} readOnly />
+              <p className="text-xs text-muted-foreground">
+                Copia este enlace manualmente y compartelo con quien quieras invitar.
+              </p>
+            </div>
+            <p className={invite.error ? "text-sm text-destructive" : "hidden"}>
+              {invite.error}
+            </p>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Módulos de Gestión */}
       <Card className="border-0 shadow-sm">

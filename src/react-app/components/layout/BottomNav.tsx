@@ -1,6 +1,6 @@
 import { NavLink, useLocation } from "react-router";
 import {
-  LayoutDashboard,
+  Bot,
   Users,
   Calendar,
   Settings,
@@ -13,7 +13,7 @@ import { cn } from "@/react-app/lib/utils";
 import { useModulePrefsContext } from "@/react-app/context/ModulePrefsContext";
 
 const navItems = [
-  { path: "/dashboard",     label: "Inicio",      icon: LayoutDashboard },
+  { path: "/agente-ia",     label: "Agente IA",   icon: Bot },
   { path: "/calendario",    label: "Calendario",  icon: Calendar,     moduleKey: "calendario"  as const },
   { path: "/empleados",     label: "Personal",    icon: Users,        moduleKey: "personal"    as const },
   { path: "/sueldos",       label: "Sueldos",     icon: Banknote,     moduleKey: "sueldos"     as const },
@@ -39,8 +39,8 @@ export default function BottomNav() {
       <div className="flex items-stretch">
         {visibleNavItems.map((item) => {
           const isActive =
-            item.path === "/dashboard"
-              ? location.pathname === "/dashboard"
+            item.path === "/agente-ia"
+              ? location.pathname === "/agente-ia"
               : location.pathname.startsWith(item.path);
           const Icon = item.icon;
 

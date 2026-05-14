@@ -109,7 +109,7 @@ export default function InvitePage() {
                 <p className="font-medium">Invitación no disponible</p>
                 <p className="text-sm text-muted-foreground">{errorMsg}</p>
               </div>
-              <Button variant="outline" onClick={() => navigate("/dashboard")}>
+              <Button variant="outline" onClick={() => navigate("/agente-ia")}>
                 Ir al inicio
               </Button>
             </CardContent>
@@ -179,7 +179,7 @@ export default function InvitePage() {
                   Ya puedes acceder a {preview?.negocio_name}
                 </p>
               </div>
-              <Button onClick={() => navigate("/dashboard")}>Ir al dashboard</Button>
+              <Button onClick={() => navigate("/agente-ia")}>Ir al dashboard</Button>
             </CardContent>
           </Card>
         )}

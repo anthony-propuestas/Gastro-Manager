@@ -102,11 +102,11 @@ describe("AuthCallback — éxito", () => {
     });
   });
 
-  it("llama a window.location.assign('/dashboard') después del timeout de éxito", async () => {
+  it("llama a window.location.assign('/agente-ia') después del timeout de éxito", async () => {
     mockFetch({ success: true });
     renderPage();
     await waitFor(
-      () => expect(assignMock).toHaveBeenCalledWith("/dashboard"),
+      () => expect(assignMock).toHaveBeenCalledWith("/agente-ia"),
       { timeout: 2000 }
     );
   });

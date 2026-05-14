@@ -44,7 +44,7 @@ export default function OwnerPanel() {
   }, [isOwner, negocioId, fetchRequests, fetchRestrictions]);
 
   if (!currentNegocio || currentNegocio.my_role !== 'owner') {
-    return <Navigate to="/dashboard" replace />;
+    return <Navigate to="/agente-ia" replace />;
   }
 
   const handleApprove = async (requestId: number) => {

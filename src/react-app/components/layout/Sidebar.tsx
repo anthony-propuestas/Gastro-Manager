@@ -1,7 +1,7 @@
 import { NavLink, useLocation, useNavigate } from "react-router";
 import { useAuth } from "@/react-app/context/AuthContext";
 import {
-  LayoutDashboard,
+  Bot,
   Users,
   Calendar,
   Settings,
@@ -28,7 +28,7 @@ import { useModulePrefsContext } from "@/react-app/context/ModulePrefsContext";
 import type { Negocio } from "@/shared/types";
 
 const navItems = [
-  { path: "/dashboard",     label: "Dashboard",    icon: LayoutDashboard },
+  { path: "/agente-ia",     label: "Agente IA",    icon: Bot },
   { path: "/calendario",    label: "Calendario",   icon: Calendar,      moduleKey: "calendario"  as const },
   { path: "/empleados",     label: "Personal",     icon: Users,         moduleKey: "personal"    as const },
   { path: "/sueldos",       label: "Sueldos",      icon: Banknote,      moduleKey: "sueldos"     as const },
@@ -199,8 +199,8 @@ export default function Sidebar() {
         <nav className="flex-1 p-3 lg:p-4 space-y-1 overflow-y-auto">
           {visibleNavItems.map((item) => {
             const isActive =
-              item.path === "/dashboard"
-                ? location.pathname === "/dashboard"
+              item.path === "/agente-ia"
+                ? location.pathname === "/agente-ia"
                 : location.pathname.startsWith(item.path);
             const Icon = item.icon;
 

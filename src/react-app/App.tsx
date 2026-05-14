@@ -8,7 +8,8 @@ import { SidebarProvider } from "@/react-app/hooks/useSidebar";
 import { ModulePrefsProvider } from "@/react-app/context/ModulePrefsContext";
 import { UsageLimitModalProvider } from "@/react-app/context/UsageLimitModalContext";
 import { ChatWidget } from "@/react-app/components/ChatWidget";
-import Dashboard from "@/react-app/pages/Dashboard";
+import { ChatProvider } from "@/react-app/context/ChatContext";
+import AgenteIA from "@/react-app/pages/Dashboard";
 import Employees from "@/react-app/pages/modulos/Employees";
 import Salaries from "@/react-app/pages/modulos/Salaries";
 import CalendarPage from "@/react-app/pages/modulos/CalendarPage";
@@ -35,6 +36,7 @@ export default function App() {
             <Router>
               <ModulePrefsProvider>
               <SidebarProvider>
+              <ChatProvider>
               <ChatWidget />
               <Routes>
           {/* Public routes */}
@@ -55,12 +57,12 @@ export default function App() {
 
           {/* Protected routes */}
               <Route
-                path="/dashboard"
+                path="/agente-ia"
                 element={
                   <ProtectedRoute>
                     <MainLayout>
                       <PageErrorBoundary>
-                        <Dashboard />
+                        <AgenteIA />
                       </PageErrorBoundary>
                     </MainLayout>
                   </ProtectedRoute>
@@ -209,6 +211,7 @@ export default function App() {
                 }
               />
             </Routes>
+              </ChatProvider>
               </SidebarProvider>
               </ModulePrefsProvider>
             </Router>

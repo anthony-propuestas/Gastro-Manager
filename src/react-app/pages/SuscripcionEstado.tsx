@@ -32,7 +32,7 @@ export default function SuscripcionEstadoPage() {
         <Button onClick={() => navigate("/suscripcion")} variant={approved ? "outline" : "default"}>
           Ver mi suscripción
         </Button>
-        <Button onClick={() => navigate("/dashboard")} variant={approved ? "default" : "outline"}>
+        <Button onClick={() => navigate("/agente-ia")} variant={approved ? "default" : "outline"}>
           Volver a la app
         </Button>
       </div>

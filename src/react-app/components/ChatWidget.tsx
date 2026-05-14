@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { MessageCircle, X, Send, Trash2 } from "lucide-react";
-import { useChat } from "@/react-app/hooks/useChat";
+import { useLocation } from "react-router";
+import { useChatContext } from "@/react-app/context/ChatContext";
 import { useMyUsage } from "@/react-app/hooks/useMyUsage";
 import { UsageBanner } from "@/react-app/components/UsageBanner";
 import { Button } from "@/react-app/components/ui/button";
@@ -9,7 +10,8 @@ import { Input } from "@/react-app/components/ui/input";
 export function ChatWidget() {
   const [isOpen, setIsOpen] = useState(false);
   const [inputValue, setInputValue] = useState("");
-  const { messages, isLoading, error, sendMessage, clearMessages } = useChat();
+  const location = useLocation();
+  const { messages, isLoading, error, sendMessage, clearMessages } = useChatContext();
   const { data: myUsage } = useMyUsage();
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -33,14 +35,16 @@ export function ChatWidget() {
 
   return (
     <>
-      {/* Floating Button — sube en mobile para no tapar bottom nav */}
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        className="fixed bottom-[72px] right-4 lg:bottom-6 lg:right-6 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg transition-all hover:scale-110 hover:shadow-xl"
-        aria-label="Abrir chat"
-      >
-        {isOpen ? <X className="h-6 w-6" /> : <MessageCircle className="h-6 w-6" />}
-      </button>
+      {/* Floating Button — oculto en /agente-ia, sube en mobile para no tapar bottom nav */}
+      {location.pathname !== "/agente-ia" && (
+        <button
+          onClick={() => setIsOpen(!isOpen)}
+          className="fixed bottom-[72px] right-4 lg:bottom-6 lg:right-6 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg transition-all hover:scale-110 hover:shadow-xl"
+          aria-label="Abrir chat"
+        >
+          {isOpen ? <X className="h-6 w-6" /> : <MessageCircle className="h-6 w-6" />}
+        </button>
+      )}
 
       {/* Chat Panel — en mobile ocupa casi toda la pantalla desde arriba del bottom nav */}
       {isOpen && (

@@ -32,7 +32,7 @@ export default function AuthCallback() {
 
         setStatus("success");
         setTimeout(() => {
-          window.location.assign("/dashboard");
+          window.location.assign("/agente-ia");
         }, 1000);
       } catch (error) {
         console.error("Auth callback error:", error);

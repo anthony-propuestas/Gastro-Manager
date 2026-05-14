@@ -54,7 +54,7 @@ export function RestrictedModuleRoute({ moduleKey, children }: RestrictedModuleR
   const { negocioRestrictions, isGerente } = useModulePrefsContext();
 
   if (isGerente && negocioRestrictions[moduleKey]) {
-    return <Navigate to="/dashboard" replace />;
+    return <Navigate to="/agente-ia" replace />;
   }
 
   return <>{children}</>;

@@ -189,12 +189,12 @@ describe("RestrictedModuleRoute", () => {
               </RestrictedModuleRoute>
             }
           />
-          <Route path="/dashboard" element={<div>dashboard page</div>} />
+          <Route path="/agente-ia" element={<div>agente-ia page</div>} />
         </Routes>
       </MemoryRouter>
     );
 
-    expect(screen.getByText("dashboard page")).toBeInTheDocument();
+    expect(screen.getByText("agente-ia page")).toBeInTheDocument();
   });
 
   it("renders children when the module is available", () => {

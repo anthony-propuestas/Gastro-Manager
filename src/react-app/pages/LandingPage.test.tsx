@@ -40,7 +40,7 @@ function renderPage(initialPath = "/") {
     <MemoryRouter initialEntries={[initialPath]}>
       <Routes>
         <Route path="/" element={<LandingPage />} />
-        <Route path="/dashboard" element={<div>dashboard page</div>} />
+        <Route path="/agente-ia" element={<div>agente-ia page</div>} />
       </Routes>
     </MemoryRouter>
   );
@@ -191,10 +191,10 @@ describe("LandingPage — renderizado", () => {
 // ─── Comportamiento de autenticación ─────────────────────────────────────────
 
 describe("LandingPage — autenticación", () => {
-  it("redirige a /dashboard cuando el usuario está autenticado", () => {
+  it("redirige a /agente-ia cuando el usuario está autenticado", () => {
     mockUseAuth.mockReturnValue(AUTH_AUTENTICADO);
     renderPage();
-    expect(screen.getByText("dashboard page")).toBeInTheDocument();
+    expect(screen.getByText("agente-ia page")).toBeInTheDocument();
   });
 
   it("no redirige mientras isPending es true (aunque user sea null)", () => {

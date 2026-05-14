@@ -97,7 +97,7 @@ Navegación lateral adaptativa.
 ```tsx
 // Navegación — items con moduleKey se filtran según preferencias de módulo
 const navItems = [
-  { label: "Inicio",        icon: LayoutDashboard, path: "/dashboard" },
+  { label: "Agente IA",     icon: Bot,             path: "/agente-ia" },
   { label: "Calendario",    icon: Calendar,        path: "/calendario",   moduleKey: "calendario" },
   { label: "Personal",      icon: Users,           path: "/empleados",    moduleKey: "personal" },
   { label: "Sueldos",       icon: Banknote,        path: "/sueldos",      moduleKey: "sueldos" },
@@ -127,34 +127,58 @@ Navegación inferior para dispositivos móviles (`components/layout/BottomNav.ts
 
 **Comportamiento:**
 - Visible solo en pantallas pequeñas (`lg:hidden`)
-- Muestra los mismos items de navegación que el Sidebar (Inicio, Calendario, Personal, Sueldos, Compras, Facturación, Vendedores, Config)
+- Muestra los mismos items de navegación que el Sidebar (Agente IA, Calendario, Personal, Sueldos, Compras, Facturación, Vendedores, Config)
 - Respeta las mismas reglas de filtrado por `moduleKey` y restricciones del owner
 - Íconos compactos con label debajo
 - Indicador visual del item activo
 
 ## Páginas
 
-### Dashboard (`pages/Dashboard.tsx`)
+### Dashboard / Agente IA (`pages/Dashboard.tsx`)
 
-Vista principal con resumen del negocio activo.
+Página principal del asistente de IA en la ruta `/agente-ia`.
 
 **Características:**
-- 4 tarjetas de estadísticas clicables (Empleados Activos, Eventos Hoy, Temas Abiertos, Sueldos del Mes)
-- Lista de los primeros 5 empleados
-- Eventos del día (filtrados desde la consulta mensual)
-- Acciones rápidas (Ver Personal, Gestionar Sueldos, Ver Calendario, Configuración)
-- **Sección de invitaciones:** genera URLs de invitación para el negocio actual via `POST /api/negocios/{id}/invitations`
+- Interfaz de chat con el agente Gemini
+- Banner de cuota mensual (`UsageBanner` via `useMyUsage`)
+- Auto-scroll al último mensaje
+- Animación de escritura (puntos rebotando) mientras carga
+- Mensaje de bienvenida cuando no hay historial
+- Botón "Limpiar" visible solo cuando hay mensajes
+- Texto de error cuando `error` tiene valor
+- Input deshabilitado mientras `isLoading` es `true`
 
 **Datos:**
 ```tsx
-const { employees } = useEmployees();
-const { fetchOverview } = useSalaries();
-// Eventos, tópicos e invitaciones usan apiFetch(..., {}, currentNegocio?.id)
+const { messages, isLoading, error, sendMessage, clearMessages } = useChatContext();
+const { data: myUsage } = useMyUsage();
 ```
 
-**Actualización por cambio de negocio:**
-- El dashboard vuelve a cargar overview, eventos y tópicos cuando cambia `currentNegocio`.
-- Antes de recargar, limpia el estado derivado (`salaryOverview`, `eventsToday`, `openTopics`) para no mostrar datos del negocio anterior.
+### Suscripcion (`pages/Suscripcion.tsx`)
+
+Gestión de suscripción en la ruta `/suscripcion`.
+
+**Características:**
+- Muestra el plan actual y tabla de pagos (aprobado, rechazado, pendiente, cancelado, en proceso)
+- Botón "Suscribirse" → llama a `crear()` con código de referido opcional, redirige a `initPoint` de MercadoPago
+- Botón "Cancelar" si la suscripción está activa
+- Botón "Actualizar método de pago" si está en período de gracia
+- Botón "Completar pago" si hay pago pendiente
+- Comparativa plan gratuito vs Plan Inteligente
+
+**Datos:**
+```tsx
+const { suscripcion, pagos, crear, cancelar } = useSuscripcion();
+```
+
+### SuscripcionEstado (`pages/SuscripcionEstado.tsx`)
+
+Página de resultado de pago en la ruta `/suscripcion/estado`.
+
+**Características:**
+- Lee los query params `collection_status` o `status` del redirect de MercadoPago
+- Muestra ícono `CheckCircle` (éxito) si el valor es `approved`, `XCircle` (fallo) en cualquier otro caso
+- Sin fetches — UI informativa pura post-redirect
 
 ### Employees (`pages/modulos/Employees.tsx`)
 
@@ -813,6 +837,20 @@ Distribuye las preferencias de módulos (`useModulePrefs`) al árbol de componen
 const { prefs, toggleModule } = useModulePrefsContext();
 ```
 
+### ChatProvider
+
+Provee el estado global de chat (implementado en `context/ChatContext.tsx`) al árbol de componentes. Comparte la misma instancia de `useChat()` entre `Dashboard` (página full-screen) y `ChatWidget` (widget flotante), evitando historiales duplicados.
+
+```tsx
+<ChatProvider>
+  {children}
+</ChatProvider>
+
+// Uso en componentes
+const { messages, isLoading, error, sendMessage, clearMessages } = useChatContext();
+// Lanza error si se usa fuera de ChatProvider
+```
+
 ## Componentes Especiales
 
 ### UsageBanner (`components/UsageBanner.tsx`)
@@ -917,13 +955,15 @@ Usuario: ¿Qué eventos tengo hoy?
 Asistente: Hoy tienes 2 eventos programados: Reunión de equipo a las 10:00 y Entrega de uniformes a las 15:00.
 ```
 
+**Hook:** Consume `useChatContext()` (comparte historial con `Dashboard`). Oculto automáticamente en la ruta `/agente-ia` para no duplicar la interfaz de chat.
+
 **Integración:**
 ```tsx
-// main.tsx
+// MainLayout.tsx
 import { ChatWidget } from "./components/ChatWidget";
 
 // ChatWidget se monta dentro del layout principal,
-// visible para todos los usuarios autenticados
+// visible para todos los usuarios autenticados excepto en /agente-ia
 <MainLayout>
   <Outlet />
   <ChatWidget />
@@ -971,7 +1011,7 @@ Por página individual.
   <Route path="/negocio/setup" element={<ProtectedRoute><NegocioSetup /></ProtectedRoute>} />
 
   {/* Protected — requieren negocio activo */}
-  <Route path="/dashboard" element={<ProtectedRoute><MainLayout><Dashboard /></MainLayout></ProtectedRoute>} />
+  <Route path="/agente-ia" element={<ProtectedRoute><MainLayout><Dashboard /></MainLayout></ProtectedRoute>} />
   <Route path="/empleados" element={<ProtectedRoute><MainLayout><RestrictedModuleRoute moduleKey="personal"><Employees /></RestrictedModuleRoute></MainLayout></ProtectedRoute>} />
   <Route path="/sueldos" element={<ProtectedRoute><MainLayout><RestrictedModuleRoute moduleKey="sueldos"><Salaries /></RestrictedModuleRoute></MainLayout></ProtectedRoute>} />
   <Route path="/calendario" element={<ProtectedRoute><MainLayout><RestrictedModuleRoute moduleKey="calendario"><CalendarPage /></RestrictedModuleRoute></MainLayout></ProtectedRoute>} />
@@ -985,8 +1025,8 @@ Por página individual.
   <Route path="/sellers" element={<ProtectedRoute><MainLayout><SellersPage /></MainLayout></ProtectedRoute>} />
 </Routes>
 
-{/* Provider hierarchy: ErrorBoundary > AuthProvider > ToastProvider > UsageLimitModalProvider > Router > ModulePrefsProvider > SidebarProvider > ChatWidget + Routes */}
-{/* ChatWidget se renderiza a nivel de SidebarProvider, fuera de MainLayout, visible en todas las rutas */}
+{/* Provider hierarchy: ErrorBoundary > AuthProvider > ToastProvider > UsageLimitModalProvider > Router > ModulePrefsProvider > SidebarProvider > ChatProvider > ChatWidget + Routes */}
+{/* ChatWidget se renderiza a nivel de ChatProvider, fuera de MainLayout, visible en todas las rutas excepto /agente-ia */}
 ```
 
 ## Estilos y Tema

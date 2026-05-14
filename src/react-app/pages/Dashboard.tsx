@@ -1,412 +1,134 @@
-import { useState, useEffect } from "react";
-import { useNavigate } from "react-router";
-import { Users, Calendar, DollarSign, AlertCircle, UsersRound } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/react-app/components/ui/card";
-import { Label } from "@/react-app/components/ui/label";
+import { useState, useRef, useEffect } from "react";
+import { Bot, Send, Trash2, MessageCircle } from "lucide-react";
+import { useChatContext } from "@/react-app/context/ChatContext";
+import { useMyUsage } from "@/react-app/hooks/useMyUsage";
+import { UsageBanner } from "@/react-app/components/UsageBanner";
+import { Button } from "@/react-app/components/ui/button";
 import { Input } from "@/react-app/components/ui/input";
-import { useAuth } from "@/react-app/context/AuthContext";
-import { useEmployees } from "@/react-app/hooks/useEmployees";
-import { useSalaries } from "@/react-app/hooks/useSalaries";
-import { apiFetch } from "@/react-app/lib/api";
 
-type InvitationResponse = {
-  success: boolean;
-  data?: { invite_url: string };
-  error?: { message?: string };
-};
-
-type SalaryOverview = {
-  totals?: {
-    total_salaries: number;
-    total_advances: number;
-  };
-};
-
-type CalendarEvent = {
-  id: number;
-  event_date: string;
-  title: string;
-  start_time?: string;
-  description?: string;
-  location?: string;
-};
-
-export default function Dashboard() {
-  const navigate = useNavigate();
-  const { currentNegocio } = useAuth();
-  const negocioId = currentNegocio?.id;
-  const { employees, isLoading: loadingEmployees } = useEmployees();
-  const { fetchOverview } = useSalaries();
-  const [invite, setInvite] = useState({ url: "", error: "", loading: false });
-  const [salaryOverview, setSalaryOverview] = useState<SalaryOverview | null>(null);
-  const [eventsToday, setEventsToday] = useState<CalendarEvent[]>([]);
-  const [openTopics, setOpenTopics] = useState(0);
-  const [loadingData, setLoadingData] = useState(true);
+export default function AgenteIA() {
+  const [inputValue, setInputValue] = useState("");
+  const { messages, isLoading, error, sendMessage, clearMessages } = useChatContext();
+  const { data: myUsage } = useMyUsage();
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const loadDashboardData = async () => {
-      setLoadingData(true);
-      setSalaryOverview(null);
-      setEventsToday([]);
-      setOpenTopics(0);
-      
-      // Load salary overview
-      const now = new Date();
-      const overview = await fetchOverview(now.getMonth() + 1, now.getFullYear());
-      setSalaryOverview(overview);
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
 
-      // Load today's events
-      try {
-        const today = new Date();
-        const month = (today.getMonth() + 1).toString();
-        const year = today.getFullYear().toString();
-        const response = await apiFetch(`/api/events?month=${month}&year=${year}`, {}, negocioId);
-        const data = await response.json();
-        
-        if (data.success) {
-          const todayStr = today.toISOString().split('T')[0];
-          const todayEvents = (data.data || []).filter((e: CalendarEvent) => e.event_date === todayStr);
-          setEventsToday(todayEvents);
-        }
-      } catch (error) {
-        console.error("Error loading events:", error);
-      }
-
-      // Count open topics across all employees
-      try {
-        const response = await apiFetch("/api/topics/deadlines", {}, negocioId);
-        const data = await response.json();
-        if (data.success) {
-          const open = (data.data || []).filter((t: { is_open: number }) => t.is_open === 1).length;
-          setOpenTopics(open);
-        }
-      } catch (error) {
-        console.error("Error loading topics:", error);
-      }
-
-      setLoadingData(false);
-    };
-
-    if (!negocioId) {
-      setSalaryOverview(null);
-      setEventsToday([]);
-      setOpenTopics(0);
-      setLoadingData(false);
-      return;
-    }
-
-    if (!loadingEmployees) {
-      loadDashboardData();
-    }
-  }, [negocioId, loadingEmployees, fetchOverview]);
-
-  const activeEmployees = employees.filter((e) => e.is_active === 1).length;
-  const totalSalaries = salaryOverview?.totals?.total_salaries || 0;
-  const totalAdvances = salaryOverview?.totals?.total_advances || 0;
-
-  const handleGenerateInvite = async () => {
-    if (!negocioId) {
-      setInvite(prev => ({ ...prev, error: "No hay un negocio seleccionado." }));
-      return;
-    }
-
-    setInvite({ url: "", error: "", loading: true });
-
-    try {
-      const response = await apiFetch(`/api/negocios/${negocioId}/invitations`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-      }, negocioId);
-
-      const data = (await response.json()) as InvitationResponse;
-
-      if (!response.ok || !data.success || !data.data?.invite_url) {
-        throw new Error(data.error?.message || "No se pudo generar la invitacion.");
-      }
-
-      setInvite({ url: data.data.invite_url, error: "", loading: false });
-    } catch (error) {
-      setInvite({
-        url: "",
-        error: error instanceof Error ? error.message : "Error inesperado al generar la invitacion.",
-        loading: false,
-      });
-    }
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!inputValue.trim() || isLoading) return;
+    const message = inputValue;
+    setInputValue("");
+    await sendMessage(message);
   };
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat("es-MX", {
-      style: "currency",
-      currency: "MXN",
-    }).format(amount);
-  };
-
-  const stats = [
-    {
-      title: "Empleados Activos",
-      value: loadingData ? "..." : activeEmployees.toString(),
-      change: `${employees.length} total`,
-      icon: Users,
-      color: "text-primary",
-      bgColor: "bg-primary/10",
-      onClick: () => navigate("/empleados"),
-    },
-    {
-      title: "Eventos Hoy",
-      value: loadingData ? "..." : eventsToday.length.toString(),
-      change: eventsToday.length === 0 ? "Sin eventos" : "Ver calendario",
-      icon: Calendar,
-      color: "text-accent",
-      bgColor: "bg-accent/10",
-      onClick: () => navigate("/calendario"),
-    },
-    {
-      title: "Temas Abiertos",
-      value: loadingData ? "..." : openTopics.toString(),
-      change: "Seguimiento pendiente",
-      icon: AlertCircle,
-      color: "text-amber-500",
-      bgColor: "bg-amber-500/10",
-      onClick: () => navigate("/empleados"),
-    },
-    {
-      title: "Sueldos del Mes",
-      value: loadingData ? "..." : formatCurrency(totalSalaries),
-      change: `Adelantos: ${formatCurrency(totalAdvances)}`,
-      icon: DollarSign,
-      color: "text-success",
-      bgColor: "bg-success/10",
-      onClick: () => navigate("/sueldos"),
-    },
-  ];
 
   return (
-    <div className="space-y-8">
+    <div className="flex flex-col -m-4 sm:-m-6 lg:-m-8 h-[calc(100dvh-7.5rem)] lg:h-screen">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl sm:text-3xl font-serif font-semibold text-foreground">
-          Bienvenido, {currentNegocio?.name}
-        </h1>
-        <p className="text-muted-foreground mt-1">
-          Aquí está el resumen de tu restaurante
-        </p>
-      </div>
-
-      {/* Stats Grid */}
-      <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
-        {stats.map((stat) => {
-          const Icon = stat.icon;
-          return (
-            <Card
-              key={stat.title}
-              className="border-0 shadow-sm bg-card cursor-pointer hover:shadow-md transition-shadow"
-              onClick={stat.onClick}
-            >
-              <CardContent className="p-4 sm:p-6">
-                <div className="flex items-start justify-between">
-                  <div className="space-y-1 sm:space-y-2 min-w-0 flex-1 mr-2">
-                    <p className="text-xs sm:text-sm font-medium text-muted-foreground leading-tight">
-                      {stat.title}
-                    </p>
-                    <p className="text-xl sm:text-3xl font-serif font-semibold truncate">
-                      {stat.value}
-                    </p>
-                    <p className="text-xs text-muted-foreground truncate">{stat.change}</p>
-                  </div>
-                  <div className={`p-2 sm:p-3 rounded-xl flex-shrink-0 ${stat.bgColor}`}>
-                    <Icon className={`w-4 h-4 sm:w-5 sm:h-5 ${stat.color}`} />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          );
-        })}
-      </div>
-
-      {/* Content Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Employees Summary */}
-        <Card className="border-0 shadow-sm">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-serif font-semibold">Personal</h2>
-              <button
-                onClick={() => navigate("/empleados")}
-                className="text-sm text-primary hover:underline"
-              >
-                Ver todos
-              </button>
-            </div>
-            {loadingEmployees ? (
-              <div className="text-center py-8 text-muted-foreground">
-                Cargando...
-              </div>
-            ) : employees.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                No hay empleados registrados
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {employees.slice(0, 5).map((emp) => (
-                  <div
-                    key={emp.id}
-                    className="flex items-center justify-between p-3 rounded-lg bg-muted/50"
-                  >
-                    <div>
-                      <p className="font-medium">{emp.name}</p>
-                      <p className="text-sm text-muted-foreground">{emp.role}</p>
-                    </div>
-                    <div className="text-right">
-                      <div
-                        className={`inline-flex px-2 py-1 rounded text-xs ${
-                          emp.is_active
-                            ? "bg-success/10 text-success"
-                            : "bg-muted text-muted-foreground"
-                        }`}
-                      >
-                        {emp.is_active ? "Activo" : "Inactivo"}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-                {employees.length > 5 && (
-                  <p className="text-sm text-muted-foreground text-center pt-2">
-                    Y {employees.length - 5} más...
-                  </p>
-                )}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Events Summary */}
-        <Card className="border-0 shadow-sm">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-serif font-semibold">Eventos de Hoy</h2>
-              <button
-                onClick={() => navigate("/calendario")}
-                className="text-sm text-primary hover:underline"
-              >
-                Ver calendario
-              </button>
-            </div>
-            {loadingData ? (
-              <div className="text-center py-8 text-muted-foreground">
-                Cargando...
-              </div>
-            ) : eventsToday.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                No hay eventos programados para hoy
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {eventsToday.map((event) => (
-                  <div
-                    key={event.id}
-                    className="p-3 rounded-lg bg-muted/50"
-                  >
-                    <div className="flex items-start justify-between mb-1">
-                      <p className="font-medium">{event.title}</p>
-                      {event.start_time && (
-                        <span className="text-sm text-muted-foreground">
-                          {event.start_time}
-                        </span>
-                      )}
-                    </div>
-                    {event.description && (
-                      <p className="text-sm text-muted-foreground">
-                        {event.description}
-                      </p>
-                    )}
-                    {event.location && (
-                      <p className="text-xs text-muted-foreground mt-1">
-                        📍 {event.location}
-                      </p>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Quick Actions */}
-      <Card className="border-0 shadow-sm">
-        <CardContent className="p-6">
-          <h2 className="text-lg font-serif font-semibold mb-4">Acciones Rápidas</h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <button
-              onClick={() => navigate("/empleados")}
-              className="p-4 rounded-lg bg-primary text-primary-foreground font-medium hover:bg-primary/90 transition-colors text-left"
-            >
-              <Users className="w-5 h-5 mb-2" />
-              Ver Personal
-            </button>
-            <button
-              onClick={() => navigate("/sueldos")}
-              className="p-4 rounded-lg bg-success text-white font-medium hover:bg-success/90 transition-colors text-left"
-            >
-              <DollarSign className="w-5 h-5 mb-2" />
-              Gestionar Sueldos
-            </button>
-            <button
-              onClick={() => navigate("/calendario")}
-              className="p-4 rounded-lg bg-accent text-accent-foreground font-medium hover:bg-accent/90 transition-colors text-left"
-            >
-              <Calendar className="w-5 h-5 mb-2" />
-              Ver Calendario
-            </button>
-            <button
-              onClick={() => navigate("/configuracion")}
-              className="p-4 rounded-lg bg-secondary text-secondary-foreground font-medium hover:bg-secondary/80 transition-colors text-left border border-border"
-            >
-              <AlertCircle className="w-5 h-5 mb-2" />
-              Configuración
-            </button>
+      <div className="flex-shrink-0 flex items-center justify-between px-4 sm:px-6 py-4 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white">
+        <div className="flex items-center gap-3">
+          <Bot className="w-6 h-6" />
+          <div>
+            <h1 className="text-lg font-semibold">Agente IA</h1>
+            <p className="text-xs opacity-90">Pregunta sobre tu negocio</p>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+        {messages.length > 0 && (
+          <button
+            onClick={clearMessages}
+            className="flex items-center gap-2 rounded px-3 py-1.5 text-sm hover:bg-white/20 transition-colors"
+          >
+            <Trash2 className="w-4 h-4" />
+            Limpiar
+          </button>
+        )}
+      </div>
 
-      {/* Invite member */}
-      {currentNegocio && (
-        <Card className="border-0 shadow-sm">
-          <CardHeader>
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-primary/10">
-                <UsersRound className="w-5 h-5 text-primary" />
-              </div>
-              <div>
-                <CardTitle className="text-lg font-serif">Invitar a un miembro</CardTitle>
-                <CardDescription>
-                  Genera un enlace para invitar a alguien a tu negocio y compartir acceso.
-                </CardDescription>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <button
-              type="button"
-              onClick={handleGenerateInvite}
-              disabled={invite.loading}
-              className="inline-flex h-10 items-center justify-center rounded-4xl border border-border bg-input/30 px-4 text-sm font-medium hover:bg-input/50 disabled:opacity-50"
+      {/* Messages */}
+      <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4">
+        <UsageBanner label="Chat IA" usage={myUsage?.usage["chat"]} />
+        {messages.length === 0 && (
+          <div className="text-center text-muted-foreground text-sm mt-16">
+            <MessageCircle className="h-16 w-16 mx-auto mb-4 opacity-20" />
+            <p className="mb-2 text-base">¡Hola! Soy tu agente de IA.</p>
+            <p className="text-xs">Puedo ayudarte con información sobre:</p>
+            <ul className="text-xs mt-2 space-y-1">
+              <li>• Tus empleados y sus datos</li>
+              <li>• Sueldos y adelantos</li>
+              <li>• Eventos del calendario</li>
+              <li>• Temas pendientes</li>
+            </ul>
+          </div>
+        )}
+
+        {messages.map((msg, idx) => (
+          <div
+            key={idx}
+            className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
+          >
+            <div
+              className={`max-w-[80%] rounded-lg px-4 py-2 ${
+                msg.role === "user"
+                  ? "bg-emerald-500 text-white"
+                  : "bg-muted text-foreground"
+              }`}
             >
-              {invite.loading ? "Generando..." : "Generar link de invitacion"}
-            </button>
-            <div className={invite.url ? "space-y-2" : "hidden"}>
-              <Label htmlFor="dashboard-invite-url">Link generado</Label>
-              <Input id="dashboard-invite-url" value={invite.url} readOnly />
-              <p className="text-xs text-muted-foreground">
-                Copia este enlace manualmente y compartelo con quien quieras invitar.
+              <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+              <p className="text-xs opacity-70 mt-1">
+                {msg.timestamp.toLocaleTimeString("es-ES", {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}
               </p>
             </div>
-            <p className={invite.error ? "text-sm text-destructive" : "hidden"}>
-              {invite.error}
-            </p>
-          </CardContent>
-        </Card>
-      )}
+          </div>
+        ))}
+
+        {isLoading && (
+          <div className="flex justify-start">
+            <div className="bg-muted rounded-lg px-4 py-2">
+              <div className="flex space-x-2">
+                <div className="h-2 w-2 rounded-full bg-emerald-500 animate-bounce" />
+                <div className="h-2 w-2 rounded-full bg-emerald-500 animate-bounce" style={{ animationDelay: "0.1s" }} />
+                <div className="h-2 w-2 rounded-full bg-emerald-500 animate-bounce" style={{ animationDelay: "0.2s" }} />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {error && (
+          <div className="bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 rounded-lg px-4 py-2">
+            <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+          </div>
+        )}
+
+        <div ref={messagesEndRef} />
+      </div>
+
+      {/* Input */}
+      <div className="flex-shrink-0 border-t border-border bg-background p-4 sm:p-6">
+        <form onSubmit={handleSubmit}>
+          <div className="flex gap-2">
+            <Input
+              value={inputValue}
+              onChange={(e) => setInputValue(e.target.value)}
+              placeholder="Escribe tu pregunta..."
+              disabled={isLoading}
+              className="flex-1"
+            />
+            <Button
+              type="submit"
+              disabled={isLoading || !inputValue.trim()}
+              size="icon"
+              className="bg-emerald-500 hover:bg-emerald-600"
+            >
+              <Send className="h-4 w-4" />
+            </Button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }

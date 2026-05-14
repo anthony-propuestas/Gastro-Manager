@@ -82,7 +82,7 @@ export default function LandingPage() {
   useScrollReveal();
 
   if (!isPending && user) {
-    return <Navigate to="/dashboard" replace />;
+    return <Navigate to="/agente-ia" replace />;
   }
 
   const handleLogin = async () => {
