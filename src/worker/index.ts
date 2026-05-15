@@ -2949,7 +2949,7 @@ async function rebuildContext(
   const currentYear = now.getFullYear();
   const monthPad = currentMonth.toString().padStart(2, "0");
 
-  const [employeesResult, eventsResult, topicsResult, advancesResult, salaryPaymentsResult] =
+  const [employeesResult, eventsResult, topicsResult, advancesResult, salaryPaymentsResult, gastosResult, ventasResult] =
     await db.batch([
       db.prepare(
         `SELECT name, role, is_active, monthly_salary FROM employees
@@ -2976,6 +2976,16 @@ async function rebuildContext(
          FROM salary_payments sp JOIN employees e ON sp.employee_id = e.id
          WHERE sp.negocio_id = ? AND sp.period_month = ? AND sp.period_year = ?`
       ).bind(negocio.id, currentMonth, currentYear),
+      db.prepare(
+        `SELECT categoria, SUM(monto) as total
+         FROM compras WHERE negocio_id = ? AND strftime('%Y-%m', fecha) = ?
+         GROUP BY categoria ORDER BY total DESC LIMIT 9`
+      ).bind(negocio.id, `${currentYear}-${monthPad}`),
+      db.prepare(
+        `SELECT metodo_pago, SUM(monto_total) as total, COUNT(*) as n
+         FROM facturas WHERE negocio_id = ? AND strftime('%Y-%m', fecha) = ?
+         GROUP BY metodo_pago ORDER BY total DESC`
+      ).bind(negocio.id, `${currentYear}-${monthPad}`),
     ]);
 
   const employees = employeesResult.results as any[];
@@ -2983,11 +2993,16 @@ async function rebuildContext(
   const topics = topicsResult.results as any[];
   const advances = advancesResult.results as any[];
   const salaryPayments = salaryPaymentsResult.results as any[];
+  const gastosPorCategoria = gastosResult.results as any[];
+  const ventasPorMetodo    = ventasResult.results as any[];
 
   const monthLabel = now.toLocaleString("es-ES", { month: "short" }) + "/" + currentYear;
   const activeEmps = employees.filter((e) => e.is_active);
   const inactiveEmps = employees.filter((e) => !e.is_active);
   const totalAdvances = advances.reduce((s: number, a: any) => s + (a.amount || 0), 0);
+  const totalGastos   = gastosPorCategoria.reduce((s: number, g: any) => s + (g.total || 0), 0);
+  const totalVentas   = ventasPorMetodo.reduce((s: number, v: any) => s + (v.total || 0), 0);
+  const totalFacturas = ventasPorMetodo.reduce((s: number, v: any) => s + (v.n || 0), 0);
 
   const contextText = [
     `Sistema: La Hoja. Negocio: "${negocio.name}". Responde en español, de forma concisa.`,
@@ -3009,6 +3024,13 @@ async function rebuildContext(
     salaryPayments.length
       ? `Sueldos ${monthLabel}: ${salaryPayments.map((sp: any) => `${sp.employee_name} ${sp.is_paid ? "PAGADO" : "PENDIENTE"}($${sp.net_amount} neto)`).join(", ")}`
       : `Sin pagos registrados en ${monthLabel}`,
+    `Balance ${monthLabel}: Ventas $${totalVentas} - Gastos $${totalGastos} = $${totalVentas - totalGastos}`,
+    gastosPorCategoria.length
+      ? `Gastos ${monthLabel}: ${gastosPorCategoria.map((g: any) => `${g.categoria} $${g.total}`).join(", ")}`
+      : null,
+    ventasPorMetodo.length
+      ? `Ventas ${monthLabel}: ${totalFacturas} registros. ${ventasPorMetodo.map((v: any) => `${v.metodo_pago} $${v.total}`).join(", ")}`
+      : null,
   ]
     .filter(Boolean)
     .join("\n");
@@ -3032,9 +3054,11 @@ async function rebuildContext(
 // ── Helper: filtrar contexto según keywords del mensaje ───────────────────────
 function filterContext(contextText: string, message: string): string {
   const msg = message.toLowerCase();
-  const wantsEvents  = /evento|turno|reserva|fecha/.test(msg);
-  const wantsTopics  = /tema|pendiente|tarea|recordatorio/.test(msg);
-  const wantsSalary  = /sueldo|pago|adelanto|salario/.test(msg);
+  const wantsEvents   = /evento|turno|reserva|fecha/.test(msg);
+  const wantsTopics   = /tema|pendiente|tarea|recordatorio/.test(msg);
+  const wantsSalary   = /sueldo|pago|adelanto|salario/.test(msg);
+  const wantsCompras  = /compra|gasto|proveedor|categor|insumo/.test(msg);
+  const wantsVentas   = /venta|factura|ingreso|cobro|recaudac/.test(msg);
 
   return contextText
     .split("\n")
@@ -3044,6 +3068,9 @@ function filterContext(contextText: string, message: string): string {
       if (line.startsWith("Temas")      || line.startsWith("Sin temas"))     return wantsTopics;
       if (line.startsWith("Adelantos")  || line.startsWith("Sin adelantos")) return wantsSalary;
       if (line.startsWith("Sueldos")    || line.startsWith("Sin pagos"))     return wantsSalary;
+      if (line.startsWith("Balance"))                                         return true;
+      if (line.startsWith("Gastos"))                                          return wantsCompras || wantsVentas;
+      if (line.startsWith("Ventas"))                                          return wantsVentas;
       return true;
     })
     .join("\n");

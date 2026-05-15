@@ -88,6 +88,8 @@ function makeChatDb(opts: { forceContextCacheMiss?: boolean } = {}) {
       { results: [] }, // topics
       { results: [] }, // advances
       { results: [] }, // salary_payments
+      { results: [] }, // gastosPorCategoria
+      { results: [] }, // ventasPorMetodo
     ]),
   } as unknown as D1Database;
 
@@ -195,5 +197,132 @@ describe("POST /api/chat SQL Context Queries", () => {
     // DeepSeek uses `messages`: 1 system (context) + 5 trimmed history + 1 new user = 7.
     expect(requestBody.messages).toBeDefined();
     expect(requestBody.messages.length).toBe(7);
+  });
+
+  it("incluye línea de Balance en el contexto reconstruido", async () => {
+    const { mockDb } = makeChatDb({ forceContextCacheMiss: true });
+
+    const env = {
+      DB: mockDb,
+      JWT_SECRET: "secret",
+      DEEPSEEK_API_KEY: "deepseek_key",
+      APP_URL: "http://localhost",
+    };
+
+    const req = new Request("http://localhost/api/chat", {
+      method: "POST",
+      headers: {
+        "Cookie": "session_token=valid_token",
+        "X-Negocio-ID": "1",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ message: "test", history: [] }),
+    });
+
+    const res = await app.fetch(req, env as any, execCtx);
+    expect(res.status).toBe(200);
+
+    const fetchCall = mockFetch.mock.calls.find((call: any[]) => call[0].includes("chat/completions"));
+    const requestBody = JSON.parse(fetchCall![1].body);
+    const systemContent: string = requestBody.messages[0].content;
+
+    expect(systemContent).toMatch(/Balance/);
+  });
+
+  it("filtra líneas de Gastos/Ventas según keywords del mensaje", async () => {
+    const makeReq = (message: string) => new Request("http://localhost/api/chat", {
+      method: "POST",
+      headers: {
+        "Cookie": "session_token=valid_token",
+        "X-Negocio-ID": "1",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ message, history: [] }),
+    });
+
+    const gastosResult = [{ categoria: "Insumos", total: 500 }];
+    const ventasResult = [{ metodo_pago: "efectivo", total: 1000, n: 5 }];
+
+    const makeDbWithData = (opts: { forceContextCacheMiss?: boolean } = {}) => {
+      const prepareCalls: string[] = [];
+      const mockDb = {
+        prepare: vi.fn().mockImplementation((sql: string) => {
+          prepareCalls.push(sql);
+          return {
+            bind: vi.fn().mockReturnThis(),
+            first: vi.fn().mockImplementation(async () => {
+              if (sql.includes("FROM users") && sql.includes("role"))
+                return { role: "usuario_inteligente", email_verified: 1 };
+              if (sql.includes("suscripciones") && sql.includes("estado"))
+                return { estado: "activa", grace_deadline: null };
+              if (sql.includes("negocio_members"))
+                return { negocio_id: 1, negocio_role: "owner" };
+              if (sql.includes("FROM negocios"))
+                return { id: 1, name: "Test Negocio" };
+              if (sql.includes("usage_counters") && sql.includes("RETURNING"))
+                return { count: 1 };
+              if (sql.includes("context_text") && sql.includes("fetched_at"))
+                return opts.forceContextCacheMiss ? null : { context_text: "Cached context", fetched_at: new Date().toISOString() };
+              if (sql.includes("gemini_cache_name") && sql.includes("gemini_cache_expires_at"))
+                return { gemini_cache_name: null, gemini_cache_expires_at: null };
+              if (sql.includes("negocio_module_restrictions"))
+                return null;
+              return null;
+            }),
+            all: vi.fn().mockResolvedValue({ results: [] }),
+            run: vi.fn().mockResolvedValue({ success: true }),
+          };
+        }),
+        batch: vi.fn().mockResolvedValue([
+          { results: [] },
+          { results: [] },
+          { results: [] },
+          { results: [] },
+          { results: [] },
+          { results: gastosResult },
+          { results: ventasResult },
+        ]),
+      } as unknown as D1Database;
+      return mockDb;
+    };
+
+    const env = (db: D1Database) => ({ DB: db, JWT_SECRET: "secret", DEEPSEEK_API_KEY: "deepseek_key", APP_URL: "http://localhost" });
+
+    // Mensaje sin keywords financieros → "Gastos …" y "Ventas …" filtradas, "Balance" presente
+    mockFetch.mockReset();
+    mockFetch.mockImplementation(() => Promise.resolve(new Response(JSON.stringify({
+      choices: [{ message: { content: "ok" } }],
+      usage: { prompt_tokens: 1, completion_tokens: 1 },
+    }))));
+
+    const db1 = makeDbWithData({ forceContextCacheMiss: true });
+    const res1 = await app.fetch(makeReq("quiénes son mis empleados"), env(db1) as any, execCtx);
+    expect(res1.status).toBe(200);
+
+    const call1 = mockFetch.mock.calls.find((c: any[]) => c[0].includes("chat/completions"));
+    const body1 = JSON.parse(call1![1].body);
+    const sys1: string = body1.messages[0].content;
+
+    expect(sys1).toMatch(/Balance/);
+    expect(sys1).not.toMatch(/^Gastos /m);
+    expect(sys1).not.toMatch(/^Ventas /m);
+
+    // Mensaje con keyword de ventas → "Ventas …" y "Balance" presentes
+    mockFetch.mockReset();
+    mockFetch.mockImplementation(() => Promise.resolve(new Response(JSON.stringify({
+      choices: [{ message: { content: "ok" } }],
+      usage: { prompt_tokens: 1, completion_tokens: 1 },
+    }))));
+
+    const db2 = makeDbWithData({ forceContextCacheMiss: true });
+    const res2 = await app.fetch(makeReq("cuánto vendí este mes"), env(db2) as any, execCtx);
+    expect(res2.status).toBe(200);
+
+    const call2 = mockFetch.mock.calls.find((c: any[]) => c[0].includes("chat/completions"));
+    const body2 = JSON.parse(call2![1].body);
+    const sys2: string = body2.messages[0].content;
+
+    expect(sys2).toMatch(/Balance/);
+    expect(sys2).toMatch(/Ventas /);
   });
 });

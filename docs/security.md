@@ -71,13 +71,13 @@ El endpoint `POST /api/chat` introduce una superficie adicional que merece atenc
 
 ### Historial enviado por el cliente
 
-El cliente envía un array `history` con los turnos previos de la conversación. El servidor lo recibe y lo inyecta en el prompt de Gemini como historial multi-turno. Mitigaciones aplicadas:
+El cliente envía un array `history` con los turnos previos de la conversación. El servidor lo recibe y lo inyecta en el prompt de DeepSeek como historial multi-turno. Mitigaciones aplicadas:
 
 - El array se corta a los últimos **5 ítems** (`slice(-5)`) antes de procesarlo, evitando que un cliente infle el payload para agotar tokens de la API.
 - El campo `message` se valida como string no vacío.
 - `history` se valida como array.
 
-Cada ítem de `history` se valida con `chatHistoryItemSchema` (Zod): `role` debe ser `"user" | "model"` y `content` tiene un máximo de 2000 caracteres. El mensaje entrante también está limitado a 2000 caracteres server-side.
+Cada ítem de `history` se valida con `chatHistoryItemSchema` (Zod): `role` debe ser `"user" | "assistant"` y `content` tiene un máximo de 2000 caracteres. El mensaje entrante también está limitado a 2000 caracteres server-side.
 
 ### Prompt injection via historial
 
@@ -89,15 +89,16 @@ Un usuario autenticado puede craftear ítems en `history` para intentar manipula
 - El contexto se genera **después** de que `negocioMiddleware` valida la membresía, por lo que los datos almacenados ya están autorizados.
 - **Staleness:** si un miembro es expulsado del negocio, su caché puede contener datos del negocio por hasta **30 minutos** hasta que expire. Riesgo bajo dado que el acceso a la API ya estará bloqueado por `negocioMiddleware` en el momento de la expulsión.
 
-### Gemini API-level caching (`gemini_cache_name`)
+### Enriquecimiento de contexto financiero (Balance / Gastos / Ventas)
 
-El handler guarda en `chat_context_cache` el nombre del `cachedContent` creado en la API de Google (`cachedContents/xyz`) junto con su expiración (`gemini_cache_expires_at`).
+Áreas revisadas:
 
-- **Aislamiento:** el nombre del cache de Gemini es por `negocio_id` — mismo scope que el caché de contexto D1. No hay riesgo de cross-negocio.
-- **Invalidación coordinada:** cuando el contexto D1 expira (30 min) y se reconstruye, el campo `gemini_cache_name` se limpia a `NULL` en el mismo upsert. El siguiente request crea un nuevo `cachedContent` con los datos frescos. La ventana de datos desactualizados en el cache de Gemini es, por tanto, idéntica a la del caché D1 (30 min).
-- **Fallback graceful:** si la API de Gemini rechaza la creación del cache (ej. contexto demasiado corto, error de red), la función retorna `null` y el endpoint continúa con el comportamiento previo (contexto embebido en `contents[0]`). No hay degradación de seguridad.
-- **Prompt injection:** el contexto ahora se envía como `systemInstruction` del `cachedContent`, en lugar del primer turno de `contents`. Desde el punto de vista de inyección, esto es ligeramente más robusto: las instrucciones de sistema tienen mayor peso en el modelo y son más difíciles de sobreescribir vía historial del usuario.
-- **API key:** la misma `GEMINI_API_KEY` ya existente se usa para crear el `cachedContent`. No hay exposición adicional de credenciales.
+- **Aislamiento por `negocio_id`**: las queries de `compras` y `facturas` filtran por `negocio_id = ?` y por `strftime('%Y-%m', fecha) = ?` — idéntico patrón que el resto de queries del contexto. No hay riesgo de cross-negocio.
+- **filterContext**: la lógica condicional opera sobre líneas de texto ya construidas a partir de datos autorizados; no amplía el scope de acceso a DB ni expone datos de otros negocios.
+- **Chatbot / historial**: las líneas Balance/Gastos/Ventas son generadas server-side; no provienen del historial del cliente. Sin vector de inyección adicional.
+- **Cuotas**: no hay nuevo endpoint ni nuevo consumo de cuota; el cambio está dentro del `rebuildContext` existente.
+
+**Conclusión**: sin nuevo riesgo de seguridad. Los datos financieros en el contexto están correctamente particionados por `negocio_id` y su inclusión condicional (`filterContext`) no afecta el aislamiento.
 
 ---
 
@@ -105,7 +106,7 @@ El handler guarda en `chat_context_cache` el nombre del `cachedContent` creado e
 
 - Todas las entradas del cliente se validan con **Zod** en el servidor antes de escribir en DB. Los schemas están centralizados en `src/worker/validation.ts` y tienen cobertura de tests al 100%.
 - El backend nunca confía en datos del cliente sin validar: tipos, rangos de monto, formatos de fecha/hora y campos requeridos se comprueban en cada endpoint.
-- El array `history` del chatbot se acota a 20 ítems server-side y cada ítem se valida con Zod (`role: "user"|"model"`, `content` máx. 2000 chars).
+- El array `history` del chatbot se acota a 5 ítems server-side (`slice(-5)`) y cada ítem se valida con Zod (`role: "user"|"assistant"`, `content` máx. 2000 chars).
 
 ---
 
@@ -219,7 +220,7 @@ Los eventos `login_success` y `email_verify_success` se registran en `usage_logs
 |---|---|
 | `JWT_SECRET` | Firma de sesiones JWT. Nunca expuesta al cliente. |
 | `GOOGLE_CLIENT_SECRET` | Intercambio OAuth. Solo en el Worker. |
-| `GEMINI_API_KEY` | Llamadas a la API de Gemini. Solo en el Worker. |
+| `DEEPSEEK_API_KEY` | Llamadas a la API de DeepSeek. Solo en el Worker. |
 | `INITIAL_ADMIN_EMAIL` | Email del primer admin. No se incluye en el bundle del cliente. |
 | `MERCADO_PAGO_ACCESS_TOKEN` | Token de producción para llamadas a la API de MercadoPago. |
 | `MERCADO_PAGO_ACCESS_TOKEN_TEST` | *(Opcional)* Token de prueba; si está presente, tiene precedencia sobre el de producción. |
@@ -267,7 +268,7 @@ Vite genera archivos con hash en el nombre (ej. `index-BFSxencr.js`). Tras un re
 | Inyección SQL | D1 con prepared statements en todos los endpoints |
 | Campos de salida del empleado (`ausencia_desde`, `informo`, `cuando_informo`, `sueldo_pendiente`) | Solo modificables vía `PUT /api/employees/:id`, protegido por `authMiddleware` + `negocioMiddleware` + `createModuleRestrictionMiddleware('personal')`. El query sigue usando `WHERE id = ? AND negocio_id = ?` — no hay acceso cross-negocio. Los 4 campos se validan con Zod: tipos, rango de `sueldo_pendiente ≥ 0`, nullable permitido. |
 | Prompt injection via `history` del chat | Autocontenido (solo afecta al atacante); contexto del negocio es server-controlled; ítems validados con `chatHistoryArraySchema` (role + longitud) |
-| Agotamiento de tokens de Gemini vía history largo | `history` cortado a 20 ítems server-side; cada ítem validado (role + longitud) |
+| Agotamiento de tokens de DeepSeek vía history largo | `history` cortado a 5 ítems server-side (`slice(-5)`); cada ítem validado (role + longitud) |
 | Rate limiting en endpoints de auth (`/api/auth/*`) | Implementado: `checkRateLimit()` en `POST /api/sessions` (10 req / 15 min por IP) y `GET /api/auth/verify-email` (5 req / 60 min por IP). IP hasheada con SHA-256. Tabla `rate_limit_auth` en D1. |
 | Datos de negocio en caché tras expulsión de miembro | Caché expira en 30 min; acceso a la API ya bloqueado por `negocioMiddleware` desde el momento de la expulsión |
 | Auto-referido en Sellers | Worker verifica `seller.user_id !== currentUser.id` antes de crear el registro |
@@ -311,7 +312,7 @@ Vite genera archivos con hash en el nombre (ej. `index-BFSxencr.js`). Tras un re
 Áreas revisadas:
 
 - **ChatContext nuevo**: `ChatProvider` encapsula `useChat()` existente y lo comparte entre `Dashboard` y `ChatWidget`. No hay nueva superficie de red; el mismo endpoint `POST /api/chat` con las mismas validaciones Zod y la misma autenticación por JWT/cookie. Sin impacto en seguridad.
-- **Chatbot / historial**: el historial sigue truncado a 20 ítems antes de enviarlo a Gemini. El nuevo context solo reorganiza el estado en React; no modifica cómo se construye ni se envía el payload.
+- **Chatbot / historial**: el historial sigue truncado a 5 ítems antes de enviarlo a DeepSeek. El nuevo context solo reorganiza el estado en React; no modifica cómo se construye ni se envía el payload.
 - **Autenticación / sesión**: `ProtectedRoute` y `AuthCallback` solo cambiaron la ruta de redirect post-auth (`/dashboard` → `/agente-ia`). El contrato de seguridad es idéntico: la cookie `session_token` sigue siendo validada por `authMiddleware` en cada request; el reload completo de `AuthCallback` no fue modificado.
 - **Autorización / roles**: `OwnerPanel` y `RestrictedModuleRoute` siguen redirigiendo a `/agente-ia` (antes `/dashboard`) sin cambios en la lógica de verificación de roles.
 - **Suscripcion.tsx / SuscripcionEstado.tsx**: solo consumen el hook `useSuscripcion()` ya existente; no agregan endpoints ni modifican el flujo de webhook de MercadoPago documentado arriba.
