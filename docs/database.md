@@ -8,7 +8,7 @@
 
 ## Esquema General
 
-La base de datos tiene **24 tablas** en 7 grupos funcionales:
+La base de datos tiene **23 tablas** en 7 grupos funcionales:
 
 | Grupo | Tablas |
 |---|---|
@@ -543,7 +543,7 @@ users (Google ID)
   │       │
   │       └── usage_limits (límites globales por tool)
   │
-  └─── chat_context_cache (scope: user_id + negocio_id)
+  └─── chat_context_cache (scope: negocio_id)
 
 admin_emails  (standalone — consultado por isAdmin())
 ```
@@ -557,7 +557,7 @@ admin_emails  (standalone — consultado por isAdmin())
 | Aislamiento de datos | Todas las queries de datos filtran por `negocio_id` |
 | Timestamps | `created_at` + `updated_at` en todas las tablas; `updated_at` se actualiza manualmente |
 | Booleanos | `INTEGER` 0/1 con prefijo `is_` o `has_` |
-| Migraciones | Numeradas `1.sql`–`27.sql`, inmutables en producción |
+| Migraciones | Numeradas `1.sql`–`28.sql`, inmutables en producción |
 
 ---
 
@@ -632,17 +632,15 @@ Adicionalmente, el endpoint `PUT /api/admin/usage-limits` fue actualizado para u
 
 ### `chat_context_cache`
 
-Caché de contexto para el chatbot IA. Almacena el contexto de conversación por usuario y negocio para reducir queries a D1 y llamadas a la API de Gemini. Creada en **migración 18**; columnas de Gemini caching agregadas en **migración 25**.
+Caché de contexto para el chatbot IA. Almacena el contexto de conversación por negocio (compartido por todos los miembros) para reducir queries a D1 y llamadas a la API de Gemini. Recreada en **migración 28** (DROP + CREATE) consolidando la PK a solo `negocio_id`.
 
 ```sql
 CREATE TABLE chat_context_cache (
-  user_id                 TEXT NOT NULL,
-  negocio_id              TEXT NOT NULL,
-  context_text            TEXT NOT NULL,
-  fetched_at              TEXT NOT NULL,
-  gemini_cache_name       TEXT,     -- nombre del cachedContent en Gemini API (NULL si no aplica)
-  gemini_cache_expires_at INTEGER,  -- timestamp epoch ms de expiración del cache de Gemini
-  PRIMARY KEY (user_id, negocio_id)
+  negocio_id               TEXT NOT NULL PRIMARY KEY,
+  context_text             TEXT NOT NULL,
+  fetched_at               TEXT NOT NULL,
+  gemini_cache_name        TEXT,     -- nombre del cachedContent en Gemini API (NULL si no aplica)
+  gemini_cache_expires_at  INTEGER   -- timestamp epoch ms de expiración del cache de Gemini
 );
 ```
 

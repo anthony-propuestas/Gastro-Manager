@@ -1,13 +1,12 @@
 export async function getOrCreateGeminiCache(
   db: D1Database,
   apiKey: string,
-  userId: number | string,
   negocioId: number | string,
   contextText: string
 ): Promise<string | null> {
   const existing = await db
-    .prepare("SELECT gemini_cache_name, gemini_cache_expires_at FROM chat_context_cache WHERE user_id = ? AND negocio_id = ?")
-    .bind(userId, negocioId)
+    .prepare("SELECT gemini_cache_name, gemini_cache_expires_at FROM chat_context_cache WHERE negocio_id = ?")
+    .bind(negocioId)
     .first<{ gemini_cache_name: string | null; gemini_cache_expires_at: number | null }>();
 
   if (
@@ -36,8 +35,8 @@ export async function getOrCreateGeminiCache(
     const expiresAt = Date.now() + ttlSeconds * 1000;
 
     await db
-      .prepare("UPDATE chat_context_cache SET gemini_cache_name = ?, gemini_cache_expires_at = ? WHERE user_id = ? AND negocio_id = ?")
-      .bind(data.name, expiresAt, userId, negocioId)
+      .prepare("UPDATE chat_context_cache SET gemini_cache_name = ?, gemini_cache_expires_at = ? WHERE negocio_id = ?")
+      .bind(data.name, expiresAt, negocioId)
       .run();
 
     return data.name;

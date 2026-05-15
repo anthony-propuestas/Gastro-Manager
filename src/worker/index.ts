@@ -1410,6 +1410,7 @@ app.post("/api/employees", authMiddleware, negocioMiddleware, createModuleRestri
       .first();
 
     c.executionCtx.waitUntil(c.env.CACHE.delete(`emp:${negocio.id}`));
+    c.executionCtx.waitUntil(db.prepare("DELETE FROM chat_context_cache WHERE negocio_id = ?").bind(negocio.id).run());
     await logUsage(db, user.id, negocio.id, "create", "employee");
     return c.json(apiResponse(newEmployee), 201);
   } catch (error) {
@@ -1483,6 +1484,7 @@ app.put("/api/employees/:id", authMiddleware, negocioMiddleware, createModuleRes
       .first();
 
     c.executionCtx.waitUntil(c.env.CACHE.delete(`emp:${negocio.id}`));
+    c.executionCtx.waitUntil(db.prepare("DELETE FROM chat_context_cache WHERE negocio_id = ?").bind(negocio.id).run());
     await logUsage(db, user.id, negocio.id, "update", "employee");
     return c.json(apiResponse(updated), 200);
   } catch (error) {
@@ -1515,6 +1517,7 @@ app.delete("/api/employees/:id", authMiddleware, negocioMiddleware, createModule
     await db.prepare("DELETE FROM employees WHERE id = ?").bind(employeeId).run();
 
     c.executionCtx.waitUntil(c.env.CACHE.delete(`emp:${negocio.id}`));
+    c.executionCtx.waitUntil(db.prepare("DELETE FROM chat_context_cache WHERE negocio_id = ?").bind(negocio.id).run());
     await logUsage(db, user.id, negocio.id, "delete", "employee");
     return c.json(apiResponse({ deleted: true }), 200);
   } catch (error) {
@@ -1675,6 +1678,7 @@ app.post("/api/employees/:employeeId/topics", authMiddleware, negocioMiddleware,
       .bind(result.meta.last_row_id)
       .first();
 
+    c.executionCtx.waitUntil(db.prepare("DELETE FROM chat_context_cache WHERE negocio_id = ?").bind(negocio.id).run());
     await logUsage(db, user.id, negocio.id, "create", "topic");
     return c.json(apiResponse(newTopic), 201);
   } catch (error) {
@@ -1727,6 +1731,7 @@ app.put("/api/topics/:id", authMiddleware, negocioMiddleware, createModuleRestri
 
     const updated = await db.prepare("SELECT * FROM topics WHERE id = ?").bind(topicId).first();
 
+    c.executionCtx.waitUntil(db.prepare("DELETE FROM chat_context_cache WHERE negocio_id = ?").bind(negocio.id).run());
     return c.json(apiResponse(updated), 200);
   } catch (error) {
     console.error("Error updating topic:", error);
@@ -1756,6 +1761,7 @@ app.delete("/api/topics/:id", authMiddleware, negocioMiddleware, createModuleRes
     await db.prepare("DELETE FROM notes WHERE topic_id = ?").bind(topicId).run();
     await db.prepare("DELETE FROM topics WHERE id = ?").bind(topicId).run();
 
+    c.executionCtx.waitUntil(db.prepare("DELETE FROM chat_context_cache WHERE negocio_id = ?").bind(negocio.id).run());
     return c.json(apiResponse({ deleted: true }), 200);
   } catch (error) {
     console.error("Error deleting topic:", error);
@@ -2316,6 +2322,7 @@ app.post("/api/employees/:employeeId/advances", authMiddleware, negocioMiddlewar
       .bind(result.meta.last_row_id)
       .first();
 
+    c.executionCtx.waitUntil(db.prepare("DELETE FROM chat_context_cache WHERE negocio_id = ?").bind(negocio.id).run());
     await logUsage(db, user.id, negocio.id, "create", "advance");
     return c.json(apiResponse(newAdvance), 201);
   } catch (error) {
@@ -2342,6 +2349,7 @@ app.delete("/api/advances/:id", authMiddleware, negocioMiddleware, createModuleR
 
     await db.prepare("DELETE FROM advances WHERE id = ?").bind(advanceId).run();
 
+    c.executionCtx.waitUntil(db.prepare("DELETE FROM chat_context_cache WHERE negocio_id = ?").bind(negocio.id).run());
     await logUsage(db, user.id, negocio.id, "delete", "advance");
     return c.json(apiResponse({ deleted: true }), 200);
   } catch (error) {
@@ -2452,6 +2460,7 @@ app.post("/api/salary-payments/mark-paid", authMiddleware, negocioMiddleware, cr
         .run();
     }
 
+    c.executionCtx.waitUntil(db.prepare("DELETE FROM chat_context_cache WHERE negocio_id = ?").bind(negocio.id).run());
     await logUsage(db, user.id, negocio.id, "payment", "salary");
     return c.json(apiResponse({ success: true }), 200);
   } catch (error) {
@@ -2576,6 +2585,7 @@ app.post("/api/salary-payments/mark-all-paid", authMiddleware, negocioMiddleware
       }
     }
 
+    c.executionCtx.waitUntil(db.prepare("DELETE FROM chat_context_cache WHERE negocio_id = ?").bind(negocio.id).run());
     await logUsage(db, user.id, negocio.id, "payment", "salary");
     return c.json(apiResponse({ success: true, count: employees.results.length }), 200);
   } catch (error) {
@@ -2929,6 +2939,116 @@ app.get("/api/usage/me", authMiddleware, negocioMiddleware, async (c) => {
   return c.json(apiResponse({ period, role: user.role, usage }), 200);
 });
 
+// ── Helper: rebuild y persistir contexto de negocio en D1 ────────────────────
+async function rebuildContext(
+  db: D1Database,
+  negocio: { id: string | number; name: string }
+): Promise<string> {
+  const now = new Date();
+  const currentMonth = now.getMonth() + 1;
+  const currentYear = now.getFullYear();
+  const monthPad = currentMonth.toString().padStart(2, "0");
+
+  const [employeesResult, eventsResult, topicsResult, advancesResult, salaryPaymentsResult] =
+    await db.batch([
+      db.prepare(
+        `SELECT name, role, is_active, monthly_salary FROM employees
+         WHERE negocio_id = ? ORDER BY is_active DESC, id DESC LIMIT 30`
+      ).bind(negocio.id),
+      db.prepare(
+        `SELECT title, event_date, start_time FROM events
+         WHERE negocio_id = ? AND strftime('%m', event_date) = ? AND strftime('%Y', event_date) = ?
+         ORDER BY event_date ASC LIMIT 20`
+      ).bind(negocio.id, monthPad, currentYear.toString()),
+      db.prepare(
+        `SELECT t.title, t.due_date, e.name as employee_name
+         FROM topics t JOIN employees e ON t.employee_id = e.id
+         WHERE e.negocio_id = ? AND t.is_open = 1
+         ORDER BY t.due_date ASC LIMIT 15`
+      ).bind(negocio.id),
+      db.prepare(
+        `SELECT a.amount, e.name as employee_name
+         FROM advances a JOIN employees e ON a.employee_id = e.id
+         WHERE a.negocio_id = ? AND a.period_month = ? AND a.period_year = ?`
+      ).bind(negocio.id, currentMonth, currentYear),
+      db.prepare(
+        `SELECT sp.salary_amount, sp.net_amount, sp.is_paid, e.name as employee_name
+         FROM salary_payments sp JOIN employees e ON sp.employee_id = e.id
+         WHERE sp.negocio_id = ? AND sp.period_month = ? AND sp.period_year = ?`
+      ).bind(negocio.id, currentMonth, currentYear),
+    ]);
+
+  const employees = employeesResult.results as any[];
+  const events = eventsResult.results as any[];
+  const topics = topicsResult.results as any[];
+  const advances = advancesResult.results as any[];
+  const salaryPayments = salaryPaymentsResult.results as any[];
+
+  const monthLabel = now.toLocaleString("es-ES", { month: "short" }) + "/" + currentYear;
+  const activeEmps = employees.filter((e) => e.is_active);
+  const inactiveEmps = employees.filter((e) => !e.is_active);
+  const totalAdvances = advances.reduce((s: number, a: any) => s + (a.amount || 0), 0);
+
+  const contextText = [
+    `Sistema: La Hoja. Negocio: "${negocio.name}". Responde en español, de forma concisa.`,
+    activeEmps.length
+      ? `Activos: ${activeEmps.map((e: any) => `${e.name}(${e.role} $${e.monthly_salary || 0})`).join(", ")}`
+      : "Sin empleados activos",
+    inactiveEmps.length
+      ? `Inactivos: ${inactiveEmps.map((e: any) => e.name).join(", ")}`
+      : null,
+    events.length
+      ? `Eventos ${monthLabel}: ${events.map((ev: any) => `"${ev.title}" ${ev.event_date}${ev.start_time ? " " + ev.start_time : ""}`).join(", ")}`
+      : `Sin eventos en ${monthLabel}`,
+    topics.length
+      ? `Temas abiertos: ${topics.map((t: any) => `"${t.title}"→${t.employee_name}${t.due_date ? " vence " + t.due_date : ""}`).join(", ")}`
+      : "Sin temas abiertos",
+    advances.length
+      ? `Adelantos ${monthLabel}: ${advances.map((a: any) => `${a.employee_name} $${a.amount}`).join(", ")} | Total $${totalAdvances}`
+      : `Sin adelantos en ${monthLabel}`,
+    salaryPayments.length
+      ? `Sueldos ${monthLabel}: ${salaryPayments.map((sp: any) => `${sp.employee_name} ${sp.is_paid ? "PAGADO" : "PENDIENTE"}($${sp.net_amount} neto)`).join(", ")}`
+      : `Sin pagos registrados en ${monthLabel}`,
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  await db
+    .prepare(
+      `INSERT INTO chat_context_cache (negocio_id, context_text, fetched_at, gemini_cache_name, gemini_cache_expires_at)
+       VALUES (?, ?, datetime('now'), NULL, NULL)
+       ON CONFLICT(negocio_id) DO UPDATE SET
+         context_text            = excluded.context_text,
+         fetched_at              = excluded.fetched_at,
+         gemini_cache_name       = NULL,
+         gemini_cache_expires_at = NULL`
+    )
+    .bind(negocio.id, contextText)
+    .run();
+
+  return contextText;
+}
+
+// ── Helper: filtrar contexto según keywords del mensaje ───────────────────────
+function filterContext(contextText: string, message: string): string {
+  const msg = message.toLowerCase();
+  const wantsEvents  = /evento|turno|reserva|fecha/.test(msg);
+  const wantsTopics  = /tema|pendiente|tarea|recordatorio/.test(msg);
+  const wantsSalary  = /sueldo|pago|adelanto|salario/.test(msg);
+
+  return contextText
+    .split("\n")
+    .filter((line) => {
+      if (line.startsWith("Sistema:")   || line.startsWith("Activos:")   || line.startsWith("Inactivos:")) return true;
+      if (line.startsWith("Eventos")    || line.startsWith("Sin eventos"))   return wantsEvents;
+      if (line.startsWith("Temas")      || line.startsWith("Sin temas"))     return wantsTopics;
+      if (line.startsWith("Adelantos")  || line.startsWith("Sin adelantos")) return wantsSalary;
+      if (line.startsWith("Sueldos")    || line.startsWith("Sin pagos"))     return wantsSalary;
+      return true;
+    })
+    .join("\n");
+}
+
 // ============================================
 // Chatbot Routes (Protected + Negocio)
 // ============================================
@@ -2959,107 +3079,32 @@ app.post("/api/chat", authMiddleware, negocioMiddleware, createUsageLimitMiddlew
     }
     const trimmedHistory = historyResult.data!;
 
-    // ── Caché de contexto de negocio (30 min TTL) ──────────────────────────
+    // ── Caché de contexto de negocio (30 min TTL, stale-while-revalidate) ──
     const CACHE_TTL_MS = 30 * 60_000;
     const cached = await db
-      .prepare("SELECT context_text, fetched_at FROM chat_context_cache WHERE user_id = ? AND negocio_id = ?")
-      .bind(user.id, negocio.id)
+      .prepare("SELECT context_text, fetched_at FROM chat_context_cache WHERE negocio_id = ?")
+      .bind(negocio.id)
       .first<{ context_text: string; fetched_at: string }>();
 
     const isStale =
       !cached || Date.now() - new Date(cached.fetched_at).getTime() > CACHE_TTL_MS;
 
     let contextText: string;
-    if (isStale) {
-      const now = new Date();
-      const currentMonth = now.getMonth() + 1;
-      const currentYear = now.getFullYear();
-      const monthPad = currentMonth.toString().padStart(2, "0");
-
-      const [employeesResult, eventsResult, topicsResult, advancesResult, salaryPaymentsResult] =
-        await db.batch([
-          db.prepare(
-            `SELECT name, role, is_active, monthly_salary FROM employees
-             WHERE negocio_id = ? ORDER BY is_active DESC, id DESC LIMIT 30`
-          ).bind(negocio.id),
-          db.prepare(
-            `SELECT title, event_date, start_time FROM events
-             WHERE negocio_id = ? AND strftime('%m', event_date) = ? AND strftime('%Y', event_date) = ?
-             ORDER BY event_date ASC LIMIT 20`
-          ).bind(negocio.id, monthPad, currentYear.toString()),
-          db.prepare(
-            `SELECT t.title, t.due_date, e.name as employee_name
-             FROM topics t JOIN employees e ON t.employee_id = e.id
-             WHERE e.negocio_id = ? AND t.is_open = 1
-             ORDER BY t.due_date ASC LIMIT 15`
-          ).bind(negocio.id),
-          db.prepare(
-            `SELECT a.amount, e.name as employee_name
-             FROM advances a JOIN employees e ON a.employee_id = e.id
-             WHERE a.negocio_id = ? AND a.period_month = ? AND a.period_year = ?`
-          ).bind(negocio.id, currentMonth, currentYear),
-          db.prepare(
-            `SELECT sp.salary_amount, sp.net_amount, sp.is_paid, e.name as employee_name
-             FROM salary_payments sp JOIN employees e ON sp.employee_id = e.id
-             WHERE sp.negocio_id = ? AND sp.period_month = ? AND sp.period_year = ?`
-          ).bind(negocio.id, currentMonth, currentYear),
-        ]);
-
-      const employees = employeesResult.results as any[];
-      const events = eventsResult.results as any[];
-      const topics = topicsResult.results as any[];
-      const advances = advancesResult.results as any[];
-      const salaryPayments = salaryPaymentsResult.results as any[];
-
-      const monthLabel = now.toLocaleString("es-ES", { month: "short" }) + "/" + currentYear;
-      const activeEmps = employees.filter((e) => e.is_active);
-      const inactiveEmps = employees.filter((e) => !e.is_active);
-      const totalAdvances = advances.reduce((s: number, a: any) => s + (a.amount || 0), 0);
-
-      contextText = [
-        `Sistema: La Hoja. Negocio: "${negocio.name}". Responde en español, de forma concisa.`,
-        activeEmps.length
-          ? `Activos: ${activeEmps.map((e: any) => `${e.name}(${e.role} $${e.monthly_salary || 0})`).join(", ")}`
-          : "Sin empleados activos",
-        inactiveEmps.length
-          ? `Inactivos: ${inactiveEmps.map((e: any) => e.name).join(", ")}`
-          : null,
-        events.length
-          ? `Eventos ${monthLabel}: ${events.map((ev: any) => `"${ev.title}" ${ev.event_date}${ev.start_time ? " " + ev.start_time : ""}`).join(", ")}`
-          : `Sin eventos en ${monthLabel}`,
-        topics.length
-          ? `Temas abiertos: ${topics.map((t: any) => `"${t.title}"→${t.employee_name}${t.due_date ? " vence " + t.due_date : ""}`).join(", ")}`
-          : "Sin temas abiertos",
-        advances.length
-          ? `Adelantos ${monthLabel}: ${advances.map((a: any) => `${a.employee_name} $${a.amount}`).join(", ")} | Total $${totalAdvances}`
-          : `Sin adelantos en ${monthLabel}`,
-        salaryPayments.length
-          ? `Sueldos ${monthLabel}: ${salaryPayments.map((sp: any) => `${sp.employee_name} ${sp.is_paid ? "PAGADO" : "PENDIENTE"}($${sp.net_amount} neto)`).join(", ")}`
-          : `Sin pagos registrados en ${monthLabel}`,
-      ]
-        .filter(Boolean)
-        .join("\n");
-
-      await db
-        .prepare(
-          `INSERT INTO chat_context_cache (user_id, negocio_id, context_text, fetched_at, gemini_cache_name, gemini_cache_expires_at)
-           VALUES (?, ?, ?, datetime('now'), NULL, NULL)
-           ON CONFLICT(user_id, negocio_id) DO UPDATE SET
-             context_text            = excluded.context_text,
-             fetched_at              = excluded.fetched_at,
-             gemini_cache_name       = NULL,
-             gemini_cache_expires_at = NULL`
-        )
-        .bind(user.id, negocio.id, contextText)
-        .run();
+    if (isStale && cached) {
+      contextText = cached.context_text;
+      c.executionCtx.waitUntil(rebuildContext(db, negocio));
+    } else if (isStale) {
+      contextText = await rebuildContext(db, negocio);
     } else {
       contextText = cached.context_text;
     }
 
+    const systemPrompt = filterContext(contextText, message);
+
     // ── Construir messages[] para DeepSeek (OpenAI-compatible) ───────────────
     type DSMessage = { role: "system" | "user" | "assistant"; content: string };
     const dsMessages: DSMessage[] = [
-      { role: "system", content: contextText },
+      { role: "system", content: systemPrompt },
       ...trimmedHistory.map((m) => ({ role: m.role as "user" | "assistant", content: m.content })),
       { role: "user", content: message },
     ];
