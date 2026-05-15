@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import app from "./index";
+import app, { filterContextByRestrictions } from "./index";
 
 vi.mock("hono/cookie", () => ({
   getCookie: () => "valid_token"
@@ -30,6 +30,7 @@ vi.stubGlobal("fetch", mockFetch);
  *   8. chat handler: INSERT INTO chat_context_cache (upsert)
  *   9. geminiCache: SELECT gemini_cache_name FROM chat_context_cache
  *  10. chat handler: INSERT INTO gemini_usage_log
+ *  11. chat handler: SELECT module_key FROM negocio_module_restrictions (non-owner only, uses .all())
  *
  * `forceContextCacheMiss` – when true, the context_text SELECT returns null
  * so the handler rebuilds context via batch().
@@ -71,10 +72,6 @@ function makeChatDb(opts: { forceContextCacheMiss?: boolean } = {}) {
           // 9. geminiCache: SELECT gemini_cache_name
           if (sql.includes("gemini_cache_name") && sql.includes("gemini_cache_expires_at")) {
             return { gemini_cache_name: null, gemini_cache_expires_at: null };
-          }
-          // 5b. negocio_module_restrictions
-          if (sql.includes("negocio_module_restrictions")) {
-            return null;
           }
           return null;
         }),
@@ -229,6 +226,65 @@ describe("POST /api/chat SQL Context Queries", () => {
     expect(systemContent).toMatch(/Balance/);
   });
 
+  it("filtra contexto por restricciones de módulo para gerentes", async () => {
+    const cachedContext = [
+      'Sistema: La Hoja. Negocio: "Test". Responde en español, de forma concisa.',
+      "Activos: Juan(cocinero $1500)",
+      "Sin temas abiertos",
+      "Balance may/2026: Ventas $2000 - Gastos $800 = $1200",
+    ].join("\n");
+
+    const gerenteDb = {
+      prepare: vi.fn().mockImplementation((sql: string) => ({
+        bind: vi.fn().mockReturnThis(),
+        first: vi.fn().mockImplementation(async () => {
+          if (sql.includes("FROM users") && sql.includes("role"))
+            return { role: "usuario_inteligente", email_verified: 1 };
+          if (sql.includes("suscripciones") && sql.includes("estado"))
+            return { estado: "activa", grace_deadline: null };
+          if (sql.includes("negocio_members"))
+            return { negocio_id: 1, negocio_role: "gerente" };
+          if (sql.includes("FROM negocios"))
+            return { id: 1, name: "Test Negocio" };
+          if (sql.includes("usage_counters") && sql.includes("RETURNING"))
+            return { count: 1 };
+          if (sql.includes("context_text") && sql.includes("fetched_at"))
+            return { context_text: cachedContext, fetched_at: new Date().toISOString() };
+          if (sql.includes("gemini_cache_name"))
+            return { gemini_cache_name: null, gemini_cache_expires_at: null };
+          return null;
+        }),
+        all: vi.fn().mockImplementation(async () => {
+          if (sql.includes("negocio_module_restrictions"))
+            return { results: [{ module_key: "personal" }] };
+          return { results: [] };
+        }),
+        run: vi.fn().mockResolvedValue({ success: true }),
+      })),
+      batch: vi.fn().mockResolvedValue([
+        { results: [] }, { results: [] }, { results: [] },
+        { results: [] }, { results: [] }, { results: [] }, { results: [] },
+      ]),
+    } as unknown as D1Database;
+
+    const env = { DB: gerenteDb, JWT_SECRET: "secret", DEEPSEEK_API_KEY: "deepseek_key", APP_URL: "http://localhost" };
+    const req = new Request("http://localhost/api/chat", {
+      method: "POST",
+      headers: { "Cookie": "session_token=valid_token", "X-Negocio-ID": "1", "Content-Type": "application/json" },
+      body: JSON.stringify({ message: "quiénes trabajan aquí", history: [] }),
+    });
+
+    const res = await app.fetch(req, env as any, execCtx);
+    expect(res.status).toBe(200);
+
+    const fetchCall = mockFetch.mock.calls.find((c: any[]) => c[0].includes("chat/completions"));
+    const systemContent: string = JSON.parse(fetchCall![1].body).messages[0].content;
+
+    expect(systemContent).not.toMatch(/Activos:/);
+    expect(systemContent).toMatch(/Sistema:/);
+    expect(systemContent).toMatch(/Balance/);
+  });
+
   it("filtra líneas de Gastos/Ventas según keywords del mensaje", async () => {
     const makeReq = (message: string) => new Request("http://localhost/api/chat", {
       method: "POST",
@@ -324,5 +380,69 @@ describe("POST /api/chat SQL Context Queries", () => {
 
     expect(sys2).toMatch(/Balance/);
     expect(sys2).toMatch(/Ventas /);
+  });
+});
+
+// ── Tests unitarios de filterContextByRestrictions ────────────────────────────
+
+const SAMPLE_CONTEXT = [
+  'Sistema: La Hoja. Negocio: "Test". Responde en español, de forma concisa.',
+  "Activos: Juan(cocinero $1500), María(cajera $1200)",
+  "Inactivos: Pedro",
+  "Sin temas abiertos",
+  "Eventos may/2026: \"Reunión\" 2026-05-20",
+  "Adelantos may/2026: Juan $200 | Total $200",
+  "Sueldos may/2026: Juan PAGADO($1300 neto)",
+  "Balance may/2026: Ventas $2000 - Gastos $800 = $1200",
+  "Gastos may/2026: Insumos $500, Servicios $300",
+  "Ventas may/2026: 10 registros. efectivo $2000",
+].join("\n");
+
+describe("filterContextByRestrictions", () => {
+  it("sin restricciones retorna el texto sin cambios", () => {
+    expect(filterContextByRestrictions(SAMPLE_CONTEXT, new Set())).toBe(SAMPLE_CONTEXT);
+  });
+
+  it("personal restringido elimina Activos e Inactivos", () => {
+    const result = filterContextByRestrictions(SAMPLE_CONTEXT, new Set(["personal"]));
+    expect(result).not.toMatch(/Activos:/);
+    expect(result).not.toMatch(/Inactivos:/);
+    expect(result).toMatch(/Sistema:/);
+    expect(result).toMatch(/Balance/);
+    expect(result).toMatch(/Sin temas/);
+  });
+
+  it("sueldos restringido elimina Adelantos y Sueldos", () => {
+    const result = filterContextByRestrictions(SAMPLE_CONTEXT, new Set(["sueldos"]));
+    expect(result).not.toMatch(/Adelantos/);
+    expect(result).not.toMatch(/Sueldos/);
+    expect(result).toMatch(/Activos:/);
+  });
+
+  it("calendario restringido elimina Eventos", () => {
+    const result = filterContextByRestrictions(SAMPLE_CONTEXT, new Set(["calendario"]));
+    expect(result).not.toMatch(/Eventos/);
+    expect(result).toMatch(/Activos:/);
+  });
+
+  it("compras restringido elimina Gastos y reescribe Balance mostrando solo Ventas", () => {
+    const result = filterContextByRestrictions(SAMPLE_CONTEXT, new Set(["compras"]));
+    expect(result).not.toMatch(/^Gastos/m);
+    expect(result).toMatch(/Balance may\/2026: Ventas \$2000 \(gastos restringidos\)/);
+    expect(result).toMatch(/Ventas may\/2026/);
+  });
+
+  it("facturacion restringido elimina Ventas y reescribe Balance mostrando solo Gastos", () => {
+    const result = filterContextByRestrictions(SAMPLE_CONTEXT, new Set(["facturacion"]));
+    expect(result).not.toMatch(/^Ventas/m);
+    expect(result).toMatch(/Balance may\/2026: Gastos \$800 \(ventas restringidas\)/);
+    expect(result).toMatch(/Gastos may\/2026/);
+  });
+
+  it("compras + facturacion restringidos eliminan Gastos, Ventas y Balance completo", () => {
+    const result = filterContextByRestrictions(SAMPLE_CONTEXT, new Set(["compras", "facturacion"]));
+    expect(result).not.toMatch(/^Gastos/m);
+    expect(result).not.toMatch(/^Ventas/m);
+    expect(result).not.toMatch(/Balance/);
   });
 });

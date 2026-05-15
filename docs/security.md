@@ -95,6 +95,7 @@ Un usuario autenticado puede craftear ítems en `history` para intentar manipula
 
 - **Aislamiento por `negocio_id`**: las queries de `compras` y `facturas` filtran por `negocio_id = ?` y por `strftime('%Y-%m', fecha) = ?` — idéntico patrón que el resto de queries del contexto. No hay riesgo de cross-negocio.
 - **filterContext**: la lógica condicional opera sobre líneas de texto ya construidas a partir de datos autorizados; no amplía el scope de acceso a DB ni expone datos de otros negocios.
+- **filterContextByRestrictions**: filtra las líneas Balance/Gastos/Ventas del contexto según módulos restringidos del rol, antes de enviarlo al LLM. Un gerente con `compras` restringido no ve datos de Gastos en el contexto del chatbot; uno con `facturacion` restringido no ve Ventas; si ambos están restringidos se elimina también el Balance. El filtrado ocurre server-side antes del envío a DeepSeek; no depende de decisiones del cliente.
 - **Chatbot / historial**: las líneas Balance/Gastos/Ventas son generadas server-side; no provienen del historial del cliente. Sin vector de inyección adicional.
 - **Cuotas**: no hay nuevo endpoint ni nuevo consumo de cuota; el cambio está dentro del `rebuildContext` existente.
 

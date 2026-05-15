@@ -212,6 +212,19 @@ El middleware `createModuleRestrictionMiddleware(moduleKey)` verifica:
 - Si el usuario es `gerente` **y** el módulo está restringido → HTTP 403.
 - Si el usuario es `owner` → acceso permitido siempre.
 
+#### Restricciones en el contexto del chatbot (`filterContextByRestrictions`)
+
+El endpoint `POST /api/chat` no aplica `createModuleRestrictionMiddleware` (el chatbot no bloquea el acceso por módulo). Sin embargo, la función `filterContextByRestrictions` filtra las líneas financieras del contexto enviado al LLM según los módulos restringidos del rol:
+
+| Módulos restringidos | Líneas eliminadas del contexto | Balance reescrito como |
+|---|---|---|
+| `compras` | Gastos | `"Ventas $X (gastos restringidos)"` |
+| `facturacion` | Ventas | `"Gastos $X (ventas restringidas)"` |
+| `compras` + `facturacion` | Gastos, Ventas **y** Balance | — (eliminado) |
+| Ninguno (o `owner`) | — | Sin cambios |
+
+El filtrado ocurre server-side, después de `filterContext` y antes del envío a DeepSeek. No afecta el acceso a los datos de empleados, eventos, temas, adelantos ni sueldos, que siguen incluidos en el contexto independientemente de restricciones.
+
 ### En el frontend
 
 - **Sidebar**: los gerentes no ven enlaces a módulos restringidos.

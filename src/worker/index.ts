@@ -3076,6 +3076,42 @@ function filterContext(contextText: string, message: string): string {
     .join("\n");
 }
 
+export function filterContextByRestrictions(contextText: string, restricted: Set<string>): string {
+  if (restricted.size === 0) return contextText;
+
+  const hp  = restricted.has('personal');
+  const hs  = restricted.has('sueldos');
+  const hc  = restricted.has('calendario');
+  const hco = restricted.has('compras');
+  const hf  = restricted.has('facturacion');
+
+  return contextText
+    .split("\n")
+    .map((line) => {
+      if (hp && (line.startsWith("Activos:") || line.startsWith("Inactivos:") || line.startsWith("Sin empleados")))
+        return null;
+      if (hs && (line.startsWith("Adelantos") || line.startsWith("Sin adelantos") || line.startsWith("Sueldos") || line.startsWith("Sin pagos")))
+        return null;
+      if (hc && (line.startsWith("Eventos") || line.startsWith("Sin eventos")))
+        return null;
+      if (hco && line.startsWith("Gastos"))
+        return null;
+      if (hf && line.startsWith("Ventas"))
+        return null;
+      if (line.startsWith("Balance")) {
+        if (hco && hf) return null;
+        const month  = line.match(/Balance ([^:]+):/)?.[1] ?? "";
+        const ventas = line.match(/Ventas \$([\d.]+)/)?.[1];
+        const gastos = line.match(/Gastos \$([\d.]+)/)?.[1];
+        if (hco) return `Balance ${month}: Ventas $${ventas ?? "?"} (gastos restringidos)`;
+        if (hf)  return `Balance ${month}: Gastos $${gastos ?? "?"} (ventas restringidas)`;
+      }
+      return line;
+    })
+    .filter(Boolean)
+    .join("\n");
+}
+
 // ============================================
 // Chatbot Routes (Protected + Negocio)
 // ============================================
@@ -3126,7 +3162,18 @@ app.post("/api/chat", authMiddleware, negocioMiddleware, createUsageLimitMiddlew
       contextText = cached.context_text;
     }
 
-    const systemPrompt = filterContext(contextText, message);
+    const filtered = filterContext(contextText, message);
+
+    let restrictions = new Set<string>();
+    if (negocio.member_role !== 'owner') {
+      const rows = await db
+        .prepare("SELECT module_key FROM negocio_module_restrictions WHERE negocio_id = ? AND is_restricted = 1")
+        .bind(negocio.id)
+        .all<{ module_key: string }>();
+      restrictions = new Set(rows.results.map(r => r.module_key));
+    }
+
+    const systemPrompt = filterContextByRestrictions(filtered, restrictions);
 
     // ── Construir messages[] para DeepSeek (OpenAI-compatible) ───────────────
     type DSMessage = { role: "system" | "user" | "assistant"; content: string };

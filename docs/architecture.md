@@ -18,7 +18,7 @@ Cloudflare Pages — functions/[[route]].ts intercepta TODAS las rutas
    │                    ├── usageLimitMiddleware     → cuotas atómicas
    │                    └── Route handlers → D1 (SQLite)
    │                                         ├── R2 producción (comprobantes)
-   │                                         └── Google Gemini API (chatbot)
+   │                                         └── DeepSeek API (chatbot)
    ├── /assets/*  → ASSETS (404 + Cache-Control: no-store si el archivo no existe)
    └── demás      → ASSETS con fallback a /index.html para SPA routing
 
@@ -44,7 +44,7 @@ GitHub Actions (cron diario 03:00 UTC)
 | Caché en memoria | Cloudflare KV (binding `CACHE`) | — |
 | Autenticación | Google OAuth nativo + JWT (jose) | — |
 | Validación | Zod | — |
-| IA | Google Gemini 2.5 Flash | v1beta |
+| IA | DeepSeek (API OpenAI-compatible) | deepseek-chat |
 
 ---
 
@@ -141,7 +141,7 @@ Ejecuta en endpoints de módulos restringibles (`calendario`, `personal`, `sueld
 
 | Ruta | Razón |
 |---|---|
-| `POST /api/chat` | El chatbot no pertenece a ningún módulo. No es restringible por el owner. Además, el contexto enviado a Gemini incluye datos de **todos** los módulos (empleados, eventos, tópicos, anticipos, pagos) independientemente de restricciones. Un gerente con módulos restringidos puede acceder a esa información indirectamente via el chatbot. |
+| `POST /api/chat` | El chatbot no pertenece a ningún módulo. No es restringible por el owner vía `createModuleRestrictionMiddleware`. El contexto incluye empleados, eventos, tópicos, anticipos y pagos independientemente de restricciones. Las líneas financieras (Balance/Gastos/Ventas) sí se filtran post-construcción por `filterContextByRestrictions` según los módulos restringidos del rol. |
 | `GET /api/compras/files/*` | Solo requiere `auth + negocio`. Un gerente con `compras` restringido podría acceder a imágenes de comprobantes si conoce la URL directa (el key de R2). Se valida que el key pertenezca al negocio activo, pero no se verifica la restricción del módulo. |
 | `GET /api/auth/verify-email` | Endpoint de verificación de email. No requiere sesión activa ni negocio; solo valida el token de verificación. |
 
@@ -188,14 +188,18 @@ Las cuotas son **por usuario por negocio por mes** (`UNIQUE(user_id, negocio_id,
 - El endpoint `mark-all-paid` consume **N usos** (uno por empleado marcado), con lógica inline (no usa el middleware estándar).
 - `compras` y `facturacion` tienen límite default de 50 seedeado en migración 16.
 
-**⚠️ DISCREPANCIA CRÍTICA - Consumo de cuota en PUT/DELETE:**
-La documentación anterior indicaba que `PUT /api/compras`, `PUT /api/facturacion` y `DELETE /api/facturacion` consumían cuota. **El código real NO incluye `createUsageLimitMiddleware` en estos endpoints**. Por lo tanto:
-- **PUT /api/compras/:id** → NO consume cuota (inconsistencia)
-- **DELETE /api/compras/:id** → NO consume cuota (inconsistencia)
-- **PUT /api/facturacion/:id** → NO consume cuota (inconsistencia)
-- **DELETE /api/facturacion/:id** → NO consume cuota (inconsistencia)
+**Comportamiento real de quota en compras y facturación:**
 
-Además, las operaciones DELETE en otros módulos (`employees`, `topics`, `notes`, `job-roles`, `advances`) también **NO consumen cuota**, a pesar de que solo POST está documentado como sujeto a límites. Esto permite a usuarios básicos eliminar datos ilimitadamente.
+| Operación | Consume cuota |
+|---|---|
+| `POST /api/compras` | Sí (`createUsageLimitMiddleware(USAGE_TOOLS.COMPRAS)`) |
+| `PUT /api/compras/:id` | Sí (`createUsageLimitMiddleware(USAGE_TOOLS.COMPRAS)`) |
+| `DELETE /api/compras/:id` | **No** (solo `auth + negocio + restriction`) |
+| `POST /api/facturacion` | Sí (`createUsageLimitMiddleware(USAGE_TOOLS.FACTURACION)`) |
+| `PUT /api/facturacion/:id` | Sí (`createUsageLimitMiddleware(USAGE_TOOLS.FACTURACION)`) |
+| `DELETE /api/facturacion/:id` | Sí (`createUsageLimitMiddleware(USAGE_TOOLS.FACTURACION)`) |
+
+Las operaciones DELETE en otros módulos (`employees`, `topics`, `notes`, `job-roles`, `advances`) **no consumen cuota** — solo POST/escrituras de creación están sujetas a límite en esos módulos.
 
 ---
 
@@ -249,23 +253,22 @@ POST /api/chat { message }
         │                 empleados (activos primero ORDER BY is_active DESC, LIMIT 30),
         │                 eventos (mes actual ORDER BY event_date ASC, LIMIT 20),
         │                 temas abiertos (ORDER BY due_date ASC, LIMIT 15),
-        │                 adelantos (mes actual), sueldos (mes actual)
+        │                 adelantos (mes actual), sueldos (mes actual),
+        │                 gastos por categoría (mes actual, LIMIT 9),
+        │                 ventas por método de pago (mes actual)
         │               ])
-        │                └── UPSERT chat_context_cache (limpia gemini_cache_name = NULL)
-        ├── getOrCreateGeminiCache() [geminiCache.ts]
-        │     ├── hit: gemini_cache_name válido (<2h) → retorna nombre existente
-        │     └── miss: POST /v1beta/cachedContents (systemInstruction, TTL 2h)
-        │                └── UPDATE chat_context_cache (gemini_cache_name, gemini_cache_expires_at)
-        │                └── null si API falla (fallback transparente)
-        ├── POST → Gemini 2.5 Flash API
-        │     ├── con cache: { cachedContent: "cachedContents/xyz", contents: [history + message] }
-        │     └── sin cache (fallback): { contents: [contextText + history + message] }
+        │                └── UPSERT chat_context_cache
+        ├── filterContext(contextText, message)
+        │     — incluye Balance siempre; incluye Gastos/Ventas solo si el mensaje
+        │       contiene keywords de compras o ventas (wantsCompras / wantsVentas)
+        ├── filterContextByRestrictions(filtered, restrictedModules)
+        │     — elimina líneas Gastos/Ventas/Balance según módulos restringidos del rol
+        ├── POST → DeepSeek API (OpenAI-compatible, model: deepseek-chat)
+        │     └── { messages: [{ role:"system", content: systemPrompt }, ...history(-5), message] }
         │     └── Respuesta → { reply: "..." }
-        └── waitUntil(INSERT gemini_usage_log(prompt_tokens, output_tokens))
-              — registra usageMetadata de la respuesta de Gemini (no bloquea al cliente)
 ```
 
-⚠️ **Implicación de seguridad:** El chatbot accede a datos de todos los módulos sin respetar restricciones del owner. Un gerente con módulos restringidos puede obtener información de esos módulos a través del chat.
+⚠️ **Implicación de seguridad (parcial):** El chatbot accede a datos de empleados, eventos, temas, adelantos y sueldos sin respetar restricciones del owner. Las líneas financieras (Balance/Gastos/Ventas del mes) sí se filtran por `filterContextByRestrictions` según el rol. Un gerente con `compras` o `facturacion` restringidos no verá esos datos financieros en el contexto del chat, pero sí puede ver información de personal, eventos y temas aunque esos módulos estén restringidos.
 
 ---
 
@@ -325,7 +328,7 @@ gastro-manager/
 │   │   └── index.ts         # Worker de cron: handler scheduled() — limpieza mensual de R2
 │   ├── worker/
 │   │   ├── index.ts         # Todos los endpoints y middlewares (solo exporta { fetch })
-│   │   ├── geminiCache.ts   # getOrCreateGeminiCache() — Gemini API-level context caching
+│   │   ├── geminiCache.ts   # legacy — getOrCreateGeminiCache() no importado en index.ts (migrado a DeepSeek)
 │   │   ├── rateLimitAuth.ts # checkRateLimit() — rate limiting D1 para endpoints de auth
 │   │   ├── usageTools.ts    # Constantes USAGE_TOOLS y DEFAULT_USAGE_LIMITS
 │   │   └── validation.ts    # Esquemas Zod
@@ -446,7 +449,7 @@ Las escrituras a KV y las invalidaciones se hacen en `waitUntil` (no bloquean la
 - **Edge computing**: Workers ejecutan en +200 ubicaciones; latencia ~10-50ms.
 - **D1 co-localizado**: SQLite co-ubicado con el Worker; sin latencia de red adicional.
 - **Sin N+1**: los endpoints de overview (sueldos, calendario) usan JOINs y queries agregadas.
-- **db.batch()** en el handler de chat: las 5 queries de contexto se envían en una sola llamada a D1 (antes usaban `Promise.all` con 5 llamadas independientes).
+- **db.batch()** en el handler de chat: las 7 queries de contexto (empleados, eventos, temas, adelantos, sueldos, gastos por categoría, ventas por método) se envían en una sola llamada a D1.
 
 ---
 
