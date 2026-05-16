@@ -207,3 +207,58 @@ describe("useChat", () => {
     );
   });
 });
+
+// ─── triggerDailyGreeting ─────────────────────────────────────────────────────
+
+describe("useChat — triggerDailyGreeting", () => {
+  const KEY = "chatLastActivity_5";
+
+  beforeEach(() => {
+    localStorage.clear();
+    vi.clearAllMocks();
+    mockUseAuth.mockReturnValue({ currentNegocio: { id: 5 } });
+    mockApiFetch.mockResolvedValue(ok("ok"));
+  });
+
+  it("no envía mensaje en la primera visita (sin clave previa)", async () => {
+    const { result } = renderHook(() => useChat());
+
+    await act(async () => { await result.current.triggerDailyGreeting(); });
+
+    expect(mockApiFetch).not.toHaveBeenCalled();
+    expect(localStorage.getItem(KEY)).not.toBeNull();
+  });
+
+  it("no envía mensaje cuando la actividad fue hace menos de 8h", async () => {
+    localStorage.setItem(KEY, String(Date.now() - 1 * 60 * 60 * 1000)); // 1h atrás
+    const { result } = renderHook(() => useChat());
+
+    await act(async () => { await result.current.triggerDailyGreeting(); });
+
+    expect(mockApiFetch).not.toHaveBeenCalled();
+  });
+
+  it("envía saludo de bienvenida tras más de 8h de inactividad", async () => {
+    localStorage.setItem(KEY, String(Date.now() - 9 * 60 * 60 * 1000)); // 9h atrás
+    const { result } = renderHook(() => useChat());
+
+    await act(async () => { await result.current.triggerDailyGreeting(); });
+
+    expect(mockApiFetch).toHaveBeenCalledTimes(1);
+    const body = JSON.parse((mockApiFetch.mock.calls[0]?.[1] as RequestInit).body as string);
+    expect(body.message).toBe("Dame un resumen breve de los eventos de hoy y si hay algo pendiente importante");
+  });
+
+  it("no envía saludo si ya hay mensajes en el historial", async () => {
+    localStorage.setItem(KEY, String(Date.now() - 9 * 60 * 60 * 1000));
+    const { result } = renderHook(() => useChat());
+
+    // Agrega un mensaje primero
+    await act(async () => { await result.current.sendMessage("Hola"); });
+    vi.clearAllMocks();
+
+    await act(async () => { await result.current.triggerDailyGreeting(); });
+
+    expect(mockApiFetch).not.toHaveBeenCalled();
+  });
+});

@@ -11,7 +11,7 @@ export function ChatWidget() {
   const [isOpen, setIsOpen] = useState(false);
   const [inputValue, setInputValue] = useState("");
   const location = useLocation();
-  const { messages, isLoading, error, sendMessage, clearMessages } = useChatContext();
+  const { messages, isLoading, error, sendMessage, clearMessages, triggerDailyGreeting } = useChatContext();
   const { data: myUsage } = useMyUsage();
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -38,7 +38,11 @@ export function ChatWidget() {
       {/* Floating Button — oculto en /agente-ia, sube en mobile para no tapar bottom nav */}
       {location.pathname !== "/agente-ia" && (
         <button
-          onClick={() => setIsOpen(!isOpen)}
+          onClick={() => {
+            const opening = !isOpen;
+            setIsOpen(opening);
+            if (opening) triggerDailyGreeting();
+          }}
           className="fixed bottom-[72px] right-4 lg:bottom-6 lg:right-6 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg transition-all hover:scale-110 hover:shadow-xl"
           aria-label="Abrir chat"
         >

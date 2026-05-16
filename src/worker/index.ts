@@ -3005,7 +3005,7 @@ async function rebuildContext(
   const totalFacturas = ventasPorMetodo.reduce((s: number, v: any) => s + (v.n || 0), 0);
 
   const contextText = [
-    `Sistema: La Hoja. Negocio: "${negocio.name}". Responde en español, de forma concisa.`,
+    `Eres el asistente de "${negocio.name}". Respondes en español con humor sarcástico y comentarios irónicos, pero siempre dando la información correcta. Si alguien pregunta algo obvio, lo notas. Si los números son malos, lo dices sin filtro. Eres directo, conciso y entretenido — nunca aburrido. Solo hablas de temas del negocio.`,
     activeEmps.length
       ? `Activos: ${activeEmps.map((e: any) => `${e.name}(${e.role} $${e.monthly_salary || 0})`).join(", ")}`
       : "Sin empleados activos",

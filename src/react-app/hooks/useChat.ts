@@ -2,6 +2,8 @@ import { useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import { apiFetch } from "../lib/api";
 
+const INACTIVITY_THRESHOLD_MS = 8 * 60 * 60 * 1000;
+
 interface Message {
   role: "user" | "assistant";
   content: string;
@@ -63,11 +65,33 @@ export function useChat() {
     setError(null);
   };
 
+  const triggerDailyGreeting = async () => {
+    const negocioId = currentNegocio?.id;
+    const key = `chatLastActivity_${negocioId ?? "default"}`;
+    const lastActivity = localStorage.getItem(key);
+    const now = Date.now();
+
+    localStorage.setItem(key, String(now));
+
+    if (!lastActivity) return;
+
+    if (
+      now - Number(lastActivity) > INACTIVITY_THRESHOLD_MS &&
+      messages.length === 0 &&
+      !isLoading
+    ) {
+      await sendMessage(
+        "Dame un resumen breve de los eventos de hoy y si hay algo pendiente importante"
+      );
+    }
+  };
+
   return {
     messages,
     isLoading,
     error,
     sendMessage,
     clearMessages,
+    triggerDailyGreeting,
   };
 }
