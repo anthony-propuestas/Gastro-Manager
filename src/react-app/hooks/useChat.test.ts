@@ -212,6 +212,8 @@ describe("useChat", () => {
 
 describe("useChat — triggerDailyGreeting", () => {
   const KEY = "chatLastActivity_5";
+  const GREETING_KEY = "chatLastGreeting_5";
+  const today = () => new Date().toISOString().split("T")[0];
 
   beforeEach(() => {
     localStorage.clear();
@@ -231,8 +233,9 @@ describe("useChat — triggerDailyGreeting", () => {
     expect(localStorage.getItem(KEY)).not.toBeNull();
   });
 
-  it("no envía mensaje cuando la actividad fue hace menos de 8h", async () => {
+  it("no envía mensaje cuando la actividad fue hace menos de 8h y ya se saludó hoy", async () => {
     localStorage.setItem(KEY, String(Date.now() - 1 * 60 * 60 * 1000)); // 1h atrás
+    localStorage.setItem(GREETING_KEY, today());
     const { result } = renderHook(() => useChat());
 
     await act(async () => { await result.current.triggerDailyGreeting(); });
@@ -249,6 +252,24 @@ describe("useChat — triggerDailyGreeting", () => {
     expect(mockApiFetch).toHaveBeenCalledTimes(1);
     const body = JSON.parse((mockApiFetch.mock.calls[0]?.[1] as RequestInit).body as string);
     expect(body.message).toBe("Dame un resumen breve de los eventos de hoy y si hay algo pendiente importante");
+  });
+
+  it("envía saludo cuando es un día nuevo aunque la actividad fue reciente", async () => {
+    localStorage.setItem(KEY, String(Date.now() - 1 * 60 * 60 * 1000)); // 1h atrás (no inactivo)
+    localStorage.setItem(GREETING_KEY, "2000-01-01"); // fecha vieja → isNewDay = true
+    const { result } = renderHook(() => useChat());
+
+    await act(async () => { await result.current.triggerDailyGreeting(); });
+
+    expect(mockApiFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("persiste greetingKey en localStorage al enviar el saludo del día", async () => {
+    const { result } = renderHook(() => useChat());
+
+    await act(async () => { await result.current.triggerDailyGreeting(); });
+
+    expect(localStorage.getItem(GREETING_KEY)).toBe(today());
   });
 
   it("no envía saludo si ya hay mensajes en el historial", async () => {

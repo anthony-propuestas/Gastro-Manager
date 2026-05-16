@@ -243,7 +243,7 @@ Ninguna variable sensible se incluye en el build del frontend (Vite). El Worker 
 - `src/react-app/components/employees/EmployeeViewModal.test.tsx`: verifica que el modal de vista es de solo lectura (no expone acciones de escritura) y que no renderiza cuando `employee` es null.
 - `src/react-app/pages/modulos/Employees.test.tsx`: verifica que el toggle de estado (activo/inactivo) llama a `updateEmployee` correctamente y que el clic en el botón de estado no abre el modal de vista (separación de intenciones).
 - `src/react-app/pages/Admin.test.tsx`: verifica que la tarjeta "Usuarios Registrados" muestre `totalUsers` correctamente y que las tarjetas eliminadas (`registeredEmails`, `avgEmployees`, `avgEvents`) ya no estén presentes en el DOM.
-- `src/react-app/components/ChatWidget.test.tsx` y `src/react-app/hooks/useChat.test.ts`: verifica que `triggerDailyGreeting` envía el saludo en la primera visita (comportamiento intencional) y tras >8h de inactividad, siempre que el historial esté vacío; no envía si hay mensajes previos, está cargando, o no han pasado 8h sin ser primera visita. Verifica también que el historial se corta a 5 items antes de enviarse al backend. **Áreas revisadas sin riesgo nuevo:** `triggerDailyGreeting` usa una clave localStorage particionada por `negocio_id` (no filtra datos entre negocios); `negocio_id` ya validado por `negocioMiddleware` en el backend. No aplica cambio en autenticación, autorización ni endpoints.
+- `src/react-app/components/ChatWidget.test.tsx` y `src/react-app/hooks/useChat.test.ts`: verifica que `triggerDailyGreeting` envía el saludo en la primera visita (comportamiento intencional), tras >8h de inactividad, o en un nuevo día calendario (`isNewDay`), siempre que el historial esté vacío; no envía si hay mensajes previos, está cargando, o no han pasado 8h **y ya se saludó hoy** (ambas condiciones requeridas simultáneamente). Verifica que el nuevo `greetingKey` se persiste en localStorage al enviar el saludo. Verifica también que el historial se corta a 5 items antes de enviarse al backend. **Áreas revisadas sin riesgo nuevo:** `triggerDailyGreeting` usa claves localStorage particionadas por `negocio_id` (no filtra datos entre negocios); `negocio_id` ya validado por `negocioMiddleware` en el backend. No aplica cambio en autenticación, autorización ni endpoints.
 
 ---
 
@@ -333,3 +333,18 @@ Vite genera archivos con hash en el nombre (ej. `index-BFSxencr.js`). Tras un re
 - **Autorización / roles**: No aplica. Sin cambios en guards ni restricciones de módulo.
 
 **Conclusión**: sin riesgo de seguridad. El cambio es cosmético (prevención de overflow visual con CSS) y no altera ninguna superficie de datos, endpoint ni flujo de autenticación.
+
+---
+
+## Revisión — Saludo diario por día nuevo en triggerDailyGreeting (2026-05-16)
+
+Áreas revisadas:
+
+- **Endpoint nuevo o modificado**: No hay nuevos endpoints ni cambios de contrato. El cambio está enteramente en la lógica cliente de `useChat.ts` y el montaje de `Dashboard.tsx`.
+- **Autenticación / sesión**: No aplica. `triggerDailyGreeting` llama a `sendMessage`, que ya pasa por `authMiddleware` en el backend. Sin cambios en el flujo de auth.
+- **Chatbot / historial**: La nueva condición `isNewDay` evalúa si la fecha ISO de hoy (`YYYY-MM-DD`) difiere del valor almacenado en `greetingKey` (localStorage del browser). El `greetingKey` es client-only y no expone datos del servidor. La condición solo dispara el saludo si el historial está vacío y no hay carga en curso — las mismas guardas que antes.
+- **Aislamiento por `negocio_id`**: El nuevo `greetingKey` es una clave localStorage del browser, no particionada por `negocio_id`. Riesgo revisado: si dos negocios comparten el mismo browser, el `greetingKey` puede suprimir el saludo del segundo negocio en el mismo día. No hay fuga de datos — solo supresión cosmética de saludo. El `activityKey` existente sí incluye `negocio_id`; el `greetingKey` es intencionalmente global (el saludo es por día, no por negocio).
+- **Autorización / roles**: No aplica. Sin cambios en guards ni restricciones de módulo.
+- **Validación de entrada**: No aplica. `greetingKey` es leído/escrito en localStorage local; no es input del servidor.
+
+**Conclusión**: sin nuevo riesgo de seguridad. La condición `isNewDay` y el `greetingKey` son lógica cliente que no amplía la superficie de datos del backend ni altera autenticación, autorización ni aislamiento entre negocios.

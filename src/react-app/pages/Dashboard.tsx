@@ -8,13 +8,18 @@ import { Input } from "@/react-app/components/ui/input";
 
 export default function AgenteIA() {
   const [inputValue, setInputValue] = useState("");
-  const { messages, isLoading, error, sendMessage, clearMessages } = useChatContext();
+  const { messages, isLoading, error, sendMessage, clearMessages, triggerDailyGreeting } = useChatContext();
   const { data: myUsage } = useMyUsage();
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  useEffect(() => {
+    triggerDailyGreeting();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

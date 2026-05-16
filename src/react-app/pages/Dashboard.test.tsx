@@ -27,6 +27,7 @@ const BASE_MOCK = {
   error: null as string | null,
   sendMessage: vi.fn(),
   clearMessages: vi.fn(),
+  triggerDailyGreeting: vi.fn(),
 };
 
 beforeEach(() => {
@@ -84,6 +85,17 @@ describe("AgenteIA — estados de carga y error", () => {
     mockUseChatContext.mockReturnValue({ ...BASE_MOCK, error: "Error de conexión" });
     render(<AgenteIA />);
     expect(screen.getByText("Error de conexión")).toBeInTheDocument();
+  });
+});
+
+// ─── Montaje ──────────────────────────────────────────────────────────────────
+
+describe("AgenteIA — montaje", () => {
+  it("llama triggerDailyGreeting al montar el componente", () => {
+    const triggerDailyGreeting = vi.fn();
+    mockUseChatContext.mockReturnValue({ ...BASE_MOCK, triggerDailyGreeting });
+    render(<AgenteIA />);
+    expect(triggerDailyGreeting).toHaveBeenCalledTimes(1);
   });
 });
 

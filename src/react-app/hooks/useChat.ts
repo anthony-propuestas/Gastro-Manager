@@ -4,6 +4,10 @@ import { apiFetch } from "../lib/api";
 
 const INACTIVITY_THRESHOLD_MS = 8 * 60 * 60 * 1000;
 
+function todayString() {
+  return new Date().toISOString().split("T")[0];
+}
+
 interface Message {
   role: "user" | "assistant";
   content: string;
@@ -66,17 +70,25 @@ export function useChat() {
   };
 
   const triggerDailyGreeting = async () => {
-    const negocioId = currentNegocio?.id;
-    const key = `chatLastActivity_${negocioId ?? "default"}`;
-    const lastActivity = localStorage.getItem(key);
-    const now = Date.now();
+    if (messages.length > 0 || isLoading) return;
 
-    localStorage.setItem(key, String(now));
+    const negocioId = currentNegocio?.id;
+    const activityKey = `chatLastActivity_${negocioId ?? "default"}`;
+    const greetingKey = `chatLastGreeting_${negocioId ?? "default"}`;
+
+    const lastActivity = localStorage.getItem(activityKey);
+    const lastGreetingDay = localStorage.getItem(greetingKey);
+    const now = Date.now();
+    const today = todayString();
+
+    localStorage.setItem(activityKey, String(now));
 
     const isFirstUse = !lastActivity;
     const isInactive = !!lastActivity && now - Number(lastActivity) > INACTIVITY_THRESHOLD_MS;
+    const isNewDay = lastGreetingDay !== today;
 
-    if ((isFirstUse || isInactive) && messages.length === 0 && !isLoading) {
+    if (isFirstUse || isInactive || isNewDay) {
+      localStorage.setItem(greetingKey, today);
       await sendMessage(
         "Dame un resumen breve de los eventos de hoy y si hay algo pendiente importante"
       );

@@ -9,6 +9,7 @@ vi.mock("@/react-app/hooks/useChat", () => ({
     error: null,
     sendMessage: vi.fn(),
     clearMessages: vi.fn(),
+    triggerDailyGreeting: vi.fn(),
   })),
 }));
 
@@ -44,5 +45,6 @@ describe("useChatContext", () => {
     expect(Array.isArray(captured!.messages)).toBe(true);
     expect(typeof captured!.sendMessage).toBe("function");
     expect(typeof captured!.clearMessages).toBe("function");
+    expect(typeof captured!.triggerDailyGreeting).toBe("function");
   });
 });

@@ -150,9 +150,11 @@ Página principal del asistente de IA en la ruta `/agente-ia`.
 
 **Datos:**
 ```tsx
-const { messages, isLoading, error, sendMessage, clearMessages } = useChatContext();
+const { messages, isLoading, error, sendMessage, clearMessages, triggerDailyGreeting } = useChatContext();
 const { data: myUsage } = useMyUsage();
 ```
+
+Al montar, un `useEffect` llama a `triggerDailyGreeting()` una vez para disparar el saludo del día si corresponde.
 
 ### Suscripcion (`pages/Suscripcion.tsx`)
 
@@ -810,6 +812,7 @@ export function useChat() {
 - `X-Negocio-ID` propagado via `apiFetch` con `currentNegocio?.id` como tercer argumento
 - Estados de carga y error independientes
 - `clearMessages()` resetea el historial local y el estado de error
+- `triggerDailyGreeting()`: envía el saludo automático si `isFirstUse || isInactive (>8h) || isNewDay` — siempre que el historial esté vacío y no haya carga en curso. Persiste la fecha del último saludo en `greetingKey` (localStorage) como ISO `YYYY-MM-DD` para evitar duplicados en el mismo día.
 
 ## Context Providers
 
@@ -921,7 +924,7 @@ Widget flotante para interactuar con el asistente virtual potenciado por DeepSee
 - Panel de chat expandible (`w-[380px]`, altura 500px)
 - Integra `UsageBanner` para la herramienta "chat" (via `useMyUsage`)
 - Si el envío de mensaje falla por límite de uso, el modal global de upgrade puede abrirse automáticamente
-- Llama a `triggerDailyGreeting` al abrir (saludo automático en primera visita o si >8h de inactividad, siempre que el historial esté vacío)
+- Llama a `triggerDailyGreeting` al abrir (saludo automático en primera visita, si >8h de inactividad, o en un nuevo día calendario, siempre que el historial esté vacío)
 - Historial de mensajes en la sesión
 - Animación de carga con puntos rebotando
 - Botón para limpiar historial
