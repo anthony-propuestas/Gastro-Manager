@@ -336,6 +336,21 @@ Vite genera archivos con hash en el nombre (ej. `index-BFSxencr.js`). Tras un re
 
 ---
 
+## Revisión — is_paid y total_paid en módulo Sueldos (2026-05-16)
+
+Áreas revisadas:
+
+- **Endpoint nuevo o modificado**: No hay nuevos endpoints. `GET /api/salaries/overview` ahora incluye `is_paid: boolean` por empleado (antes devuelto como 0/1 pero no tipado) y `total_paid` en el objeto `totals`. Sin cambio en method, ruta ni autenticación.
+- **Aislamiento por `negocio_id`**: El cálculo de `total_paid` y `is_paid` usa los mismos queries existentes filtrados por `negocio_id`. No hay acceso cross-negocio.
+- **Autenticación / sesión**: No aplica. Sin cambios en el flujo de auth.
+- **Autorización / roles**: El endpoint mantiene `authMiddleware → negocioMiddleware → createModuleRestrictionMiddleware('sueldos')`. Sin degradación de protección.
+- **Validación de entrada**: No aplica. Los nuevos campos son campos calculados en el servidor, no input del cliente.
+- **Cuotas**: No aplica. `GET /api/salaries/overview` es de solo lectura y no consume cuota.
+
+**Conclusión**: sin riesgo de seguridad. Los cambios son un refactor del cálculo de `total_remaining` (ahora solo suma empleados no pagados) y la adición de `total_paid` como campo derivado; ambos son generados server-side a partir de datos ya autorizados por `negocioMiddleware`.
+
+---
+
 ## Revisión — Saludo diario por día nuevo en triggerDailyGreeting (2026-05-16)
 
 Áreas revisadas:

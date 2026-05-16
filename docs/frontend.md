@@ -205,9 +205,9 @@ Sistema de sueldos y adelantos.
 
 **Características:**
 - Selector de período (mes/año)
-- Resumen de totales
-- Tabla de empleados con sueldo neto
-- Botón de marcar pagado (individual/lote)
+- 4 tarjetas de resumen: Total Sueldos, Total Adelantos, Saldo Pendiente, Total Pagado
+- Tabla de empleados con sueldo neto; badge "Pagado" cuando `is_paid=true`, botón cuando `is_paid=false`
+- Botón de marcar pagado individual y "Marcar Todos" (con confirmación)
 - Modal de adelantos por empleado
 - Histórico de períodos
 

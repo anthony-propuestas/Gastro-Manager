@@ -420,15 +420,14 @@ GET /api/salaries/overview?month=4&year=2026
     "name": "María García",
     "monthly_salary": 8000,
     "advances_total": 1500,
-    "net_amount": 6500,
-    "is_paid": 0
+    "remaining": 6500,
+    "is_paid": false
   }],
   "totals": {
     "total_salaries": 25000,
     "total_advances": 4500,
-    "total_net": 20500,
-    "paid_count": 2,
-    "pending_count": 3
+    "total_remaining": 18000,
+    "total_paid": 7000
   }
 }
 ```

@@ -13,6 +13,7 @@ type SalaryOverview = {
     total_salaries: number;
     total_advances: number;
     total_remaining: number;
+    total_paid: number;
   };
   employees?: Array<{
     id: number;
@@ -21,6 +22,7 @@ type SalaryOverview = {
     monthly_salary: number;
     advances_total: number;
     remaining: number;
+    is_paid: boolean;
   }>;
 };
 
@@ -141,7 +143,7 @@ export default function Salaries() {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="bg-card rounded-xl p-6 border border-border">
           <div className="flex items-center gap-3 mb-2">
             <div className="p-2 rounded-lg bg-primary/10">
@@ -175,6 +177,18 @@ export default function Salaries() {
           </div>
           <div className="text-2xl font-bold">
             {formatCurrency(overview?.totals?.total_remaining || 0)}
+          </div>
+        </div>
+
+        <div className="bg-card rounded-xl p-6 border border-border">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="p-2 rounded-lg bg-emerald-500/10">
+              <CheckCircle2 className="w-5 h-5 text-emerald-500" />
+            </div>
+            <span className="text-sm text-muted-foreground">Pagado</span>
+          </div>
+          <div className="text-2xl font-bold text-emerald-500">
+            {formatCurrency(overview?.totals?.total_paid || 0)}
           </div>
         </div>
       </div>
@@ -235,14 +249,21 @@ export default function Salaries() {
                         <Plus className="w-4 h-4 mr-1" />
                         Adelanto
                       </Button>
-                      <Button
-                        size="sm"
-                        onClick={() => handleMarkPaid(emp.id)}
-                        className="bg-success hover:bg-success/90"
-                      >
-                        <CheckCircle2 className="w-4 h-4 mr-1" />
-                        Pagado
-                      </Button>
+                      {emp.is_paid ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
+                          <CheckCircle2 className="w-3 h-3" />
+                          Pagado
+                        </span>
+                      ) : (
+                        <Button
+                          size="sm"
+                          onClick={() => handleMarkPaid(emp.id)}
+                          className="bg-success hover:bg-success/90"
+                        >
+                          <CheckCircle2 className="w-4 h-4 mr-1" />
+                          Pagado
+                        </Button>
+                      )}
                     </div>
                   </td>
                 </tr>

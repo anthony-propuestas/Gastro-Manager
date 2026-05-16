@@ -2201,24 +2201,32 @@ app.get("/api/salaries/overview", authMiddleware, negocioMiddleware, createModul
       .prepare(
         `SELECT e.id, e.name, e.role, e.monthly_salary,
           (SELECT COALESCE(SUM(amount), 0) FROM advances
-           WHERE employee_id = e.id AND period_month = ? AND period_year = ?) as advances_total
+           WHERE employee_id = e.id AND period_month = ? AND period_year = ?) as advances_total,
+          (SELECT COALESCE(is_paid, 0) FROM salary_payments
+           WHERE employee_id = e.id AND period_month = ? AND period_year = ?
+           LIMIT 1) as is_paid
          FROM employees e
          WHERE e.negocio_id = ? AND e.is_active = 1
          ORDER BY e.monthly_salary DESC`
       )
-      .bind(currentMonth, currentYear, negocio.id)
+      .bind(currentMonth, currentYear, currentMonth, currentYear, negocio.id)
       .all();
 
-    const totals = { total_salaries: 0, total_advances: 0, total_remaining: 0 };
+    const totals = { total_salaries: 0, total_advances: 0, total_remaining: 0, total_paid: 0 };
 
     const employeesWithCalculations = employees.results.map((emp: any) => {
       const salary = emp.monthly_salary || 0;
       const advances = emp.advances_total || 0;
       const remaining = salary - advances;
+      const isPaid = emp.is_paid === 1;
       totals.total_salaries += salary;
       totals.total_advances += advances;
-      totals.total_remaining += remaining;
-      return { ...emp, remaining };
+      if (isPaid) {
+        totals.total_paid += salary;
+      } else {
+        totals.total_remaining += remaining;
+      }
+      return { ...emp, remaining, is_paid: isPaid };
     });
 
     return c.json(
