@@ -76,7 +76,12 @@ vi.mock("@/react-app/components/UsageBanner", () => ({
 }));
 
 vi.mock("@/react-app/components/employees/EmployeeModal", () => ({
-  default: () => null,
+  default: ({ isOpen, employee }: { isOpen: boolean; employee?: Employee | null }) =>
+    isOpen ? (
+      <div data-testid="edit-modal">
+        {employee && <span data-testid="edit-modal-name">{employee.name}</span>}
+      </div>
+    ) : null,
 }));
 
 vi.mock("@/react-app/components/employees/JobRolesModal", () => ({
@@ -151,19 +156,13 @@ describe("Employees — control segmentado de estado en tarjetas", () => {
     expect(inactiveButtons.length).toBe(2);
   });
 
-  it("clic en 'Empleado inactivo' en tarjeta activa llama updateEmployee con is_active: false", async () => {
+  it("clic en 'Empleado inactivo' abre el modal de edición pre-configurado como inactivo", () => {
     render(<Employees />);
-
-    // Toma el primer par de botones (tarjeta de María García, activa)
     const inactiveButtons = screen.getAllByRole("button", { name: /empleado inactivo/i });
-    fireEvent.click(inactiveButtons[0]);
+    fireEvent.click(inactiveButtons[0]); // tarjeta de María García (activa)
 
-    await waitFor(() => {
-      expect(mockUpdateEmployee).toHaveBeenCalledWith(
-        activeEmployee.id,
-        expect.objectContaining({ is_active: false })
-      );
-    });
+    expect(screen.getByTestId("edit-modal")).toBeDefined();
+    expect(screen.getByTestId("edit-modal-name").textContent).toBe("María García");
   });
 
   it("clic en 'Empleado activo' en tarjeta inactiva llama updateEmployee con is_active: true", async () => {
@@ -188,16 +187,6 @@ describe("Employees — control segmentado de estado en tarjetas", () => {
     expect(screen.queryByTestId("view-modal")).toBeNull();
   });
 
-  it("muestra toast de éxito al cambiar estado a inactivo", async () => {
-    render(<Employees />);
-    const inactiveButtons = screen.getAllByRole("button", { name: /empleado inactivo/i });
-    fireEvent.click(inactiveButtons[0]);
-
-    await waitFor(() => {
-      expect(mockToastSuccess).toHaveBeenCalledWith("Empleado marcado como inactivo");
-    });
-  });
-
   it("muestra toast de éxito al cambiar estado a activo", async () => {
     render(<Employees />);
     const activeButtons = screen.getAllByRole("button", { name: /empleado activo/i });
@@ -208,14 +197,4 @@ describe("Employees — control segmentado de estado en tarjetas", () => {
     });
   });
 
-  it("muestra toast de error cuando updateEmployee falla", async () => {
-    mockUpdateEmployee.mockRejectedValueOnce(new Error("Error de red"));
-    render(<Employees />);
-    const inactiveButtons = screen.getAllByRole("button", { name: /empleado inactivo/i });
-    fireEvent.click(inactiveButtons[0]);
-
-    await waitFor(() => {
-      expect(mockToastError).toHaveBeenCalledWith("Error de red");
-    });
-  });
 });

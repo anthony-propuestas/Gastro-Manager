@@ -305,7 +305,7 @@ export default function Employees() {
                       Empleado activo
                     </button>
                     <button
-                      onClick={() => handleToggleStatus(employee, false)}
+                      onClick={() => { setEditingEmployee({...employee, is_active: 0}); setIsModalOpen(true); }}
                       className={`flex-1 px-2 py-2 border-l border-border transition-colors font-medium ${
                         employee.is_active === 0
                           ? "bg-destructive/10 text-destructive"
