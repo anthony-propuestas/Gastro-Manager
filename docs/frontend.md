@@ -416,18 +416,25 @@ Gestión de sueldos y adelantos.
 
 ```tsx
 export function useSalaries() {
-  const fetchOverview = async (month, year) => { ... };
-  const createAdvance = async (employeeId, data) => { ... };
-  const deleteAdvance = async (id) => { ... };
-  const markSalaryPaid = async (id, paidDate) => { ... };
-  const markAllPaid = async (month, year, paidDate) => { ... };
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError]         = useState<string | null>(null);
+
+  const fetchOverview   = async (month?: number, year?: number): Promise<SalaryOverview | null> => { ... };
+  const fetchAdvances   = async (employeeId: number, month?: number, year?: number): Promise<Advance[]> => { ... };
+  const createAdvance   = async (employeeId: number, input: AdvanceInput): Promise<Advance | null> => { ... };
+  const deleteAdvance   = async (advanceId: number): Promise<boolean> => { ... };
+  const markAsPaid      = async (employeeId: number, month: number, year: number): Promise<boolean> => { ... };
+  const markAllAsPaid   = async (month: number, year: number): Promise<boolean> => { ... };
 
   return {
+    isLoading,
+    error,
     fetchOverview,
+    fetchAdvances,
     createAdvance,
     deleteAdvance,
-    markSalaryPaid,
-    markAllPaid,
+    markAsPaid,
+    markAllAsPaid,
   };
 }
 ```

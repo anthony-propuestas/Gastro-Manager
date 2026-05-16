@@ -1,6 +1,6 @@
 import { renderHook, act } from "@testing-library/react";
 import { vi, describe, it, expect, beforeEach } from "vitest";
-import { useSalaries } from "./useSalaries";
+import { useSalaries, Advance } from "./useSalaries";
 
 const mockUseAuth = vi.fn();
 const mockApiFetch = vi.fn();
@@ -19,7 +19,7 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
-const ADVANCE = {
+const ADVANCE: Advance = {
   id: 1,
   negocio_id: 1,
   user_id: "u1",
