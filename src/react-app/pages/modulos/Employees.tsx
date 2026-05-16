@@ -239,11 +239,11 @@ export default function Employees() {
                           .slice(0, 2)}
                       </span>
                     </div>
-                    <div>
-                      <h3 className="font-semibold text-foreground">
+                    <div className="min-w-0">
+                      <h3 className="font-semibold text-foreground truncate">
                         {employee.name}
                       </h3>
-                      <p className="text-sm text-muted-foreground">
+                      <p className="text-sm text-muted-foreground truncate">
                         {employee.role}
                       </p>
                     </div>

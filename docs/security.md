@@ -320,3 +320,16 @@ Vite genera archivos con hash en el nombre (ej. `index-BFSxencr.js`). Tras un re
 - **Suscripcion.tsx / SuscripcionEstado.tsx**: solo consumen el hook `useSuscripcion()` ya existente; no agregan endpoints ni modifican el flujo de webhook de MercadoPago documentado arriba.
 
 **Conclusión**: sin nuevo riesgo de seguridad. Los cambios son de organización de estado React y renombrado de rutas frontend.
+
+---
+
+## Revisión — Truncación de texto en tarjetas y modal de empleados (2026-05-16)
+
+Áreas revisadas:
+
+- **Validación de entrada**: No aplica. Los cambios son exclusivamente clases Tailwind (`truncate`, `min-w-0`) en `Employees.tsx` y `EmployeeViewModal.tsx`. No se modificó ningún endpoint, payload ni lógica de negocio.
+- **Aislamiento por negocio_id**: No aplica. No hay acceso a datos nuevo ni modificado.
+- **Autenticación / sesión**: No aplica. Sin cambios en flujo de auth.
+- **Autorización / roles**: No aplica. Sin cambios en guards ni restricciones de módulo.
+
+**Conclusión**: sin riesgo de seguridad. El cambio es cosmético (prevención de overflow visual con CSS) y no altera ninguna superficie de datos, endpoint ni flujo de autenticación.

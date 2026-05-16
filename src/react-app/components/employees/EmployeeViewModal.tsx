@@ -68,7 +68,7 @@ export default function EmployeeViewModal({
             <h2 className="text-xl font-serif font-semibold truncate">
               {employee.name}
             </h2>
-            <p className="text-sm text-muted-foreground">{employee.role}</p>
+            <p className="text-sm text-muted-foreground truncate">{employee.role}</p>
           </div>
           <button
             onClick={onClose}
