@@ -220,12 +220,14 @@ describe("useChat — triggerDailyGreeting", () => {
     mockApiFetch.mockResolvedValue(ok("ok"));
   });
 
-  it("no envía mensaje en la primera visita (sin clave previa)", async () => {
+  it("envía saludo en la primera visita (sin clave previa)", async () => {
     const { result } = renderHook(() => useChat());
 
     await act(async () => { await result.current.triggerDailyGreeting(); });
 
-    expect(mockApiFetch).not.toHaveBeenCalled();
+    expect(mockApiFetch).toHaveBeenCalledTimes(1);
+    const body = JSON.parse((mockApiFetch.mock.calls[0]?.[1] as RequestInit).body as string);
+    expect(body.message).toBe("Dame un resumen breve de los eventos de hoy y si hay algo pendiente importante");
     expect(localStorage.getItem(KEY)).not.toBeNull();
   });
 

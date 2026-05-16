@@ -921,7 +921,7 @@ Widget flotante para interactuar con el asistente virtual potenciado por DeepSee
 - Panel de chat expandible (`w-[380px]`, altura 500px)
 - Integra `UsageBanner` para la herramienta "chat" (via `useMyUsage`)
 - Si el envío de mensaje falla por límite de uso, el modal global de upgrade puede abrirse automáticamente
-- Llama a `triggerDailyGreeting` al abrir (saludo automático si >8h de inactividad y historial vacío)
+- Llama a `triggerDailyGreeting` al abrir (saludo automático en primera visita o si >8h de inactividad, siempre que el historial esté vacío)
 - Historial de mensajes en la sesión
 - Animación de carga con puntos rebotando
 - Botón para limpiar historial

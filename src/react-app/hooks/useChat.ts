@@ -73,13 +73,10 @@ export function useChat() {
 
     localStorage.setItem(key, String(now));
 
-    if (!lastActivity) return;
+    const isFirstUse = !lastActivity;
+    const isInactive = !!lastActivity && now - Number(lastActivity) > INACTIVITY_THRESHOLD_MS;
 
-    if (
-      now - Number(lastActivity) > INACTIVITY_THRESHOLD_MS &&
-      messages.length === 0 &&
-      !isLoading
-    ) {
+    if ((isFirstUse || isInactive) && messages.length === 0 && !isLoading) {
       await sendMessage(
         "Dame un resumen breve de los eventos de hoy y si hay algo pendiente importante"
       );
