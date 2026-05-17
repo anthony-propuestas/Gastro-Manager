@@ -420,6 +420,7 @@ GET /api/salaries/overview?month=4&year=2026
     "name": "María García",
     "monthly_salary": 8000,
     "advances_total": 1500,
+    "paid_amount": 0,
     "remaining": 6500,
     "is_paid": false
   }],
@@ -431,6 +432,8 @@ GET /api/salaries/overview?month=4&year=2026
   }
 }
 ```
+
+> `paid_amount`: neto pagado al empleado (`monthly_salary - advances_total` si `is_paid=true`, `0` si no). `remaining`: `0` cuando `is_paid=true`. `total_paid`: suma de netos pagados, no de sueldos brutos.
 
 ---
 
@@ -551,15 +554,11 @@ Registra una nueva compra.
 
 **Valores válidos de `categoria`:** `"carnes"` | `"verduras"` | `"bebidas"` | `"limpieza"` | `"descartables"` | `"servicios"` | `"mantenimiento"` | `"alquiler"` | `"otros"`
 
-#### `PUT /api/compras/:id` ⚠️ *Restringible por owner*
-Actualiza una compra (todos los campos opcionales, mismos valores válidos que POST).
-
-**DISCREPANCIA DOCUMENTADA:** La documentación anterior indicaba que `PUT` consume cuota, pero **el código actual NO incluye `createUsageLimitMiddleware`**. Por lo tanto, las actualizaciones de compras **NO consumen cuota** (inconsistencia con la documentación).
+#### `PUT /api/compras/:id` ⚠️ *Sujeto a cuota `compras` · Restringible por owner*
+Actualiza una compra (todos los campos opcionales, mismos valores válidos que POST). Al igual que `POST`, las actualizaciones también consumen cuota.
 
 #### `DELETE /api/compras/:id` ⚠️ *Restringible por owner*
-Elimina una compra. Si tiene `comprobante_key`, también elimina el archivo de R2.
-
-**DISCREPANCIA DOCUMENTADA:** El código actual **NO incluye `createUsageLimitMiddleware`**. Las eliminaciones de compras **NO consumen cuota**.
+Elimina una compra. Si tiene `comprobante_key`, también elimina el archivo de R2. No consume cuota.
 
 #### `POST /api/compras/upload` ⚠️ *Requiere autenticación + negocio · Restringible por owner*
 Sube una imagen de comprobante a Cloudflare R2.
@@ -664,20 +663,16 @@ Registra una nueva venta.
 
 **Lógica de `metodo_pago` en el backend:** si `pagos_detalle` está presente en el body, el servidor lo parsea y calcula `metodo_pago` automáticamente: 1 método → ese método; 2+ métodos → `"mixto"`. Si el parse de `pagos_detalle` falla, se usa el `metodo_pago` enviado por el cliente tal cual.
 
-#### `PUT /api/facturacion/:id` ⚠️ *Restringible por owner*
-Actualiza una venta existente. Solo actualiza los campos proporcionados. Verifica que la venta pertenezca al negocio activo.
+#### `PUT /api/facturacion/:id` ⚠️ *Sujeto a cuota `facturacion` · Restringible por owner*
+Actualiza una venta existente. Solo actualiza los campos proporcionados. Verifica que la venta pertenezca al negocio activo. Al igual que `POST`, las actualizaciones también consumen cuota.
 
-**DISCREPANCIA DOCUMENTADA:** La documentación anterior indicaba que `PUT` consume cuota, pero **el código actual NO incluye `createUsageLimitMiddleware`**. Por lo tanto, las actualizaciones de facturas **NO consumen cuota** (inconsistencia con la documentación).
-
-#### `DELETE /api/facturacion/:id` ⚠️ *Restringible por owner*
-Elimina una venta. Verifica que pertenezca al negocio activo antes de borrar.
+#### `DELETE /api/facturacion/:id` ⚠️ *Sujeto a cuota `facturacion` · Restringible por owner*
+Elimina una venta. Verifica que pertenezca al negocio activo antes de borrar. Las eliminaciones también consumen cuota.
 
 ```json
 // Response data
 { "deleted": true }
 ```
-
-**DISCREPANCIA DOCUMENTADA:** La documentación anterior indicaba que `DELETE` consume cuota, pero **el código actual NO incluye `createUsageLimitMiddleware`**. Las eliminaciones de facturas **NO consumen cuota** (inconsistencia con la documentación).
 
 ---
 

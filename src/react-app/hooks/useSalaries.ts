@@ -31,6 +31,7 @@ export interface EmployeeSalary {
   monthly_salary: number;
   advances_total: number;
   remaining: number;
+  paid_amount: number;
   is_paid: boolean;
 }
 

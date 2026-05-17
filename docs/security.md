@@ -351,6 +351,21 @@ Vite genera archivos con hash en el nombre (ej. `index-BFSxencr.js`). Tras un re
 
 ---
 
+## Revisión — Campo `paid_amount` en `GET /api/salaries/overview` (2026-05-17)
+
+Áreas revisadas:
+
+- **Endpoint nuevo o modificado**: No hay nuevos endpoints. `GET /api/salaries/overview` ahora incluye `paid_amount` por empleado (neto pagado) y corrige `remaining` a `0` cuando `is_paid=true`. `total_paid` ahora refleja el neto (salary - advances), no el sueldo bruto. Sin cambio en method, ruta ni autenticación.
+- **Aislamiento por `negocio_id`**: `paid_amount` se deriva de los mismos campos ya filtrados por `negocioMiddleware`. No hay acceso cross-negocio.
+- **Validación de entrada**: No aplica. `paid_amount` es un campo calculado server-side; no hay nuevo input del cliente.
+- **Autenticación / sesión**: No aplica. Sin cambios en el flujo de auth.
+- **Autorización / roles**: El endpoint mantiene `authMiddleware → negocioMiddleware → createModuleRestrictionMiddleware('sueldos')`. Sin degradación de protección.
+- **Cuotas**: No aplica. `GET /api/salaries/overview` es de solo lectura.
+
+**Conclusión**: sin riesgo de seguridad. `paid_amount` es un campo derivado de datos ya autorizados; la corrección de `remaining` elimina una inconsistencia de UI sin ampliar la superficie de ataque.
+
+---
+
 ## Revisión — Saludo diario por día nuevo en triggerDailyGreeting (2026-05-16)
 
 Áreas revisadas:

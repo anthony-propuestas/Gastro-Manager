@@ -34,7 +34,7 @@ const ADVANCE: Advance = {
 };
 
 const OVERVIEW = {
-  employees: [{ id: 2, name: "Ana", role: "Chef", monthly_salary: 15000, advances_total: 500, remaining: 14500, is_paid: false }],
+  employees: [{ id: 2, name: "Ana", role: "Chef", monthly_salary: 15000, advances_total: 500, remaining: 14500, paid_amount: 0, is_paid: false }],
   totals: { total_salaries: 15000, total_advances: 500, total_remaining: 14500, total_paid: 0 },
   period: { month: 5, year: 2026 },
 };

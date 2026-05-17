@@ -34,6 +34,7 @@ const EMP = {
   monthly_salary: 15000,
   advances_total: 0,
   remaining: 15000,
+  paid_amount: 0,
   is_paid: false,
 };
 

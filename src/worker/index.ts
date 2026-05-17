@@ -2217,16 +2217,18 @@ app.get("/api/salaries/overview", authMiddleware, negocioMiddleware, createModul
     const employeesWithCalculations = employees.results.map((emp: any) => {
       const salary = emp.monthly_salary || 0;
       const advances = emp.advances_total || 0;
-      const remaining = salary - advances;
+      const net = salary - advances;
       const isPaid = emp.is_paid === 1;
+      const paid_amount = isPaid ? net : 0;
+      const remaining = isPaid ? 0 : net;
       totals.total_salaries += salary;
       totals.total_advances += advances;
       if (isPaid) {
-        totals.total_paid += salary;
+        totals.total_paid += net;
       } else {
         totals.total_remaining += remaining;
       }
-      return { ...emp, remaining, is_paid: isPaid };
+      return { ...emp, remaining, paid_amount, is_paid: isPaid };
     });
 
     return c.json(

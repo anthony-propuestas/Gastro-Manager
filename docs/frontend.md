@@ -47,8 +47,6 @@ Todos en `components/ui/`, basados en Radix UI (shadcn/ui):
 - **Table** (`table.tsx`): Tablas de datos
 - **Toast** (`toast.tsx`): Notificaciones temporales (success, error, info, warning)
 - **Switch** (`switch.tsx`): Toggle switches para activar/desactivar opciones
-- **Dialog** (`dialog.tsx`): Modales con overlay (basado en Radix UI)
-- **Popover** (`popover.tsx`): Dropdowns y tooltips (basado en Radix UI)
 
 **Uso:**
 ```tsx
@@ -206,7 +204,8 @@ Sistema de sueldos y adelantos.
 **Características:**
 - Selector de período (mes/año)
 - 4 tarjetas de resumen: Total Sueldos, Total Adelantos, Saldo Pendiente, Total Pagado
-- Tabla de empleados con sueldo neto; badge "Pagado" cuando `is_paid=true`, botón cuando `is_paid=false`
+- Tabla de empleados: Nombre, Puesto, Sueldo, Adelantos, **Pagado** (monto neto si ya pagó, "—" si no), A Pagar, Acciones
+- Badge "Pagado" cuando `is_paid=true`; botón "Pagado" cuando `is_paid=false`
 - Botón de marcar pagado individual y "Marcar Todos" (con confirmación)
 - Modal de adelantos por empleado
 - Histórico de períodos
@@ -415,6 +414,17 @@ const response = await apiFetch("/api/employees", {}, currentNegocio?.id);
 Gestión de sueldos y adelantos.
 
 ```tsx
+export interface EmployeeSalary {
+  id: number;
+  name: string;
+  role: string;
+  monthly_salary: number;
+  advances_total: number;
+  paid_amount: number;
+  remaining: number;
+  is_paid: boolean;
+}
+
 export function useSalaries() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError]         = useState<string | null>(null);

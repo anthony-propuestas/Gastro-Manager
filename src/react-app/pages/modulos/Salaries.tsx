@@ -22,6 +22,7 @@ type SalaryOverview = {
     monthly_salary: number;
     advances_total: number;
     remaining: number;
+    paid_amount: number;
     is_paid: boolean;
   }>;
 };
@@ -214,6 +215,7 @@ export default function Salaries() {
                 <th className="text-left p-4 font-medium">Puesto</th>
                 <th className="text-right p-4 font-medium">Sueldo</th>
                 <th className="text-right p-4 font-medium">Adelantos</th>
+                <th className="text-right p-4 font-medium">Pagado</th>
                 <th className="text-right p-4 font-medium">A Pagar</th>
                 <th className="text-center p-4 font-medium">Acciones</th>
               </tr>
@@ -235,6 +237,9 @@ export default function Salaries() {
                     ) : (
                       formatCurrency(0)
                     )}
+                  </td>
+                  <td className="p-4 text-right font-semibold text-emerald-500">
+                    {emp.paid_amount > 0 ? formatCurrency(emp.paid_amount) : "—"}
                   </td>
                   <td className="p-4 text-right font-semibold text-success">
                     {formatCurrency(emp.remaining)}
