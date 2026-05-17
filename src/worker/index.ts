@@ -28,6 +28,7 @@ import {
 import { USAGE_TOOLS, type UsageTool } from "./usageTools";
 import { checkRateLimit } from "./rateLimitAuth";
 import { incrementAndCheckInteligenteLimit, CHAT_CAP_INTELIGENTE } from "./usageLimit";
+import { calcSalaryRow } from "./salaryHelpers";
 
 type Env = {
   DB: D1Database;
@@ -2217,15 +2218,12 @@ app.get("/api/salaries/overview", authMiddleware, negocioMiddleware, createModul
     const employeesWithCalculations = employees.results.map((emp: any) => {
       const salary = emp.monthly_salary || 0;
       const advances = emp.advances_total || 0;
-      const net = salary - advances;
       const isPaid = emp.is_paid === 1;
-      const paid_amount = isPaid ? net : 0;
-      const remaining = isPaid ? 0 : net;
+      const { paid_amount, remaining } = calcSalaryRow(salary, advances, isPaid);
       totals.total_salaries += salary;
       totals.total_advances += advances;
-      if (isPaid) {
-        totals.total_paid += net;
-      } else {
+      totals.total_paid += paid_amount;
+      if (!isPaid) {
         totals.total_remaining += remaining;
       }
       return { ...emp, remaining, paid_amount, is_paid: isPaid };
