@@ -87,53 +87,96 @@ export default function ComprasHistoryModal({ isOpen, onClose, compras, onChange
             </select>
           </div>
 
-          {/* Table */}
+          {/* Lista / Tabla */}
           <div className="overflow-y-auto flex-1">
             {filtered.length === 0 ? (
               <div className="p-8 text-center text-muted-foreground">
                 No hay compras para mostrar
               </div>
             ) : (
-              <table className="w-full">
-                <thead className="bg-muted/50 border-b border-border sticky top-0">
-                  <tr>
-                    <th className="text-left p-3 font-medium text-sm">Fecha</th>
-                    <th className="text-left p-3 font-medium text-sm">Item</th>
-                    <th className="text-right p-3 font-medium text-sm">Monto</th>
-                    <th className="text-left p-3 font-medium text-sm hidden sm:table-cell">Categoria</th>
-                    <th className="text-left p-3 font-medium text-sm hidden md:table-cell">Comprador</th>
-                    <th className="text-center p-3 font-medium text-sm">Acciones</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
+              <>
+                {/* Lista en móvil */}
+                <div className="sm:hidden divide-y divide-border">
                   {filtered.map((c) => (
-                    <tr key={c.id} className="hover:bg-muted/30 transition-colors">
-                      <td className="p-3 text-sm">{formatDate(c.fecha)}</td>
-                      <td className="p-3">
-                        <div className="font-medium text-sm">{c.item}</div>
-                        <span className={`text-xs px-1.5 py-0.5 rounded-full ${
-                          c.tipo === "producto" ? "bg-blue-500/10 text-blue-500" : "bg-purple-500/10 text-purple-500"
-                        }`}>
-                          {c.tipo === "producto" ? "Producto" : "Servicio"}
-                        </span>
-                      </td>
-                      <td className="p-3 text-right font-semibold text-sm">{formatCurrency(c.monto)}</td>
-                      <td className="p-3 text-sm text-muted-foreground hidden sm:table-cell capitalize">{c.categoria}</td>
-                      <td className="p-3 text-sm text-muted-foreground hidden md:table-cell">{c.comprador_name || "—"}</td>
-                      <td className="p-3">
-                        <div className="flex items-center justify-center gap-1">
-                          <Button size="sm" variant="outline" onClick={() => setEditingCompra(c)}>
-                            <Pencil className="w-3.5 h-3.5" />
-                          </Button>
-                          <Button size="sm" variant="outline" onClick={() => handleDelete(c)} className="text-destructive hover:text-destructive">
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </Button>
+                    <div key={c.id} className="p-4 space-y-2">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0 flex-1">
+                          <p className="font-medium text-sm truncate">{c.item}</p>
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className={`text-xs px-1.5 py-0.5 rounded-full ${
+                              c.tipo === "producto" ? "bg-blue-500/10 text-blue-500" : "bg-purple-500/10 text-purple-500"
+                            }`}>
+                              {c.tipo === "producto" ? "Producto" : "Servicio"}
+                            </span>
+                            {c.categoria && (
+                              <span className="text-xs text-muted-foreground capitalize">{c.categoria}</span>
+                            )}
+                          </div>
                         </div>
-                      </td>
-                    </tr>
+                        <div className="text-right flex-shrink-0">
+                          <p className="font-semibold text-sm">{formatCurrency(c.monto)}</p>
+                          <p className="text-xs text-muted-foreground">{formatDate(c.fecha)}</p>
+                        </div>
+                      </div>
+                      {c.comprador_name && (
+                        <p className="text-xs text-muted-foreground">Comprador: {c.comprador_name}</p>
+                      )}
+                      <div className="flex gap-2 pt-1">
+                        <Button size="sm" variant="outline" className="flex-1" onClick={() => setEditingCompra(c)}>
+                          <Pencil className="w-3.5 h-3.5 mr-1" />
+                          Editar
+                        </Button>
+                        <Button size="sm" variant="outline" className="flex-1 text-destructive hover:text-destructive" onClick={() => handleDelete(c)}>
+                          <Trash2 className="w-3.5 h-3.5 mr-1" />
+                          Eliminar
+                        </Button>
+                      </div>
+                    </div>
                   ))}
-                </tbody>
-              </table>
+                </div>
+
+                {/* Tabla en desktop */}
+                <table className="hidden sm:table w-full">
+                  <thead className="bg-muted/50 border-b border-border sticky top-0">
+                    <tr>
+                      <th className="text-left p-3 font-medium text-sm">Fecha</th>
+                      <th className="text-left p-3 font-medium text-sm">Item</th>
+                      <th className="text-right p-3 font-medium text-sm">Monto</th>
+                      <th className="text-left p-3 font-medium text-sm">Categoria</th>
+                      <th className="text-left p-3 font-medium text-sm hidden md:table-cell">Comprador</th>
+                      <th className="text-center p-3 font-medium text-sm">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {filtered.map((c) => (
+                      <tr key={c.id} className="hover:bg-muted/30 transition-colors">
+                        <td className="p-3 text-sm">{formatDate(c.fecha)}</td>
+                        <td className="p-3">
+                          <div className="font-medium text-sm">{c.item}</div>
+                          <span className={`text-xs px-1.5 py-0.5 rounded-full ${
+                            c.tipo === "producto" ? "bg-blue-500/10 text-blue-500" : "bg-purple-500/10 text-purple-500"
+                          }`}>
+                            {c.tipo === "producto" ? "Producto" : "Servicio"}
+                          </span>
+                        </td>
+                        <td className="p-3 text-right font-semibold text-sm">{formatCurrency(c.monto)}</td>
+                        <td className="p-3 text-sm text-muted-foreground capitalize">{c.categoria}</td>
+                        <td className="p-3 text-sm text-muted-foreground hidden md:table-cell">{c.comprador_name || "—"}</td>
+                        <td className="p-3">
+                          <div className="flex items-center justify-center gap-1">
+                            <Button size="sm" variant="outline" onClick={() => setEditingCompra(c)}>
+                              <Pencil className="w-3.5 h-3.5" />
+                            </Button>
+                            <Button size="sm" variant="outline" onClick={() => handleDelete(c)} className="text-destructive hover:text-destructive">
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </>
             )}
           </div>
 

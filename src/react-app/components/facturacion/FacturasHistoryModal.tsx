@@ -118,69 +118,116 @@ export default function FacturasHistoryModal({ isOpen, onClose, facturas, onChan
             </select>
           </div>
 
-          {/* Table */}
+          {/* Lista / Tabla */}
           <div className="overflow-y-auto flex-1">
             {filtered.length === 0 ? (
               <div className="p-8 text-center text-muted-foreground">
                 No hay ventas para mostrar
               </div>
             ) : (
-              <table className="w-full">
-                <thead className="bg-muted/50 border-b border-border sticky top-0">
-                  <tr>
-                    <th className="text-left p-3 font-medium text-sm">Fecha</th>
-                    <th className="text-left p-3 font-medium text-sm">Turno</th>
-                    <th className="text-left p-3 font-medium text-sm">Método(s)</th>
-                    <th className="text-right p-3 font-medium text-sm">Monto</th>
-                    <th className="text-left p-3 font-medium text-sm hidden sm:table-cell">Concepto</th>
-                    <th className="text-center p-3 font-medium text-sm">Acciones</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
+              <>
+                {/* Lista en móvil */}
+                <div className="sm:hidden divide-y divide-border">
                   {filtered.map((f) => {
                     const pagos = parsePagosDetalle(f.pagos_detalle);
                     return (
-                      <tr key={f.id} className="hover:bg-muted/30 transition-colors">
-                        <td className="p-3 text-sm">{formatDate(f.fecha)}</td>
-                        <td className="p-3 text-sm">{turnoLabel(f.turno)}</td>
-                        <td className="p-3">
-                          {pagos.length > 1 ? (
-                            <div className="flex flex-wrap gap-1">
-                              {pagos.map((p, i) => (
-                                <span
-                                  key={i}
-                                  className="text-xs px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground"
-                                >
-                                  {getMetodoLabel(p.metodo_pago)}
-                                </span>
-                              ))}
+                      <div key={f.id} className="p-4 space-y-2">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-xs text-muted-foreground">{turnoLabel(f.turno)}</span>
+                              {pagos.length > 1 ? (
+                                <div className="flex flex-wrap gap-1">
+                                  {pagos.map((p, i) => (
+                                    <span key={i} className="text-xs px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground">
+                                      {getMetodoLabel(p.metodo_pago)}
+                                    </span>
+                                  ))}
+                                </div>
+                              ) : (
+                                <span className="text-xs font-medium">{getMetodoLabel(f.metodo_pago ?? "")}</span>
+                              )}
                             </div>
-                          ) : (
-                            <span className="text-sm font-medium">{getMetodoLabel(f.metodo_pago ?? "")}</span>
-                          )}
-                          {f.numero_comprobante && (
-                            <div className="text-xs text-muted-foreground">#{f.numero_comprobante}</div>
-                          )}
-                        </td>
-                        <td className="p-3 text-right font-semibold text-sm">{formatCurrency(f.monto_total)}</td>
-                        <td className="p-3 text-sm text-muted-foreground hidden sm:table-cell">
-                          {f.concepto || "—"}
-                        </td>
-                        <td className="p-3">
-                          <div className="flex items-center justify-center gap-1">
-                            <Button size="sm" variant="outline" onClick={() => setEditingFactura(f)}>
-                              <Pencil className="w-3.5 h-3.5" />
-                            </Button>
-                            <Button size="sm" variant="outline" onClick={() => handleDelete(f)} className="text-destructive hover:text-destructive">
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </Button>
+                            {f.concepto && (
+                              <p className="text-sm text-muted-foreground mt-1 truncate">{f.concepto}</p>
+                            )}
+                            {f.numero_comprobante && (
+                              <p className="text-xs text-muted-foreground">#{f.numero_comprobante}</p>
+                            )}
                           </div>
-                        </td>
-                      </tr>
+                          <div className="text-right flex-shrink-0">
+                            <p className="font-semibold text-sm">{formatCurrency(f.monto_total)}</p>
+                            <p className="text-xs text-muted-foreground">{formatDate(f.fecha)}</p>
+                          </div>
+                        </div>
+                        <div className="flex gap-2 pt-1">
+                          <Button size="sm" variant="outline" className="flex-1" onClick={() => setEditingFactura(f)}>
+                            <Pencil className="w-3.5 h-3.5 mr-1" />
+                            Editar
+                          </Button>
+                          <Button size="sm" variant="outline" className="flex-1 text-destructive hover:text-destructive" onClick={() => handleDelete(f)}>
+                            <Trash2 className="w-3.5 h-3.5 mr-1" />
+                            Eliminar
+                          </Button>
+                        </div>
+                      </div>
                     );
                   })}
-                </tbody>
-              </table>
+                </div>
+
+                {/* Tabla en desktop */}
+                <table className="hidden sm:table w-full">
+                  <thead className="bg-muted/50 border-b border-border sticky top-0">
+                    <tr>
+                      <th className="text-left p-3 font-medium text-sm">Fecha</th>
+                      <th className="text-left p-3 font-medium text-sm">Turno</th>
+                      <th className="text-left p-3 font-medium text-sm">Método(s)</th>
+                      <th className="text-right p-3 font-medium text-sm">Monto</th>
+                      <th className="text-left p-3 font-medium text-sm">Concepto</th>
+                      <th className="text-center p-3 font-medium text-sm">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {filtered.map((f) => {
+                      const pagos = parsePagosDetalle(f.pagos_detalle);
+                      return (
+                        <tr key={f.id} className="hover:bg-muted/30 transition-colors">
+                          <td className="p-3 text-sm">{formatDate(f.fecha)}</td>
+                          <td className="p-3 text-sm">{turnoLabel(f.turno)}</td>
+                          <td className="p-3">
+                            {pagos.length > 1 ? (
+                              <div className="flex flex-wrap gap-1">
+                                {pagos.map((p, i) => (
+                                  <span key={i} className="text-xs px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground">
+                                    {getMetodoLabel(p.metodo_pago)}
+                                  </span>
+                                ))}
+                              </div>
+                            ) : (
+                              <span className="text-sm font-medium">{getMetodoLabel(f.metodo_pago ?? "")}</span>
+                            )}
+                            {f.numero_comprobante && (
+                              <div className="text-xs text-muted-foreground">#{f.numero_comprobante}</div>
+                            )}
+                          </td>
+                          <td className="p-3 text-right font-semibold text-sm">{formatCurrency(f.monto_total)}</td>
+                          <td className="p-3 text-sm text-muted-foreground">{f.concepto || "—"}</td>
+                          <td className="p-3">
+                            <div className="flex items-center justify-center gap-1">
+                              <Button size="sm" variant="outline" onClick={() => setEditingFactura(f)}>
+                                <Pencil className="w-3.5 h-3.5" />
+                              </Button>
+                              <Button size="sm" variant="outline" onClick={() => handleDelete(f)} className="text-destructive hover:text-destructive">
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </>
             )}
           </div>
 

@@ -164,7 +164,7 @@ export default function Settings() {
     <div className="space-y-6 max-w-3xl">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-serif font-semibold text-foreground">
+        <h1 className="text-2xl sm:text-3xl font-serif font-semibold text-foreground">
           Configuración
         </h1>
         <p className="text-muted-foreground mt-1">

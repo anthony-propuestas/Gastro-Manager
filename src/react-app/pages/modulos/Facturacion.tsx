@@ -116,64 +116,68 @@ export default function Facturacion() {
           <h1 className="text-2xl sm:text-3xl font-serif font-bold">Facturación</h1>
           <p className="text-muted-foreground mt-1">Registro de ventas del negocio</p>
         </div>
-        <div className="flex items-center gap-3 flex-wrap">
-          <select
-            value={currentMonth}
-            onChange={(e) => setCurrentMonth(parseInt(e.target.value))}
-            className="h-10 rounded-md border border-input bg-background px-3 text-sm"
-          >
-            {monthNames.map((name, idx) => (
-              <option key={idx + 1} value={idx + 1}>{name}</option>
-            ))}
-          </select>
-          <select
-            value={currentYear}
-            onChange={(e) => setCurrentYear(parseInt(e.target.value))}
-            className="h-10 rounded-md border border-input bg-background px-3 text-sm"
-          >
-            {[2024, 2025, 2026, 2027].map((year) => (
-              <option key={year} value={year}>{year}</option>
-            ))}
-          </select>
-          <Button variant="outline" onClick={() => setShowHistoryModal(true)}>
-            <History className="w-4 h-4 mr-2" />
-            Historial
-          </Button>
-          <Button onClick={() => { setEditingFactura(null); setShowFacturaModal(true); }}>
-            <Plus className="w-4 h-4 mr-2" />
-            Nueva Venta
-          </Button>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
+          <div className="flex items-center gap-2">
+            <select
+              value={currentMonth}
+              onChange={(e) => setCurrentMonth(parseInt(e.target.value))}
+              className="flex-1 sm:flex-none h-10 rounded-md border border-input bg-background px-3 text-sm"
+            >
+              {monthNames.map((name, idx) => (
+                <option key={idx + 1} value={idx + 1}>{name}</option>
+              ))}
+            </select>
+            <select
+              value={currentYear}
+              onChange={(e) => setCurrentYear(parseInt(e.target.value))}
+              className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+            >
+              {[2024, 2025, 2026, 2027].map((year) => (
+                <option key={year} value={year}>{year}</option>
+              ))}
+            </select>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" className="flex-1 sm:flex-none" onClick={() => setShowHistoryModal(true)}>
+              <History className="w-4 h-4 mr-2" />
+              Historial
+            </Button>
+            <Button className="flex-1 sm:flex-none" onClick={() => { setEditingFactura(null); setShowFacturaModal(true); }}>
+              <Plus className="w-4 h-4 mr-2" />
+              Nueva Venta
+            </Button>
+          </div>
         </div>
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-card rounded-xl p-6 border border-border">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+        <div className="bg-card rounded-xl p-4 sm:p-6 border border-border">
           <div className="flex items-center gap-3 mb-2">
             <div className="p-2 rounded-lg bg-primary/10">
               <DollarSign className="w-5 h-5 text-primary" />
             </div>
             <span className="text-sm text-muted-foreground">Total del Mes</span>
           </div>
-          <div className="text-2xl font-bold">{formatCurrency(totalMes)}</div>
+          <div className="text-xl sm:text-2xl font-bold">{formatCurrency(totalMes)}</div>
         </div>
-        <div className="bg-card rounded-xl p-6 border border-border">
+        <div className="bg-card rounded-xl p-4 sm:p-6 border border-border">
           <div className="flex items-center gap-3 mb-2">
             <div className="p-2 rounded-lg bg-blue-500/10">
               <ShoppingBag className="w-5 h-5 text-blue-500" />
             </div>
             <span className="text-sm text-muted-foreground">Cantidad de Ventas</span>
           </div>
-          <div className="text-2xl font-bold">{cantidadVentas}</div>
+          <div className="text-xl sm:text-2xl font-bold">{cantidadVentas}</div>
         </div>
-        <div className="bg-card rounded-xl p-6 border border-border">
+        <div className="bg-card rounded-xl p-4 sm:p-6 border border-border">
           <div className="flex items-center gap-3 mb-2">
             <div className="p-2 rounded-lg bg-green-500/10">
               <TrendingUp className="w-5 h-5 text-green-500" />
             </div>
             <span className="text-sm text-muted-foreground">Promedio por Venta</span>
           </div>
-          <div className="text-2xl font-bold">{formatCurrency(promedio)}</div>
+          <div className="text-xl sm:text-2xl font-bold">{formatCurrency(promedio)}</div>
         </div>
       </div>
 

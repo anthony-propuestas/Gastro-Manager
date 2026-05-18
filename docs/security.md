@@ -378,3 +378,18 @@ Vite genera archivos con hash en el nombre (ej. `index-BFSxencr.js`). Tras un re
 - **Validación de entrada**: No aplica. `greetingKey` es leído/escrito en localStorage local; no es input del servidor.
 
 **Conclusión**: sin nuevo riesgo de seguridad. La condición `isNewDay` y el `greetingKey` son lógica cliente que no amplía la superficie de datos del backend ni altera autenticación, autorización ni aislamiento entre negocios.
+
+---
+
+### Revisión — Rediseño responsive (2026-05-18)
+
+Áreas revisadas:
+
+- **Endpoint nuevo o modificado**: No hay nuevos endpoints ni cambios de contrato. Los cambios son exclusivamente de layout Tailwind (`sm:` breakpoints) en componentes React.
+- **Validación de entrada**: No aplica. No se agregaron nuevos inputs de usuario ni campos de formulario.
+- **Aislamiento por `negocio_id`**: No aplica. No hay cambios en acceso a datos ni en las queries que consumen `negocio_id`.
+- **Autenticación / sesión**: No aplica. Sin cambios en el flujo de auth ni en cookies/JWT.
+- **Autorización / roles**: No aplica. Sin cambios en guards de módulo ni restricciones de rol.
+- **Cuotas y rate limiting**: No aplica. Sin nuevos endpoints que consuman cuota.
+
+**Conclusión**: sin riesgo de seguridad. El rediseño es puramente visual — dual layout mobile/desktop con Tailwind. No se agregaron endpoints, inputs, acceso a datos ni lógica de autorización.

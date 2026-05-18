@@ -60,19 +60,19 @@ describe("Salaries — estados base", () => {
 
   it("muestra el título 'Sueldos' cuando cargó", async () => {
     render(<Salaries />);
-    await waitFor(() => expect(screen.getByText("Sueldos")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole("heading", { name: "Sueldos" })).toBeInTheDocument());
   });
 
   it("muestra nombre del empleado en la tabla", async () => {
     mockFetchOverview.mockResolvedValue(OVERVIEW);
     render(<Salaries />);
-    await waitFor(() => expect(screen.getByText("Ana López")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getAllByText("Ana López").length).toBeGreaterThan(0));
   });
 
   it("muestra el puesto del empleado", async () => {
     mockFetchOverview.mockResolvedValue(OVERVIEW);
     render(<Salaries />);
-    await waitFor(() => expect(screen.getByText("Chef")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getAllByText("Chef").length).toBeGreaterThan(0));
   });
 
   it("muestra los selectores de mes y año", async () => {
@@ -126,9 +126,9 @@ describe("Salaries — acciones", () => {
   it("clic en 'Adelanto' llama handleAddAdvance (selectedEmployee se setea)", async () => {
     mockFetchOverview.mockResolvedValue(OVERVIEW);
     render(<Salaries />);
-    await waitFor(() => expect(screen.getByText("Ana López")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getAllByText("Ana López").length).toBeGreaterThan(0));
 
-    fireEvent.click(screen.getByRole("button", { name: /Adelanto/i }));
+    fireEvent.click(screen.getAllByRole("button", { name: /Adelanto/i })[0]);
     // El modal está mockeado a null, pero el click no debe tirar error
     // verificamos que fetchOverview fue llamado al menos 1 vez (mount)
     expect(mockFetchOverview).toHaveBeenCalledTimes(1);

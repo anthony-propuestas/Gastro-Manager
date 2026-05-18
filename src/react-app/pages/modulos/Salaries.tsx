@@ -109,15 +109,15 @@ export default function Salaries() {
       <UsageBanner label="Pagos de sueldo" usage={myUsage?.usage["salary_payments"]} />
       <UsageBanner label="Anticipos" usage={myUsage?.usage["advances"]} />
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h1 className="text-3xl font-serif font-bold">Sueldos</h1>
+          <h1 className="text-2xl sm:text-3xl font-serif font-bold">Sueldos</h1>
           <p className="text-muted-foreground mt-1">
             Gestión de sueldos y adelantos del personal
           </p>
         </div>
-        
-        <div className="flex items-center gap-3">
+
+        <div className="flex items-center gap-2 flex-wrap">
           <select
             value={currentMonth}
             onChange={(e) => setCurrentMonth(parseInt(e.target.value))}
@@ -144,69 +144,128 @@ export default function Salaries() {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-card rounded-xl p-6 border border-border">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="p-2 rounded-lg bg-primary/10">
-              <DollarSign className="w-5 h-5 text-primary" />
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
+        <div className="bg-card rounded-xl p-4 sm:p-6 border border-border">
+          <div className="flex items-center gap-2 mb-2">
+            <div className="p-1.5 sm:p-2 rounded-lg bg-primary/10">
+              <DollarSign className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
             </div>
-            <span className="text-sm text-muted-foreground">Sueldos Totales</span>
+            <span className="text-xs sm:text-sm text-muted-foreground">Sueldos</span>
           </div>
-          <div className="text-2xl font-bold">
+          <div className="text-lg sm:text-2xl font-bold">
             {formatCurrency(overview?.totals?.total_salaries || 0)}
           </div>
         </div>
 
-        <div className="bg-card rounded-xl p-6 border border-border">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="p-2 rounded-lg bg-amber-500/10">
-              <TrendingDown className="w-5 h-5 text-amber-500" />
+        <div className="bg-card rounded-xl p-4 sm:p-6 border border-border">
+          <div className="flex items-center gap-2 mb-2">
+            <div className="p-1.5 sm:p-2 rounded-lg bg-amber-500/10">
+              <TrendingDown className="w-4 h-4 sm:w-5 sm:h-5 text-amber-500" />
             </div>
-            <span className="text-sm text-muted-foreground">Adelantos Totales</span>
+            <span className="text-xs sm:text-sm text-muted-foreground">Adelantos</span>
           </div>
-          <div className="text-2xl font-bold">
+          <div className="text-lg sm:text-2xl font-bold">
             {formatCurrency(overview?.totals?.total_advances || 0)}
           </div>
         </div>
 
-        <div className="bg-card rounded-xl p-6 border border-border">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="p-2 rounded-lg bg-success/10">
-              <TrendingUp className="w-5 h-5 text-success" />
+        <div className="bg-card rounded-xl p-4 sm:p-6 border border-border">
+          <div className="flex items-center gap-2 mb-2">
+            <div className="p-1.5 sm:p-2 rounded-lg bg-success/10">
+              <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5 text-success" />
             </div>
-            <span className="text-sm text-muted-foreground">Total a Pagar</span>
+            <span className="text-xs sm:text-sm text-muted-foreground">A Pagar</span>
           </div>
-          <div className="text-2xl font-bold">
+          <div className="text-lg sm:text-2xl font-bold">
             {formatCurrency(overview?.totals?.total_remaining || 0)}
           </div>
         </div>
 
-        <div className="bg-card rounded-xl p-6 border border-border">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="p-2 rounded-lg bg-emerald-500/10">
-              <CheckCircle2 className="w-5 h-5 text-emerald-500" />
+        <div className="bg-card rounded-xl p-4 sm:p-6 border border-border">
+          <div className="flex items-center gap-2 mb-2">
+            <div className="p-1.5 sm:p-2 rounded-lg bg-emerald-500/10">
+              <CheckCircle2 className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-500" />
             </div>
-            <span className="text-sm text-muted-foreground">Pagado</span>
+            <span className="text-xs sm:text-sm text-muted-foreground">Pagado</span>
           </div>
-          <div className="text-2xl font-bold text-emerald-500">
+          <div className="text-lg sm:text-2xl font-bold text-emerald-500">
             {formatCurrency(overview?.totals?.total_paid || 0)}
           </div>
         </div>
       </div>
 
       {/* Action Bar */}
-      <div className="flex justify-between items-center">
-        <h2 className="text-xl font-semibold">
-          Personal - {monthNames[currentMonth - 1]} {currentYear}
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
+        <h2 className="text-base sm:text-xl font-semibold">
+          Personal — {monthNames[currentMonth - 1]} {currentYear}
         </h2>
-        <Button onClick={handleMarkAllPaid} variant="outline">
+        <Button onClick={handleMarkAllPaid} variant="outline" className="w-full sm:w-auto">
           <CheckCircle2 className="w-4 h-4 mr-2" />
           Marcar Todos como Pagados
         </Button>
       </div>
 
-      {/* Employee List */}
-      <div className="bg-card rounded-xl border border-border overflow-hidden">
+      {/* Employee List — Cards en móvil */}
+      <div className="sm:hidden space-y-3">
+        {overview?.employees?.map((emp: EmployeeSalary) => (
+          <div key={emp.id} className="bg-card rounded-xl border border-border p-4 space-y-3">
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="font-semibold truncate">{emp.name}</p>
+                <p className="text-sm text-muted-foreground truncate">{emp.role}</p>
+              </div>
+              {emp.is_paid ? (
+                <span className="flex-shrink-0 inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
+                  <CheckCircle2 className="w-3 h-3" />
+                  Pagado
+                </span>
+              ) : (
+                <span className="flex-shrink-0 inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                  Pendiente
+                </span>
+              )}
+            </div>
+            <div className="grid grid-cols-3 gap-2 text-sm">
+              <div>
+                <p className="text-xs text-muted-foreground">Sueldo</p>
+                <p className="font-medium">{formatCurrency(emp.monthly_salary || 0)}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Adelantos</p>
+                {emp.advances_total > 0 ? (
+                  <button
+                    onClick={() => handleViewAdvances(emp)}
+                    className="font-medium text-amber-500 hover:underline"
+                  >
+                    {formatCurrency(emp.advances_total)}
+                  </button>
+                ) : (
+                  <p className="font-medium text-muted-foreground">—</p>
+                )}
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">A Pagar</p>
+                <p className="font-semibold text-success">{formatCurrency(emp.remaining)}</p>
+              </div>
+            </div>
+            <div className="flex gap-2 pt-1">
+              <Button size="sm" variant="outline" className="flex-1" onClick={() => handleAddAdvance(emp)}>
+                <Plus className="w-4 h-4 mr-1" />
+                Adelanto
+              </Button>
+              {!emp.is_paid && (
+                <Button size="sm" className="flex-1 bg-success hover:bg-success/90" onClick={() => handleMarkPaid(emp.id)}>
+                  <CheckCircle2 className="w-4 h-4 mr-1" />
+                  Marcar Pagado
+                </Button>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Employee List — Tabla en desktop */}
+      <div className="hidden sm:block bg-card rounded-xl border border-border overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-muted/50 border-b border-border">
@@ -228,10 +287,7 @@ export default function Salaries() {
                   <td className="p-4 text-right">{formatCurrency(emp.monthly_salary || 0)}</td>
                   <td className="p-4 text-right text-amber-500">
                     {emp.advances_total > 0 ? (
-                      <button
-                        onClick={() => handleViewAdvances(emp)}
-                        className="hover:underline"
-                      >
+                      <button onClick={() => handleViewAdvances(emp)} className="hover:underline">
                         {formatCurrency(emp.advances_total)}
                       </button>
                     ) : (
@@ -246,11 +302,7 @@ export default function Salaries() {
                   </td>
                   <td className="p-4">
                     <div className="flex items-center justify-center gap-2">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleAddAdvance(emp)}
-                      >
+                      <Button size="sm" variant="outline" onClick={() => handleAddAdvance(emp)}>
                         <Plus className="w-4 h-4 mr-1" />
                         Adelanto
                       </Button>
@@ -260,11 +312,7 @@ export default function Salaries() {
                           Pagado
                         </span>
                       ) : (
-                        <Button
-                          size="sm"
-                          onClick={() => handleMarkPaid(emp.id)}
-                          className="bg-success hover:bg-success/90"
-                        >
+                        <Button size="sm" onClick={() => handleMarkPaid(emp.id)} className="bg-success hover:bg-success/90">
                           <CheckCircle2 className="w-4 h-4 mr-1" />
                           Pagado
                         </Button>
