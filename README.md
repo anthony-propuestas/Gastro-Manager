@@ -27,7 +27,7 @@ Sistema de gestión de restaurantes multi-usuario desplegado en Cloudflare Worke
 
 | Capa | Tecnología |
 |---|---|
-| Frontend | React 19 + React Router 7 + Tailwind CSS v4 + shadcn/ui |
+| Frontend | React 19 + React Router 7 + Tailwind CSS v3 + shadcn/ui |
 | Backend | Hono (Cloudflare Workers) |
 | Base de datos | Cloudflare D1 (SQLite serverless) |
 | Almacenamiento | Cloudflare R2 (comprobantes de compras) |
@@ -36,6 +36,7 @@ Sistema de gestión de restaurantes multi-usuario desplegado en Cloudflare Worke
 | IA | Google Gemini 2.5 Flash |
 | Hosting Frontend | Cloudflare Pages |
 | Hosting Backend | Cloudflare Workers (edge global) |
+| Mobile | Capacitor 8 (Android) |
 
 ---
 
@@ -202,10 +203,12 @@ npm run check
 ## Comandos NPM
 
 ```bash
-npm run dev             # Servidor de desarrollo
+npm run dev             # Servidor de desarrollo (frontend + worker juntos)
+npm run dev:pages       # Solo frontend (Vite)
+npm run dev:worker      # Solo worker (Wrangler)
 npm run build           # Compilar para producción
 npm run check           # Verificar build y configuración
-npm run deploy          # Compilar y desplegar a Cloudflare Workers
+npm run deploy          # Compilar y desplegar a Cloudflare Pages
                         # Cron Worker (deploy manual único): npx wrangler deploy -c wrangler-cron.json
 npm run lint            # Ejecutar linter
 npm test                # Ejecutar suite de tests (Vitest)
@@ -213,6 +216,10 @@ npm run test:watch      # Tests en modo interactivo
 npm run test:coverage   # Tests con reporte de cobertura
 npm run knip            # Detectar código sin usar
 npm run cf-typegen      # Generar tipos de Cloudflare
+
+# Mobile (Android)
+npx cap sync            # Copiar build web al proyecto Android
+npx cap open android    # Abrir en Android Studio
 ```
 
 ---
@@ -257,4 +264,4 @@ npm run cf-typegen      # Generar tipos de Cloudflare
 
 ---
 
-**Versión**: 2.4.1 · **Plataforma**: Cloudflare Workers · **Última actualización**: 2026-05-05
+**Versión**: 2.5.0 · **Plataforma**: Cloudflare Workers + Android · **Última actualización**: 2026-06-08

@@ -393,3 +393,19 @@ Vite genera archivos con hash en el nombre (ej. `index-BFSxencr.js`). Tras un re
 - **Cuotas y rate limiting**: No aplica. Sin nuevos endpoints que consuman cuota.
 
 **Conclusión**: sin riesgo de seguridad. El rediseño es puramente visual — dual layout mobile/desktop con Tailwind. No se agregaron endpoints, inputs, acceso a datos ni lógica de autorización.
+
+---
+
+### Revisión — Integración Capacitor (2026-06-08)
+
+Áreas revisadas:
+
+- **Endpoint nuevo o modificado**: No hay nuevos endpoints. Capacitor no expone ninguna API al backend; solo empaqueta la web app existente.
+- **Autenticación / sesión**: La app Android apunta a `https://www.lahoja.org` (serverUrl en `capacitor.config.ts`). El flujo OAuth + JWT es idéntico al browser. La cookie `HttpOnly` se gestiona por el WebView de Capacitor de la misma forma que en un browser estándar.
+- **Aislamiento por `negocio_id`**: No aplica. No hay cambios en el acceso a datos ni en las queries.
+- **Validación de entrada**: No aplica. No se agregaron nuevos inputs ni schemas Zod.
+- **Autorización / roles**: No aplica. Sin cambios en guards ni restricciones de módulo.
+- **Cuotas y rate limiting**: No aplica. Sin nuevos endpoints que consuman cuota.
+- **Cleartext / HTTPS**: `allowCleartext: false` no está declarado explícitamente, pero el `serverUrl` usa `https://` — no hay tráfico HTTP en claro.
+
+**Conclusión**: sin nuevo riesgo de seguridad. Capacitor envuelve la misma web app en un WebView apuntando al servidor de producción por HTTPS. No se agregaron permisos Android sensibles, nuevos endpoints, ni cambios en la lógica de autenticación o autorización.

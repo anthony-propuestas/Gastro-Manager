@@ -646,14 +646,16 @@ export function useSidebar() {
   const [isOpen, setIsOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
 
-  const toggleSidebar = () => { ... };
-  const toggleCollapse = () => { ... };
+  const toggleOpen = () => { ... };
+  const toggleCollapsed = () => { ... };
 
   return {
     isOpen,
     isCollapsed,
-    toggleSidebar,
-    toggleCollapse,
+    setIsOpen,
+    setIsCollapsed,
+    toggleOpen,
+    toggleCollapsed,
   };
 }
 ```
@@ -1293,6 +1295,29 @@ console.log("Employee data:", employee);
 ### Error Tracking
 
 ErrorBoundary captura errores y los muestra.
+
+## Aplicación Mobile (Capacitor)
+
+La misma web app se empaqueta como app Android nativa usando **Capacitor 8**. No hay código React específico para mobile — el WebView carga la build de producción directamente desde el servidor.
+
+### Configuración (`capacitor.config.ts`)
+
+| Campo | Valor |
+|---|---|
+| `appId` | `org.lahoja.app` |
+| `appName` | `La Hoja` |
+| `webDir` | `dist` |
+| `server.url` | `https://www.lahoja.org` |
+
+Con `server.url` configurado, el WebView apunta al servidor de producción en lugar de servir los archivos locales de `dist`. Esto significa que la app Android siempre corre la versión live sin necesidad de recompilar el APK en cada deploy.
+
+### Flujo de build Android
+
+```bash
+npm run build          # Compilar React → dist/
+npx cap sync           # Copiar dist/ al proyecto android/ y sincronizar plugins
+npx cap open android   # Abrir Android Studio para compilar y firmar el APK
+```
 
 ## Próximas Mejoras (NO implementadas)
 
