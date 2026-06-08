@@ -478,23 +478,24 @@ Gestión de compras y gastos del negocio.
 
 ```tsx
 export function useCompras() {
-  const [compras, setCompras]     = useState([]);
+  const [compras, setCompras]     = useState<Compra[]>([]);
+  const [summary, setSummary]     = useState<DailySummary[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError]         = useState<string | null>(null);
 
-  const fetchCompras = async (month, year) => { ... };  // GET /api/compras?month&year
-  const createCompra = async (data) => { ... };          // POST /api/compras
-  const updateCompra = async (id, data) => { ... };      // PUT /api/compras/:id
-  const deleteCompra = async (id) => { ... };            // DELETE /api/compras/:id
+  const fetchCompras  = async (month, year) => { ... };             // GET /api/compras?month&year
+  const fetchSummary  = async (month, year) => { ... };             // GET /api/compras/summary?month&year (falla silenciosamente)
+  const createCompra  = async (input): Promise<boolean>;           // POST /api/compras
+  const updateCompra  = async (id, input): Promise<boolean>;       // PUT /api/compras/:id
+  const deleteCompra  = async (id): Promise<boolean>;              // DELETE /api/compras/:id
+  const uploadComprobante = async (file: File): Promise<string | null>;  // POST /api/compras/upload (native fetch, FormData)
+  const getComprobanteUrl = (key: string): string;                  // → /api/compras/files/:key (puro, sin fetch)
 
   return {
-    compras,
-    isLoading,
-    error,
-    fetchCompras,
-    createCompra,
-    updateCompra,
-    deleteCompra,
+    compras, summary, isLoading, error,
+    fetchCompras, fetchSummary,
+    createCompra, updateCompra, deleteCompra,
+    uploadComprobante, getComprobanteUrl,
   };
 }
 ```

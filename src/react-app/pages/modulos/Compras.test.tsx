@@ -23,6 +23,7 @@ const BASE_MOCK = {
   updateCompra: vi.fn(),
   deleteCompra: vi.fn(),
   uploadComprobante: vi.fn(),
+  getComprobanteUrl: vi.fn().mockReturnValue('/api/compras/files/test'),
 };
 
 beforeEach(() => {
