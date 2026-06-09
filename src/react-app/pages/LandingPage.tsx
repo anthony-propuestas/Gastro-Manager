@@ -78,6 +78,7 @@ const GoogleIcon = () => (
 
 export default function LandingPage() {
   const [isLoading, setIsLoading] = useState(false);
+  const [loginError, setLoginError] = useState("");
   const [searchParams] = useSearchParams();
   const isVerified = searchParams.get("verified") === "true";
   const { user, isPending } = useAuth();
@@ -89,11 +90,12 @@ export default function LandingPage() {
 
   const handleLogin = async () => {
     setIsLoading(true);
+    setLoginError("");
     try {
       if (Capacitor.isNativePlatform()) {
         await GoogleAuth.initialize();
-        const user = await GoogleAuth.signIn();
-        const idToken = user.authentication.idToken;
+        const googleUser = await GoogleAuth.signIn();
+        const idToken = googleUser.authentication.idToken;
         const res = await fetch("/api/sessions", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -107,12 +109,14 @@ export default function LandingPage() {
         if (!res.ok || !data.success) throw new Error(data.error?.message ?? "Error de autenticación");
         window.location.assign("/agente-ia");
       } else {
-        const res = await fetch("/api/oauth/google/redirect_url");
+        const platform = Capacitor.isNativePlatform() ? "android" : "web";
+        const res = await fetch(`/api/oauth/google/redirect_url?platform=${platform}`);
         const json = await res.json() as { success: boolean; data: { redirect_url: string } };
         window.location.assign(json.data.redirect_url);
       }
     } catch (error) {
       console.error("Login error:", error);
+      setLoginError("No se pudo iniciar sesión. Intentá de nuevo.");
       setIsLoading(false);
     }
   };
@@ -221,6 +225,16 @@ export default function LandingPage() {
           <div className="flex items-center gap-3 bg-success/10 border border-success/20 rounded-xl px-4 py-3 text-sm text-success">
             <CheckCircle className="w-4 h-4 flex-shrink-0" />
             <span>¡Email verificado! Iniciá sesión para continuar.</span>
+          </div>
+        </div>
+      )}
+
+      {/* Login error banner */}
+      {loginError && (
+        <div className="fixed top-16 left-0 right-0 z-40 flex justify-center px-6 pt-3">
+          <div className="flex items-center gap-3 bg-destructive/10 border border-destructive/20 rounded-xl px-4 py-3 text-sm text-destructive">
+            <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+            <span>{loginError}</span>
           </div>
         </div>
       )}

@@ -3,6 +3,13 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { MemoryRouter, Routes, Route } from "react-router";
 import AuthCallback from "./AuthCallback";
 
+// ─── Capacitor mock ───────────────────────────────────────────────────────────
+
+const mockIsNativePlatform = vi.fn(() => false);
+vi.mock("@capacitor/core", () => ({
+  Capacitor: { isNativePlatform: () => mockIsNativePlatform() },
+}));
+
 // ─── Mocks ───────────────────────────────────────────────────────────────────
 
 const assignMock = vi.fn();
@@ -123,5 +130,35 @@ describe("AuthCallback — interacción", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: /Volver a intentar/i }));
     expect(screen.getByText("landing page")).toBeInTheDocument();
+  });
+});
+
+// ─── Plataforma ───────────────────────────────────────────────────────────────
+
+describe("AuthCallback — plataforma", () => {
+  it("envía platform='android' en el body cuando está en plataforma nativa", async () => {
+    mockIsNativePlatform.mockReturnValueOnce(true);
+    mockFetch({ success: true });
+    renderPage();
+    await waitFor(() =>
+      expect(screen.getByText(/Autenticación exitosa/i)).toBeInTheDocument()
+    );
+    const body = JSON.parse(
+      (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0][1].body
+    );
+    expect(body.platform).toBe("android");
+  });
+
+  it("no envía platform en el body cuando está en web", async () => {
+    mockIsNativePlatform.mockReturnValueOnce(false);
+    mockFetch({ success: true });
+    renderPage();
+    await waitFor(() =>
+      expect(screen.getByText(/Autenticación exitosa/i)).toBeInTheDocument()
+    );
+    const body = JSON.parse(
+      (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0][1].body
+    );
+    expect(body.platform).toBeUndefined();
   });
 });

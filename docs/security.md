@@ -409,3 +409,20 @@ Vite genera archivos con hash en el nombre (ej. `index-BFSxencr.js`). Tras un re
 - **Cleartext / HTTPS**: `allowCleartext: false` no está declarado explícitamente, pero el `serverUrl` usa `https://` — no hay tráfico HTTP en claro.
 
 **Conclusión**: sin nuevo riesgo de seguridad. Capacitor envuelve la misma web app en un WebView apuntando al servidor de producción por HTTPS. No se agregaron permisos Android sensibles, nuevos endpoints, ni cambios en la lógica de autenticación o autorización.
+
+---
+
+### Revisión — Autenticación Nativa + Deep Links (2026-06-09)
+
+Áreas revisadas:
+
+- **Endpoint modificado (`POST /api/sessions`)**: acepta dos nuevas ramas de autenticación. (1) `idToken`: verificado directamente con `googleapis.com/tokeninfo` — si Google responde un error o el `aud` no coincide con el `GOOGLE_CLIENT_ID`, el endpoint retorna 401. (2) `code + platform: "android"`: usa `org.lahoja.app://auth/callback` como `redirectUri`; un atacante no puede forzar que Google emita un code válido para un `redirectUri` no registrado en la consola de Google OAuth. Ambas ramas comparten el mismo UPSERT + validación de `email_verified`.
+- **Deep links (`org.lahoja.app://`)**: `DeepLinkHandler` solo navega rutas internas de la SPA. No accede a datos sensibles ni dispara acciones privilegiadas — simplemente llama a `navigate(path)`. Un deep link malicioso puede redirigir a una ruta existente, pero no puede obtener datos ni escalar privilegios porque sigue el mismo flujo de auth y `ProtectedRoute`.
+- **Campo `platform` en `/api/sessions`**: solo cambia el `redirectUri` usado para el intercambio del code. No otorga permisos adicionales ni cambia el output de la sesión (el JWT resultante es idéntico). Forzar `platform: "android"` desde un browser solo cambia el `redirectUri` que Google verificará contra su lista de registrados.
+- **Autenticación / sesión**: el flujo nativo agrega una ruta de entrada (`idToken`), pero el UPSERT y la lógica de `email_verified` son idénticos a los del flujo web — no se puede omitir la verificación de email.
+- **Validación de entrada**: el campo `idToken` no pasa por un schema Zod, pero la validación la delega Google (`googleapis.com/tokeninfo`). Si el token es malformado, Google retorna error y el endpoint retorna 401.
+- **Aislamiento por `negocio_id`**: no aplica. Sin cambios en acceso a datos.
+- **Autorización / roles**: no aplica. Sin cambios en guards de módulo.
+- **Cuotas y rate limiting**: no aplica. `POST /api/sessions` ya estaba rate-limited; el nuevo flujo `idToken` pasa por el mismo `checkRateLimit`.
+
+**Conclusión**: sin nuevo riesgo de seguridad material. El flujo nativo delega la validación a Google. El deep link solo permite navegación interna dentro de la SPA ya existente.

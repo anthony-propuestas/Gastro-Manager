@@ -19,7 +19,7 @@ Capacitor Runtime (org.lahoja.app)
 ```
 
 - `MainActivity.java` extiende `BridgeActivity` de Capacitor — no contiene lógica propia.
-- Capacitor inyecta un bridge JavaScript que permite llamar APIs nativas desde el código web (actualmente no se usa ningún plugin nativo).
+- Capacitor inyecta un bridge JavaScript que permite llamar APIs nativas desde el código web. Se usan dos plugins nativos: `@capacitor/app` (escucha deep links vía `appUrlOpen`) y `@codetrix-studio/capacitor-google-auth` (Google Sign-In nativo).
 - En producción el WebView apunta a `https://www.lahoja.org`; en desarrollo puede apuntar a `http://localhost:5173` editando `capacitor.config.ts`.
 
 ---
@@ -56,6 +56,7 @@ const config: CapacitorConfig = {
 - **Permisos:** solo `android.permission.INTERNET`
 - **Launch mode:** `singleTask`
 - **FileProvider** configurado bajo `org.lahoja.app.fileprovider` para que el código web pueda abrir el selector de archivos (subida de comprobantes)
+- **Deep links (`org.lahoja.app://`):** intent filter con el esquema `org.lahoja.app` captura URLs internas del tipo `org.lahoja.app://auth/callback?code=XXX`. El plugin `@capacitor/app` emite el evento `appUrlOpen`; `DeepLinkHandler` en `App.tsx` extrae `pathname + search` y llama a `navigate()` para enrutar dentro de la SPA.
 - Maneja cambios de orientación, teclado y tamaño de pantalla (`configChanges`)
 
 ### Versiones de SDK (`android/variables.gradle`)
@@ -74,6 +75,7 @@ const config: CapacitorConfig = {
 @capacitor/core    ^8.2.0
 @capacitor/android ^8.2.0
 @capacitor/cli     ^8.2.0
+@capacitor/app     ^8.1.0
 ```
 
 ---

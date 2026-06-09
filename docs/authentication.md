@@ -9,16 +9,28 @@ Sistema de autenticación basado en Google OAuth nativo con sesiones JWT firmada
 ```
 Usuario → Click "Login con Google"
         ↓
-GET /api/oauth/google/redirect_url
+        ├─ Si es plataforma nativa (Capacitor Android — LandingPage):
+        │    ↓ GoogleAuth.initialize() + GoogleAuth.signIn()
+        │    ↓ Obtiene idToken de Google
+        │    ↓ POST /api/sessions { idToken }
+        │    ↓ Backend verifica idToken via googleapis.com/tokeninfo?id_token=...
+        │    ↓ Extrae { sub, email, name, picture }
+        │    ↓ Continúa en el paso de UPSERT → verificación → JWT (mismo que flujo web)
+        │
+        └─ Si es plataforma web (o deep link nativo vía AuthCallback):
+GET /api/oauth/google/redirect_url?platform=web   (o ?platform=android para deep link)
         ↓ Construye URL de Google OAuth con GOOGLE_CLIENT_ID
-        ↓ redirect_uri = APP_URL + "/auth/callback" (fallback a origin de la request si APP_URL no está)
+        ↓ redirect_uri = APP_URL + "/auth/callback" (web) o "org.lahoja.app://auth/callback" (android)
 Redirect a accounts.google.com/o/oauth2/v2/auth
         ↓
 Usuario autoriza la app
         ↓
 Google redirect a /auth/callback?code=XXX
+(En app nativa: el deep link org.lahoja.app://auth/callback?code=XXX es interceptado
+ por el intent filter de AndroidManifest; DeepLinkHandler navega a la ruta interna.)
         ↓
-POST /api/sessions { code }
+POST /api/sessions { code, platform?: "android" }
+(platform: "android" indica al backend que use org.lahoja.app://auth/callback como redirectUri)
         ↓ Rate limit: max 10 intentos / 15 min por IP (429 TOO_MANY_REQUESTS si se excede)
         ↓ Valida que code esté presente (400 si no)
         ↓ Worker intercambia code con Google (oauth2.googleapis.com/token)
@@ -32,7 +44,7 @@ POST /api/sessions { code }
         │  Cookie session_token=<jwt> (HttpOnly, Secure, SameSite=Lax)
         │    ↓ Registra evento login_success en usage_logs
         │    ↓
-        │  { success: true } — frontend llama a window.location.assign("/dashboard") (reload completo)
+        │  { success: true } — frontend llama a window.location.assign("/agente-ia") (reload completo)
         ↓
         └─ Si el usuario es nuevo o no está verificado:
              ↓ Invalida tokens anteriores no usados (used_at = now)
@@ -467,7 +479,7 @@ useEffect(() => {
       }
       if (data.success) {
         setStatus("success");
-        setTimeout(() => window.location.assign("/dashboard"), 1000);
+        window.location.assign("/agente-ia");
       } else {
         throw new Error(data.error?.message);
       }

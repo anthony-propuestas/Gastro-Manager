@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
+import { Capacitor } from "@capacitor/core";
 import { Loader2, CheckCircle, XCircle } from "lucide-react";
 
 export default function AuthCallback() {
@@ -13,10 +14,13 @@ export default function AuthCallback() {
         const code = new URLSearchParams(window.location.search).get("code");
         if (!code) throw new Error("No code in URL");
 
+        const body: Record<string, string> = { code };
+        if (Capacitor.isNativePlatform()) body.platform = "android";
+
         const res = await fetch("/api/sessions", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ code }),
+          body: JSON.stringify(body),
         });
 
         const data = await res.json() as { success: boolean; error?: { code?: string; message?: string } };

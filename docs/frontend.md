@@ -1299,7 +1299,10 @@ ErrorBoundary captura errores y los muestra.
 
 ## Aplicación Mobile (Capacitor)
 
-La misma web app se empaqueta como app Android nativa usando **Capacitor 8**. No hay código React específico para mobile — el WebView carga la build de producción directamente desde el servidor.
+La misma web app se empaqueta como app Android nativa usando **Capacitor 8**. El WebView carga la build de producción directamente desde el servidor. Hay código React específico para la plataforma nativa:
+
+- **`DeepLinkHandler`** (`src/react-app/App.tsx`, exportado como named export): componente montado dentro del `<Router>`. En plataforma nativa registra un listener de `@capacitor/app` para el evento `appUrlOpen` y navega a la ruta extraída cuando recibe una URL `org.lahoja.app://...`. En web es un no-op (early return en el `useEffect`).
+- **Login nativo** (`LandingPage.tsx`): cuando `Capacitor.isNativePlatform()` es true, el botón de login usa `GoogleAuth.signIn()` del plugin `@codetrix-studio/capacitor-google-auth` en vez del flujo redirect URL. El idToken resultante se envía directamente a `POST /api/sessions`.
 
 ### Configuración (`capacitor.config.ts`)
 

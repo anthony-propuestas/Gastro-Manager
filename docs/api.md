@@ -59,12 +59,23 @@ Respuestas posibles si falla la validación:
 #### `GET /api/oauth/google/redirect_url`
 Obtiene la URL de redirección para iniciar Google OAuth.
 
+**Query params:**
+- `platform` (opcional): `"android"` → el `redirect_uri` resultante es `org.lahoja.app://auth/callback`; cualquier otro valor o ausente → `APP_URL/auth/callback`.
+
 #### `POST /api/sessions`
-Intercambia el código OAuth por una cookie de sesión. Persiste al usuario en la tabla `users` (UPSERT).
+Intercambia el código OAuth por una cookie de sesión, o valida un idToken de Google Sign-In nativo. Persiste al usuario en la tabla `users` (UPSERT).
 
 ```json
-// Request
+// Request — flujo web (OAuth code exchange)
 { "code": "oauth_code_from_google" }
+
+// Request — flujo web desde app nativa (redirect vía deep link)
+{ "code": "oauth_code_from_google", "platform": "android" }
+// platform fuerza redirect_uri = org.lahoja.app://auth/callback al intercambiar el code
+
+// Request — flujo nativo Capacitor (Google Sign-In directo)
+{ "idToken": "google_id_token" }
+// El backend verifica el idToken vía googleapis.com/tokeninfo
 ```
 
 **Comportamiento especial:** si el usuario todavía no está verificado, este endpoint no crea sesión. En su lugar genera un token de verificación, envía un correo y responde con `error.code = "PENDING_VERIFICATION"`.

@@ -1,4 +1,7 @@
-import { BrowserRouter as Router, Routes, Route } from "react-router";
+import { BrowserRouter as Router, Routes, Route, useNavigate } from "react-router";
+import { useEffect } from "react";
+import { App as CapApp } from "@capacitor/app";
+import { Capacitor } from "@capacitor/core";
 import { AuthProvider } from "@/react-app/context/AuthContext";
 import MainLayout from "@/react-app/components/layout/MainLayout";
 import ProtectedRoute, { RestrictedModuleRoute } from "@/react-app/components/auth/ProtectedRoute";
@@ -27,6 +30,30 @@ import SuscripcionPage from "@/react-app/pages/Suscripcion";
 import SuscripcionEstadoPage from "@/react-app/pages/SuscripcionEstado";
 import SellersPage from "@/react-app/pages/Sellers";
 
+export function DeepLinkHandler() {
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return;
+
+    const sub = CapApp.addListener("appUrlOpen", (event) => {
+      try {
+        const url = new URL(event.url);
+        if (url.protocol === "org.lahoja.app:") {
+          const path = url.pathname + url.search;
+          navigate(path, { replace: true });
+        }
+      } catch {
+        // ignore malformed URLs
+      }
+    });
+
+    return () => { sub.then((h) => h.remove()); };
+  }, [navigate]);
+
+  return null;
+}
+
 export default function App() {
   return (
     <ErrorBoundary>
@@ -34,6 +61,7 @@ export default function App() {
         <ToastProvider>
           <UsageLimitModalProvider>
             <Router>
+              <DeepLinkHandler />
               <ModulePrefsProvider>
               <SidebarProvider>
               <ChatProvider>

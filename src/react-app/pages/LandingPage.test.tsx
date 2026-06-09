@@ -11,6 +11,19 @@ vi.mock("@/react-app/context/AuthContext", () => ({
   useAuth: () => mockUseAuth(),
 }));
 
+const mockIsNativePlatform = vi.fn(() => false);
+vi.mock("@capacitor/core", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@capacitor/core")>();
+  return { ...actual, Capacitor: { isNativePlatform: () => mockIsNativePlatform() } };
+});
+
+const { mockGoogleAuth } = vi.hoisted(() => ({
+  mockGoogleAuth: { initialize: vi.fn(), signIn: vi.fn() },
+}));
+vi.mock("@codetrix-studio/capacitor-google-auth", () => ({
+  GoogleAuth: mockGoogleAuth,
+}));
+
 class MockIntersectionObserver {
   observe    = vi.fn();
   disconnect = vi.fn();
@@ -49,6 +62,7 @@ function renderPage(initialPath = "/") {
 beforeEach(() => {
   vi.clearAllMocks();
   mockUseAuth.mockReturnValue(AUTH_ANONYMOUS);
+  mockIsNativePlatform.mockReturnValue(false);
   global.fetch = vi.fn();
 });
 
@@ -230,7 +244,7 @@ describe("LandingPage — login", () => {
     fireEvent.click(screen.getByRole("button", { name: /iniciar sesión/i }));
 
     await waitFor(() => {
-      expect(global.fetch).toHaveBeenCalledWith("/api/oauth/google/redirect_url");
+      expect(global.fetch).toHaveBeenCalledWith("/api/oauth/google/redirect_url?platform=web");
       expect(assignMock).toHaveBeenCalledWith("https://accounts.google.com/o/oauth2/auth");
     });
   });
@@ -267,6 +281,42 @@ describe("LandingPage — login", () => {
 
     await waitFor(() => {
       expect(screen.getByRole("button", { name: /iniciar sesión/i })).not.toBeDisabled();
+    });
+  });
+
+  it("muestra banner de error cuando el fetch de redirect falla", async () => {
+    (global.fetch as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new Error("Network error"));
+
+    renderPage();
+    fireEvent.click(screen.getByRole("button", { name: /iniciar sesión/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/No se pudo iniciar sesión/i)).toBeInTheDocument();
+    });
+  });
+
+  it("native login: llama a GoogleAuth.signIn() y envía idToken a /api/sessions", async () => {
+    mockIsNativePlatform.mockReturnValue(true);
+    mockGoogleAuth.initialize.mockResolvedValueOnce(undefined);
+    mockGoogleAuth.signIn.mockResolvedValueOnce({
+      authentication: { idToken: "test-id-token" },
+    });
+    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve({ success: true }),
+    });
+
+    renderPage();
+    fireEvent.click(screen.getByRole("button", { name: /iniciar sesión/i }));
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(
+        "/api/sessions",
+        expect.objectContaining({
+          method: "POST",
+          body: expect.stringContaining("test-id-token"),
+        })
+      );
     });
   });
 });

@@ -374,7 +374,10 @@ async function logUsage(db: D1Database, userId: string, negocioId: number | null
 // ============================================
 
 app.get("/api/oauth/google/redirect_url", (c) => {
-  const redirectUri = `${c.env.APP_URL ?? new URL(c.req.url).origin}/auth/callback`;
+  const platform = c.req.query("platform");
+  const redirectUri = platform === "android"
+    ? "org.lahoja.app://auth/callback"
+    : `${c.env.APP_URL ?? new URL(c.req.url).origin}/auth/callback`;
   const url =
     `https://accounts.google.com/o/oauth2/v2/auth?` +
     `client_id=${encodeURIComponent(c.env.GOOGLE_CLIENT_ID)}` +
@@ -424,7 +427,9 @@ app.post("/api/sessions", async (c) => {
       googleUser = { id: tokenInfo.sub, email: tokenInfo.email, name: tokenInfo.name, picture: tokenInfo.picture ?? "" };
     } else {
       // Flujo web — intercambia el authorization code
-      const redirectUri = `${c.env.APP_URL ?? new URL(c.req.url).origin}/auth/callback`;
+      const redirectUri = body.platform === "android"
+        ? "org.lahoja.app://auth/callback"
+        : `${c.env.APP_URL ?? new URL(c.req.url).origin}/auth/callback`;
 
       const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
         method: "POST",

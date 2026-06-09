@@ -25,6 +25,22 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
+            <!-- Deep link para OAuth nativo de Google (reverse Web Client ID) -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="com.googleusercontent.apps.940337841448-bukrod6t1eejv9t26fb9t4peua9tevae" />
+            </intent-filter>
+
+            <!-- Deep link para callbacks de app (fallback web OAuth) -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="org.lahoja.app" />
+            </intent-filter>
+
         </activity>
 
         <provider

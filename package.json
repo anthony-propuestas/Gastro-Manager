@@ -5,9 +5,11 @@
   "type": "module",
   "dependencies": {
     "@capacitor/android": "^8.2.0",
+    "@capacitor/app": "^8.1.0",
     "@capacitor/cli": "^8.2.0",
     "@capacitor/core": "^8.2.0",
     "@codetrix-studio/capacitor-google-auth": "^3.4.0-rc.4",
+    "@testing-library/dom": "^10.4.1",
     "browser-image-compression": "^2.0.2",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
