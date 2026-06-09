@@ -392,42 +392,68 @@ app.post("/api/sessions", async (c) => {
     }
 
     const body = await c.req.json();
-    if (!body.code) {
+    if (!body.code && !body.idToken) {
       return c.json(
-        { success: false, error: { code: "VALIDATION_ERROR", message: "Código de autorización no proporcionado" } },
+        { success: false, error: { code: "VALIDATION_ERROR", message: "Parámetros de autenticación no proporcionados" } },
         400
       );
     }
 
-    const redirectUri = `${c.env.APP_URL ?? new URL(c.req.url).origin}/auth/callback`;
+    let googleUser: { id: string; email: string; name: string; picture: string };
 
-    const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        code: body.code,
-        client_id: c.env.GOOGLE_CLIENT_ID,
-        client_secret: c.env.GOOGLE_CLIENT_SECRET,
-        redirect_uri: redirectUri,
-        grant_type: "authorization_code",
-      }),
-    });
-
-    if (!tokenRes.ok) {
-      const err = await tokenRes.json() as { error_description?: string };
-      console.error("Google token exchange error:", err);
-      return c.json(
-        { success: false, error: { code: "AUTH_ERROR", message: "Error al procesar la autenticación" } },
-        500
+    if (body.idToken) {
+      // Flujo nativo (Capacitor Android) — verifica el idToken directamente con Google
+      const tokenInfoRes = await fetch(
+        `https://oauth2.googleapis.com/tokeninfo?id_token=${body.idToken}`
       );
+      if (!tokenInfoRes.ok) {
+        return c.json(
+          { success: false, error: { code: "AUTH_ERROR", message: "Error al procesar la autenticación" } },
+          401
+        );
+      }
+      const tokenInfo = await tokenInfoRes.json() as {
+        sub: string; email: string; name: string; picture?: string; aud: string;
+      };
+      if (tokenInfo.aud !== c.env.GOOGLE_CLIENT_ID) {
+        return c.json(
+          { success: false, error: { code: "AUTH_ERROR", message: "Error al procesar la autenticación" } },
+          401
+        );
+      }
+      googleUser = { id: tokenInfo.sub, email: tokenInfo.email, name: tokenInfo.name, picture: tokenInfo.picture ?? "" };
+    } else {
+      // Flujo web — intercambia el authorization code
+      const redirectUri = `${c.env.APP_URL ?? new URL(c.req.url).origin}/auth/callback`;
+
+      const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          code: body.code,
+          client_id: c.env.GOOGLE_CLIENT_ID,
+          client_secret: c.env.GOOGLE_CLIENT_SECRET,
+          redirect_uri: redirectUri,
+          grant_type: "authorization_code",
+        }),
+      });
+
+      if (!tokenRes.ok) {
+        const err = await tokenRes.json() as { error_description?: string };
+        console.error("Google token exchange error:", err);
+        return c.json(
+          { success: false, error: { code: "AUTH_ERROR", message: "Error al procesar la autenticación" } },
+          500
+        );
+      }
+
+      const { access_token } = await tokenRes.json() as { access_token: string };
+
+      const userRes = await fetch("https://www.googleapis.com/oauth2/v2/userinfo", {
+        headers: { Authorization: `Bearer ${access_token}` },
+      });
+      googleUser = await userRes.json() as { id: string; email: string; name: string; picture: string };
     }
-
-    const { access_token } = await tokenRes.json() as { access_token: string };
-
-    const userRes = await fetch("https://www.googleapis.com/oauth2/v2/userinfo", {
-      headers: { Authorization: `Bearer ${access_token}` },
-    });
-    const googleUser = await userRes.json() as { id: string; email: string; name: string; picture: string };
 
     // Check if user exists and their verification status before UPSERT
     const existingUser = await c.env.DB

@@ -50,6 +50,7 @@ Si ningún `.md` aparece en el output, este workflow no aplica — commitear nor
 | `docs/test.md` | Archivos `*.test.ts` / `*.test.tsx` en `src/` |
 | `docs/security.md` | Cualquier endpoint, guard, o validación afectada por el cambio |
 | `docs/agregar-nuevo-modulo.md` | Proceso real observado al agregar módulos (no un archivo concreto) |
+| `docs/mobile.md` | `capacitor.config.ts`, `android/variables.gradle`, `android/app/src/main/AndroidManifest.xml`, `package.json` |
 | `work-flows/*.md` | Proceso real que describe — comparar contra práctica actual |
 | `README.md` | Estado general del sistema, stack, comandos en `package.json` |
 
@@ -204,6 +205,22 @@ El proceso descrito debe coincidir con los pasos reales que se siguen al agregar
 | Orden de middlewares en endpoints | Comparar el ejemplo del Paso 17 (o el que aplique) con un handler real de un módulo existente |
 
 **Señal de discrepancia:** el doc no menciona un archivo que se tuvo que tocar al agregar el último módulo; un snippet de ejemplo usa una función que fue renombrada.
+
+---
+
+### `docs/mobile.md`
+
+Mapea a: `capacitor.config.ts`, `android/variables.gradle`, `android/app/src/main/AndroidManifest.xml`, `package.json`
+
+| Verificar | Cómo |
+|---|---|
+| `appId` | Comparar el valor en el doc con `config.appId` en `capacitor.config.ts` |
+| `server.url` | Comparar con `config.server.url` en `capacitor.config.ts` |
+| `minSdkVersion` y `targetSdkVersion` | Comparar con los valores en `android/variables.gradle` |
+| Permisos declarados | Confirmar que los permisos listados en el doc coinciden con los `<uses-permission>` en `AndroidManifest.xml` |
+| Versiones de `@capacitor/*` | Comparar con las entradas en `package.json` (dependencies o devDependencies) |
+
+**Señal de discrepancia:** el doc dice `minSdkVersion = 22` pero `variables.gradle` tiene `24`; el doc lista un permiso que fue eliminado del Manifest; la versión de Capacitor en el doc no coincide con `package.json`.
 
 ---
 

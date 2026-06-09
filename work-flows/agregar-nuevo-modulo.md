@@ -46,6 +46,10 @@ BASE DE DATOS
 ────────────────────────────────────────────────────────────────────
 migrations/N.sql                              ← 18. Crear migración con la tabla del módulo + INSERT en usage_limits
                                               ← 19. Aplicar la migración con wrangler
+
+ANDROID / MOBILE
+────────────────────────────────────────────────────────────────────
+(revisar, no siempre requiere cambios)        ← 20. Verificar compatibilidad con la capa Android (WebView)
 ```
 
 ---
@@ -657,6 +661,22 @@ Wrangler detecta automáticamente los archivos `.sql` en `/migrations` por núme
 > ```
 >
 > El flag `--remote` siempre funciona correctamente para producción.
+
+---
+
+### 20. Verificar compatibilidad con la capa Android (WebView)
+
+La app corre dentro de un WebView de Capacitor. La mayoría de módulos no requieren cambios nativos, pero siempre revisar:
+
+| Pregunta | Si la respuesta es SÍ |
+|---|---|
+| ¿El módulo usa Web Bluetooth, Web NFC, `getUserMedia`, `navigator.geolocation` u otras APIs nativas del browser? | Verificar que esa API funcione en Android WebView (API 24+) o buscar el plugin Capacitor correspondiente |
+| ¿El módulo tiene modales, drawers u overlays de pantalla completa? | Probar en viewport < 400px de ancho; el BottomNav ocupa ~56px al fondo, ajustar `pb-` si es necesario |
+| ¿El módulo incluye subida de archivos (`<input type="file">`)? | No requiere cambios — FileProvider ya está configurado en `AndroidManifest.xml` para `org.lahoja.app.fileprovider` |
+| ¿El módulo necesita un permiso de sistema (cámara, micrófono, notificaciones push, etc.)? | Agregar el `<uses-permission>` en `android/app/src/main/AndroidManifest.xml` y actualizar `docs/mobile.md` |
+| ¿Ninguna de las anteriores? | No se requiere ningún cambio en la capa Android |
+
+> La app en producción carga `https://www.lahoja.org` en el WebView. Cualquier cambio en la SPA llega a Android automáticamente sin publicar una nueva versión en Play Store.
 
 ---
 

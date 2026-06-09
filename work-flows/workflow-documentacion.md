@@ -16,6 +16,7 @@ Ejecutar después de **cualquier** cambio de código antes de cerrar la tarea.
 - [ ] `docs/roles.md` refleja cambios en módulos restringibles o comportamiento de roles
 - [ ] `docs/frontend.md` refleja rutas, páginas, hooks o componentes nuevos o eliminados
 - [ ] `docs/agregar-nuevo-modulo.md` refleja cambios en el proceso de incorporar módulos
+- [ ] `docs/mobile.md` refleja cambios en la configuración de Capacitor o el proyecto Android
 - [ ] `README.md` describe con precisión el estado actual del sistema
 
 > Solo marcar los que aplican al cambio. Si un archivo no fue afectado, omitirlo.
@@ -105,6 +106,21 @@ Actualizar solo si cambió el flujo de autenticación:
 - Nuevo endpoint de auth
 
 Si el cambio fue solo en lógica de negocio (no en auth), no tocar el archivo.
+
+---
+
+## Paso 6 — Mobile / Android (`docs/mobile.md`)
+
+Actualizar si cambió alguno de estos archivos:
+
+| Cambio en código | Acción en `docs/mobile.md` |
+|---|---|
+| `capacitor.config.ts` (appId, appName, server.url, webDir) | Actualizar la tabla de configuración y/o los snippets del archivo |
+| `android/variables.gradle` (minSdkVersion, targetSdkVersion, etc.) | Actualizar la tabla de versiones de SDK |
+| `android/app/src/main/AndroidManifest.xml` (permisos, FileProvider, etc.) | Actualizar la sección "Android nativo" |
+| `package.json` (versiones de `@capacitor/*`) | Actualizar la tabla de dependencias Capacitor |
+| `android/build.gradle` o `gradle-wrapper.properties` (versión de Gradle) | Actualizar la sección "Stack de build" |
+| Ninguno de los anteriores | No aplica |
 
 ---
 

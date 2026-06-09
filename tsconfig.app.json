@@ -26,5 +26,6 @@
     "noFallthroughCasesInSwitch": true,
     "noUncheckedSideEffectImports": true
   },
-  "include": ["src/react-app", "src/shared"]
+  "include": ["src/react-app", "src/shared"],
+  "exclude": ["src/**/*.test.ts", "src/**/*.test.tsx"]
 }

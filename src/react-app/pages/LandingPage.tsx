@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
 import { Navigate, useSearchParams } from "react-router";
+import { Capacitor } from "@capacitor/core";
+import { GoogleAuth } from "@codetrix-studio/capacitor-google-auth";
 import {
   ChefHat, Loader2, CheckCircle, Users, CalendarDays, BarChart3,
   ShoppingCart, FileText, DollarSign, AlertTriangle, ArrowRight,
@@ -88,9 +90,27 @@ export default function LandingPage() {
   const handleLogin = async () => {
     setIsLoading(true);
     try {
-      const res = await fetch("/api/oauth/google/redirect_url");
-      const json = await res.json() as { success: boolean; data: { redirect_url: string } };
-      window.location.assign(json.data.redirect_url);
+      if (Capacitor.isNativePlatform()) {
+        await GoogleAuth.initialize();
+        const user = await GoogleAuth.signIn();
+        const idToken = user.authentication.idToken;
+        const res = await fetch("/api/sessions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ idToken }),
+        });
+        const data = await res.json() as { success: boolean; error?: { code?: string; message?: string } };
+        if (data.error?.code === "PENDING_VERIFICATION") {
+          window.location.assign("/verify-email");
+          return;
+        }
+        if (!res.ok || !data.success) throw new Error(data.error?.message ?? "Error de autenticación");
+        window.location.assign("/agente-ia");
+      } else {
+        const res = await fetch("/api/oauth/google/redirect_url");
+        const json = await res.json() as { success: boolean; data: { redirect_url: string } };
+        window.location.assign(json.data.redirect_url);
+      }
     } catch (error) {
       console.error("Login error:", error);
       setIsLoading(false);
