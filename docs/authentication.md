@@ -28,6 +28,8 @@ Usuario autoriza la app
 Google redirect a /auth/callback?code=XXX
 (En app nativa: el deep link org.lahoja.app://auth/callback?code=XXX es interceptado
  por el intent filter de AndroidManifest; DeepLinkHandler navega a la ruta interna.)
+(Si Google devuelve error: /auth/callback?error=access_denied[&error_description=...]
+ → AuthCallback muestra "Google OAuth error: <error>" y no llega a /api/sessions)
         ↓
 POST /api/sessions { code, platform?: "android" }
 (platform: "android" indica al backend que use org.lahoja.app://auth/callback como redirectUri)

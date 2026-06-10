@@ -377,9 +377,12 @@ async function logUsage(db: D1Database, userId: string, negocioId: number | null
 
 app.get("/api/oauth/google/redirect_url", (c) => {
   const platform = c.req.query("platform");
+  const envAppUrl = c.env.APP_URL;
+  const originUrl = new URL(c.req.url).origin;
   const redirectUri = platform === "android"
     ? "org.lahoja.app://auth/callback"
-    : `${c.env.APP_URL ?? new URL(c.req.url).origin}/auth/callback`;
+    : `${envAppUrl ?? originUrl}/auth/callback`;
+  console.log("[OAuth URL] platform:", platform, "APP_URL env:", envAppUrl, "origin:", originUrl, "redirectUri:", redirectUri);
   const url =
     `https://accounts.google.com/o/oauth2/v2/auth?` +
     `client_id=${encodeURIComponent(c.env.GOOGLE_CLIENT_ID)}` +
@@ -432,6 +435,7 @@ app.post("/api/sessions", async (c) => {
       const redirectUri = body.platform === "android"
         ? "org.lahoja.app://auth/callback"
         : `${c.env.APP_URL ?? new URL(c.req.url).origin}/auth/callback`;
+      console.log("[Sessions] platform:", body.platform, "redirectUri para intercambio:", redirectUri, "APP_URL env:", c.env.APP_URL, "origin:", new URL(c.req.url).origin);
 
       const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
         method: "POST",
@@ -445,11 +449,12 @@ app.post("/api/sessions", async (c) => {
         }),
       });
 
+      console.log("[Sessions] Google token exchange status:", tokenRes.status);
       if (!tokenRes.ok) {
-        const err = await tokenRes.json() as { error_description?: string };
-        console.error("Google token exchange error:", err);
+        const err = await tokenRes.json() as { error?: string; error_description?: string };
+        console.error("[Sessions] Google token exchange error:", err);
         return c.json(
-          { success: false, error: { code: "AUTH_ERROR", message: "Error al procesar la autenticación" } },
+          { success: false, error: { code: "AUTH_ERROR", message: `Google error: ${err.error ?? "unknown"} — ${err.error_description ?? ""}` } },
           500
         );
       }
@@ -483,6 +488,7 @@ app.post("/api/sessions", async (c) => {
       .run();
 
     const isVerified = existingUser?.email_verified === 1;
+    console.log("[Sessions] user:", googleUser.email, "existingUser:", !!existingUser, "isVerified:", isVerified);
 
     if (!isVerified) {
       // New or unverified user — send verification email, do not create session

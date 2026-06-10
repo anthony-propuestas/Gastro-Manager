@@ -11,14 +11,24 @@ export default function AuthCallback() {
   useEffect(() => {
     const handleCallback = async () => {
       try {
-        const code = new URLSearchParams(window.location.search).get("code");
-        if (!code) throw new Error("No code in URL");
+        console.log("[Callback] URL completa:", window.location.href);
+        const params = new URLSearchParams(window.location.search);
+        const code = params.get("code");
+        const errorParam = params.get("error");
+        console.log("[Callback] code:", code ? "presente" : "AUSENTE", "error param:", errorParam);
 
-        const isAndroidChrome = /Android/i.test(navigator.userAgent) && !Capacitor.isNativePlatform();
+        if (errorParam) throw new Error(`Google OAuth error: ${errorParam} — ${params.get("error_description") ?? ""}`);
+        if (!code) throw new Error("No hay code en la URL");
+
+        const isNative = Capacitor.isNativePlatform();
+        const isAndroidChrome = /Android/i.test(navigator.userAgent) && !isNative;
+        console.log("[Callback] userAgent:", navigator.userAgent);
+        console.log("[Callback] isNativePlatform:", isNative, "isAndroidChrome:", isAndroidChrome);
 
         const body: Record<string, string> = { code };
-        if (Capacitor.isNativePlatform()) body.platform = "android";
+        if (isNative) body.platform = "android";
         else if (isAndroidChrome) body.platform = "android_chrome";
+        console.log("[Callback] body enviado a /api/sessions:", body);
 
         const res = await fetch("/api/sessions", {
           method: "POST",
@@ -26,7 +36,9 @@ export default function AuthCallback() {
           body: JSON.stringify(body),
         });
 
+        console.log("[Callback] res.status:", res.status, "res.ok:", res.ok);
         const data = await res.json() as { success: boolean; token?: string; error?: { code?: string; message?: string } };
+        console.log("[Callback] data recibida:", data);
 
         if (data.error?.code === "PENDING_VERIFICATION") {
           navigate("/verify-email", { replace: true });
@@ -38,7 +50,9 @@ export default function AuthCallback() {
         }
 
         if (isAndroidChrome && data.token) {
-          window.location.assign(`org.lahoja.app://session?token=${encodeURIComponent(data.token)}`);
+          const deepLink = `org.lahoja.app://session?token=${encodeURIComponent(data.token)}`;
+          console.log("[Callback] Intentando deep link:", deepLink);
+          window.location.assign(deepLink);
           return;
         }
 
@@ -47,9 +61,10 @@ export default function AuthCallback() {
           window.location.assign("/agente-ia");
         }, 1000);
       } catch (error) {
-        console.error("Auth callback error:", error);
+        const err = error as Error;
+        console.error("[Callback] error:", { message: err?.message, stack: err?.stack });
         setStatus("error");
-        setErrorMessage("No se pudo completar la autenticación. Por favor, intenta de nuevo.");
+        setErrorMessage(`Error: ${err?.message ?? "desconocido"} | URL: ${window.location.href}`);
       }
     };
 

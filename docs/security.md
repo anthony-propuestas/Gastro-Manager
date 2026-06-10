@@ -10,6 +10,13 @@ Este documento describe las capas de seguridad implementadas en Gastro Manager y
 - **JWT firmado** — tras autenticar con Google, el backend emite un JWT firmado con `JWT_SECRET` (TTL: 7 días) y lo devuelve como cookie `HttpOnly`. Cada request subsiguiente incluye esta cookie automáticamente sin exposición en JavaScript.
 - **Rol leído de DB en cada request** — el campo `role` del usuario no se lee del JWT sino de la tabla `users` en cada llamada. Esto garantiza que una promoción o degradación de rol tenga efecto inmediato sin necesidad de re-login ni de invalidar tokens.
 
+### Riesgos temporales — logs de diagnóstico (pendiente de revertir)
+
+Los siguientes cambios se introdujeron temporalmente para diagnosticar el bug de login en PWA/APK. **Deben revertirse una vez identificado el problema.**
+
+- **Exposición de error de Google en respuesta al cliente** (`src/worker/index.ts`): `/api/sessions` ahora retorna el mensaje de error real de Google (ej. `"Google error: redirect_uri_mismatch — ..."`) en lugar del mensaje genérico `"Error al procesar la autenticación"`. Esto revela detalles de configuración OAuth a quien controle la request, facilitando el reconocimiento de la infraestructura.
+- **JWT logueado en consola del browser** (`src/react-app/pages/AuthCallback.tsx`): `console.log("[Callback] data recibida:", data)` loguea el objeto de respuesta completo. En el flujo `android_chrome`, `data.token` contiene el JWT de sesión; si el dispositivo está comprometido y DevTools es accesible, el token queda expuesto y permite secuestro de sesión.
+
 ---
 
 ## Autorización

@@ -66,7 +66,7 @@ describe("AuthCallback — error", () => {
     await waitFor(() => {
       expect(screen.getByText(/Error de autenticación/i)).toBeInTheDocument();
     });
-    expect(screen.getByText(/No se pudo completar la autenticación/i)).toBeInTheDocument();
+    expect(screen.getByText(/No hay code en la URL/i)).toBeInTheDocument();
   });
 
   it("muestra estado de error cuando el servidor responde success: false", async () => {
@@ -81,8 +81,17 @@ describe("AuthCallback — error", () => {
     (global.fetch as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new Error("network"));
     renderPage();
     await waitFor(() => {
-      expect(screen.getByText(/No se pudo completar la autenticación/i)).toBeInTheDocument();
+      expect(screen.getByText(/Error: network/i)).toBeInTheDocument();
     });
+  });
+
+  it("muestra estado de error cuando Google devuelve error en la URL", async () => {
+    window.location.search = "?error=access_denied&error_description=Permission+denied";
+    renderPage();
+    await waitFor(() => {
+      expect(screen.getByText(/Error de autenticación/i)).toBeInTheDocument();
+    });
+    expect(screen.getByText(/Google OAuth error: access_denied/i)).toBeInTheDocument();
   });
 });
 

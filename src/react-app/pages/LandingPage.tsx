@@ -110,13 +110,16 @@ export default function LandingPage() {
         window.location.assign("/agente-ia");
       } else {
         const platform = Capacitor.isNativePlatform() ? "android" : "web";
+        console.log("[Auth] isNativePlatform:", Capacitor.isNativePlatform(), "platform:", platform, "userAgent:", navigator.userAgent);
         const res = await fetch(`/api/oauth/google/redirect_url?platform=${platform}`);
         const json = await res.json() as { success: boolean; data: { redirect_url: string } };
+        console.log("[Auth] redirect_url obtenida:", json.data.redirect_url);
         window.location.assign(json.data.redirect_url);
       }
     } catch (error) {
-      console.error("Login error:", error);
-      setLoginError("No se pudo iniciar sesión. Intentá de nuevo.");
+      const err = error as Error;
+      console.error("[Auth] handleLogin error:", { message: err?.message, name: err?.name, stack: err?.stack });
+      setLoginError(`No se pudo iniciar sesión: ${err?.message ?? "error desconocido"}`);
       setIsLoading(false);
     }
   };
