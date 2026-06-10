@@ -56,7 +56,7 @@ const config: CapacitorConfig = {
 - **Permisos:** solo `android.permission.INTERNET`
 - **Launch mode:** `singleTask`
 - **FileProvider** configurado bajo `org.lahoja.app.fileprovider` para que el código web pueda abrir el selector de archivos (subida de comprobantes)
-- **Deep links (`org.lahoja.app://`):** intent filter con el esquema `org.lahoja.app` captura URLs internas del tipo `org.lahoja.app://auth/callback?code=XXX`. El plugin `@capacitor/app` emite el evento `appUrlOpen`; `DeepLinkHandler` en `App.tsx` extrae `pathname + search` y llama a `navigate()` para enrutar dentro de la SPA.
+- **Deep links (`org.lahoja.app://`):** intent filter con el esquema `org.lahoja.app` captura URLs internas. El plugin `@capacitor/app` emite el evento `appUrlOpen`; `DeepLinkHandler` en `App.tsx` maneja dos casos: (1) `org.lahoja.app://session?token=<jwt>` — guarda el JWT en `localStorage` como `bearer_token` y navega a `/agente-ia` (handoff de sesión desde Chrome externo); (2) cualquier otra URL `org.lahoja.app://...` — extrae `pathname + search` y llama a `navigate()` para enrutar dentro de la SPA.
 - Maneja cambios de orientación, teclado y tamaño de pantalla (`configChanges`)
 
 ### Versiones de SDK (`android/variables.gradle`)

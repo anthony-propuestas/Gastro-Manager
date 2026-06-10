@@ -16,7 +16,9 @@
       "PowerShell(Set-Location \"c:\\\\Users\\\\dell\\\\Desktop\\\\PPORGAMACION\\\\proyectos de prueva\\\\Gastro Manager\"; git diff HEAD -- \"functions/[[route]].ts\" 2>&1 | Select-Object -First 300)",
       "Bash(Remove-Item \"c:\\\\Users\\\\dell\\\\Desktop\\\\PPORGAMACION\\\\proyectos de prueva\\\\Gastro Manager\\\\src\\\\react-app\\\\pages\\\\Login.tsx\")",
       "Bash(xargs cat *)",
-      "Bash(node -e \"console.log\\(require\\('./node_modules/@testing-library/react/package.json'\\).peerDependencies\\)\")"
+      "Bash(node -e \"console.log\\(require\\('./node_modules/@testing-library/react/package.json'\\).peerDependencies\\)\")",
+      "Bash(Select-String -Pattern \"\\(FAIL|✗|×|Error|failed|AuthContext|AuthCallback.*android|App.*session|api.*Bearer\\)\")",
+      "Bash(Select-Object -First 60)"
     ],
     "additionalDirectories": [
       "c:\\Users\\dell\\Desktop\\PPORGAMACION\\proyectos de prueva\\Gastro Manager\\src\\react-app\\pages"

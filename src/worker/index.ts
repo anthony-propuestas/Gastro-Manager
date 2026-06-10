@@ -177,7 +177,9 @@ async function sendCapAlertEmail(apiKey: string, toEmail: string, toName: string
 // ============================================
 
 const authMiddleware: MiddlewareHandler<{ Bindings: Env; Variables: Variables }> = async (c, next) => {
-  const token = getCookie(c, COOKIE_NAME);
+  const cookieToken = getCookie(c, COOKIE_NAME);
+  const authHeader = c.req.header("Authorization");
+  const token = cookieToken ?? (authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : undefined);
   if (!token) {
     return c.json({ success: false, error: { code: "UNAUTHORIZED", message: "No autenticado" } }, 401);
   }
@@ -524,7 +526,9 @@ app.post("/api/sessions", async (c) => {
 
     c.header("Set-Cookie", `${COOKIE_NAME}=${jwt}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=604800`);
     await logUsage(c.env.DB, googleUser.id, null, "login_success", "auth");
-    return c.json({ success: true }, 200);
+    const responseBody: Record<string, unknown> = { success: true };
+    if (body.platform === "android_chrome") responseBody.token = jwt;
+    return c.json(responseBody, 200);
   } catch (error) {
     console.error("Error exchanging code for session:", error);
     return c.json(

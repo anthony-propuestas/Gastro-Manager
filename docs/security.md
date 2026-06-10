@@ -426,3 +426,19 @@ Vite genera archivos con hash en el nombre (ej. `index-BFSxencr.js`). Tras un re
 - **Cuotas y rate limiting**: no aplica. `POST /api/sessions` ya estaba rate-limited; el nuevo flujo `idToken` pasa por el mismo `checkRateLimit`.
 
 **Conclusión**: sin nuevo riesgo de seguridad material. El flujo nativo delega la validación a Google. El deep link solo permite navegación interna dentro de la SPA ya existente.
+
+---
+
+### Revisión — Android Chrome OAuth session handoff (2026-06-10)
+
+Áreas revisadas:
+
+- **Endpoint modificado (`POST /api/sessions`)**: nueva rama `platform: "android_chrome"` que retorna el JWT firmado en el body de la respuesta (además de setear la cookie). El token del body tiene el mismo payload, TTL y firma que el de la cookie — no otorga privilegios adicionales. La cookie también se setea, pero Chrome (browser externo) no la comparte con el WebView de Capacitor; el token del body es la única forma de traspasar la sesión entre contextos.
+- **Bearer token en `authMiddleware`**: el middleware ahora acepta `Authorization: Bearer <jwt>` como alternativa a la cookie. El JWT se valida con la misma lógica (`jwtVerify`, `JWT_SECRET`, expiración, usuario en DB). Un token expirado o firmado con clave incorrecta sigue siendo rechazado con 401.
+- **Almacenamiento en `localStorage`**: el Bearer token se guarda en `localStorage` del WebView. A diferencia de la cookie HttpOnly (inaccesible a JS), `localStorage` es legible por código JavaScript. El riesgo de XSS existe en principio, pero la app carga exclusivamente desde `https://www.lahoja.org` (HTTPS, HSTS habilitado) y el CSP bloquea scripts de terceros — la superficie de XSS es la misma que existía antes de este cambio.
+- **Deep link `org.lahoja.app://session?token=...`**: el token viaja en la URL del deep link. En Android, el deep link es procesado por el sistema operativo y entregado a la app registrada. Solo la app con el `appId` registrado puede recibir este deep link; interceptarlo requeriría otra app instalada con la misma firma de developer.
+- **Aislamiento por `negocio_id`**: no aplica. Sin cambios en queries ni en validación de membresía.
+- **Autorización / roles**: no aplica. El JWT Bearer tiene el mismo payload que la cookie; el rol sigue leyéndose de DB en cada request.
+- **Cuotas y rate limiting**: no aplica. `POST /api/sessions` ya estaba rate-limited.
+
+**Conclusión**: riesgo incremental bajo. El token en localStorage tiene la misma TTL y validación que la cookie. La amenaza principal (XSS que lea el token) ya existía antes (cualquier JS inyectado podría hacer requests con la cookie presente). La mitigación aplicada (HTTPS + CSP + HSTS) cubre ambos casos.

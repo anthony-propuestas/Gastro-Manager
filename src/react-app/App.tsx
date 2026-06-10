@@ -40,6 +40,14 @@ export function DeepLinkHandler() {
       try {
         const url = new URL(event.url);
         if (url.protocol === "org.lahoja.app:") {
+          if (url.host === "session") {
+            const token = url.searchParams.get("token");
+            if (token) {
+              localStorage.setItem("bearer_token", token);
+              navigate("/agente-ia", { replace: true });
+            }
+            return;
+          }
           const path = url.pathname + url.search;
           navigate(path, { replace: true });
         }

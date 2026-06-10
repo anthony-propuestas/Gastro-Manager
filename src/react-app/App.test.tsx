@@ -90,3 +90,42 @@ describe("DeepLinkHandler — plataforma nativa", () => {
     expect(mockNavigate).not.toHaveBeenCalled();
   });
 });
+
+// ─── Deep link /session ───────────────────────────────────────────────────────
+
+describe("DeepLinkHandler — deep link /session", () => {
+  beforeEach(() => {
+    mockIsNativePlatform.mockReturnValue(true);
+  });
+
+  it("guarda bearer_token en localStorage y navega a /agente-ia al recibir /session?token=...", async () => {
+    let capturedCallback: ((event: { url: string }) => void) | null = null;
+    mockAddListener.mockImplementation((_event: string, cb: (e: { url: string }) => void) => {
+      capturedCallback = cb;
+      return Promise.resolve({ remove: vi.fn() });
+    });
+
+    renderComponent();
+    await waitFor(() => expect(capturedCallback).not.toBeNull());
+
+    capturedCallback!({ url: "org.lahoja.app://session?token=my-jwt-token" });
+
+    expect(localStorage.getItem("bearer_token")).toBe("my-jwt-token");
+    expect(mockNavigate).toHaveBeenCalledWith("/agente-ia", { replace: true });
+  });
+
+  it("no navega si el token está ausente en /session", async () => {
+    let capturedCallback: ((event: { url: string }) => void) | null = null;
+    mockAddListener.mockImplementation((_event: string, cb: (e: { url: string }) => void) => {
+      capturedCallback = cb;
+      return Promise.resolve({ remove: vi.fn() });
+    });
+
+    renderComponent();
+    await waitFor(() => expect(capturedCallback).not.toBeNull());
+
+    capturedCallback!({ url: "org.lahoja.app://session" });
+
+    expect(mockNavigate).not.toHaveBeenCalled();
+  });
+});

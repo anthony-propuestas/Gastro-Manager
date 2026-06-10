@@ -44,7 +44,15 @@ POST /api/sessions { code, platform?: "android" }
         │  Cookie session_token=<jwt> (HttpOnly, Secure, SameSite=Lax)
         │    ↓ Registra evento login_success en usage_logs
         │    ↓
-        │  { success: true } — frontend llama a window.location.assign("/agente-ia") (reload completo)
+        │    ├─ Si platform === "android_chrome":
+        │    │    ↓ { success: true, token: "<jwt>" }
+        │    │    ↓ AuthCallback redirige a org.lahoja.app://session?token=<jwt>
+        │    │    ↓ DeepLinkHandler en el WebView captura el deep link
+        │    │    ↓ Guarda token en localStorage como bearer_token
+        │    │    ↓ Navega a /agente-ia
+        │    │
+        │    └─ Caso general (web / android nativo):
+        │         ↓ { success: true } — frontend llama a window.location.assign("/agente-ia") (reload completo)
         ↓
         └─ Si el usuario es nuevo o no está verificado:
              ↓ Invalida tokens anteriores no usados (used_at = now)
@@ -79,8 +87,10 @@ Usuario navega en la app
 Request a /api/endpoint (con header X-Negocio-ID: <id> si aplica)
         ↓
 Cookie session_token enviada automáticamente
+(o header Authorization: Bearer <jwt> cuando bearer_token está en localStorage — flujo Android Chrome)
         ↓
-authMiddleware: jwtVerify(token, JWT_SECRET)
+authMiddleware: lee cookie session_token o header Authorization: Bearer <jwt>
+  ↓ jwtVerify(token, JWT_SECRET)
   ↓ Lee role y email_verified frescos de tabla users
 Si válido → continúa con el handler
 Si inválido → 401 INVALID_SESSION
@@ -99,7 +109,7 @@ GET /api/logout
         ↓
 Cookie session_token eliminada (Max-Age=0)
         ↓
-{ success: true } — AuthContext limpia estado y redirige a /
+{ success: true } — AuthContext limpia estado, elimina bearer_token de localStorage y redirige a /
 ```
 
 ---

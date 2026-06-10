@@ -353,10 +353,12 @@ Callback de OAuth.
 
 **Flujo:**
 1. Recibe código OAuth de Google
-2. Intercambia por token de sesión via `POST /api/sessions`
-3. Servidor setea cookie `session_token` (HttpOnly)
-4. Llama a `window.location.assign("/dashboard")` — reload completo para que `AuthContext` monte fresco con la cookie ya presente
-5. Si el usuario no está verificado → redirige a `/verify-email`
+2. Detecta plataforma: `Capacitor.isNativePlatform()` → `platform: "android"`; Android Chrome (`/Android/i.test(navigator.userAgent)` y no nativo) → `platform: "android_chrome"`; web desktop → sin campo
+3. Intercambia por token de sesión via `POST /api/sessions`
+4. Servidor setea cookie `session_token` (HttpOnly)
+5. **Si `platform === "android_chrome"` y el servidor retorna `{ token }` →** redirige a `org.lahoja.app://session?token=<encoded>` (no muestra pantalla de éxito; el WebView de la app captura el deep link)
+6. **Caso general →** llama a `window.location.assign("/agente-ia")` — reload completo para que `AuthContext` monte fresco con la cookie ya presente
+7. Si el usuario no está verificado → redirige a `/verify-email`
 
 ### VerifyEmailPage (`pages/VerifyEmailPage.tsx`)
 
@@ -393,6 +395,7 @@ const response = await apiFetch("/api/employees", {}, currentNegocio?.id);
 
 **Objetivo:**
 - Inyectar `X-Negocio-ID` de forma consistente.
+- Inyectar `Authorization: Bearer <token>` cuando `bearer_token` está en `localStorage` (flujo Android Chrome).
 - Evitar vistas desincronizadas al cambiar de negocio desde el sidebar.
 - Reducir headers manuales repetidos en hooks y páginas.
   const updateEmployee = async (id, data) => { ... };
@@ -839,6 +842,8 @@ export function useChat() {
 ### AuthProvider
 
 Proveedor de autenticación implementado en `context/AuthContext.tsx`. Al montar la app llama a `GET /api/users/me` para verificar la sesión activa y expone `user`, `currentNegocio`, `negocios`, `refreshNegocios` y `logout` al árbol de componentes.
+
+La llamada a `/api/users/me` incluye el header `Authorization: Bearer <token>` cuando `bearer_token` está en `localStorage` (sesión proveniente del flujo Android Chrome). `logout` elimina ese token de `localStorage` además de llamar a `GET /api/logout` para invalidar la cookie.
 
 El objeto `user` incluye `email_verified`. Ese campo se usa para bloquear rutas protegidas hasta que el usuario complete la activación por correo.
 
@@ -1301,7 +1306,7 @@ ErrorBoundary captura errores y los muestra.
 
 La misma web app se empaqueta como app Android nativa usando **Capacitor 8**. El WebView carga la build de producción directamente desde el servidor. Hay código React específico para la plataforma nativa:
 
-- **`DeepLinkHandler`** (`src/react-app/App.tsx`, exportado como named export): componente montado dentro del `<Router>`. En plataforma nativa registra un listener de `@capacitor/app` para el evento `appUrlOpen` y navega a la ruta extraída cuando recibe una URL `org.lahoja.app://...`. En web es un no-op (early return en el `useEffect`).
+- **`DeepLinkHandler`** (`src/react-app/App.tsx`, exportado como named export): componente montado dentro del `<Router>`. En plataforma nativa registra un listener de `@capacitor/app` para el evento `appUrlOpen` y maneja dos casos: (1) `org.lahoja.app://session?token=<jwt>` — guarda el JWT en `localStorage` como `bearer_token` y navega a `/agente-ia` (handoff de sesión desde Chrome externo en Android); (2) cualquier otra URL `org.lahoja.app://...` — extrae `pathname + search` y navega a esa ruta interna. En web es un no-op (early return en el `useEffect`).
 - **Login nativo** (`LandingPage.tsx`): cuando `Capacitor.isNativePlatform()` es true, el botón de login usa `GoogleAuth.signIn()` del plugin `@codetrix-studio/capacitor-google-auth` en vez del flujo redirect URL. El idToken resultante se envía directamente a `POST /api/sessions`.
 
 ### Configuración (`capacitor.config.ts`)

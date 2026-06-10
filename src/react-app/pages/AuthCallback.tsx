@@ -14,8 +14,11 @@ export default function AuthCallback() {
         const code = new URLSearchParams(window.location.search).get("code");
         if (!code) throw new Error("No code in URL");
 
+        const isAndroidChrome = /Android/i.test(navigator.userAgent) && !Capacitor.isNativePlatform();
+
         const body: Record<string, string> = { code };
         if (Capacitor.isNativePlatform()) body.platform = "android";
+        else if (isAndroidChrome) body.platform = "android_chrome";
 
         const res = await fetch("/api/sessions", {
           method: "POST",
@@ -23,7 +26,7 @@ export default function AuthCallback() {
           body: JSON.stringify(body),
         });
 
-        const data = await res.json() as { success: boolean; error?: { code?: string; message?: string } };
+        const data = await res.json() as { success: boolean; token?: string; error?: { code?: string; message?: string } };
 
         if (data.error?.code === "PENDING_VERIFICATION") {
           navigate("/verify-email", { replace: true });
@@ -32,6 +35,11 @@ export default function AuthCallback() {
 
         if (!res.ok || !data.success) {
           throw new Error(data.error?.message ?? "Error de autenticación");
+        }
+
+        if (isAndroidChrome && data.token) {
+          window.location.assign(`org.lahoja.app://session?token=${encodeURIComponent(data.token)}`);
+          return;
         }
 
         setStatus("success");

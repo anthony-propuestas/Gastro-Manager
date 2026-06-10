@@ -73,10 +73,21 @@ Intercambia el código OAuth por una cookie de sesión, o valida un idToken de G
 { "code": "oauth_code_from_google", "platform": "android" }
 // platform fuerza redirect_uri = org.lahoja.app://auth/callback al intercambiar el code
 
+// Request — flujo Chrome externo en Android (handoff a la app vía deep link)
+{ "code": "oauth_code_from_google", "platform": "android_chrome" }
+// Usa redirect_uri = https://www.lahoja.org/auth/callback (igual que web)
+// El backend retorna además el JWT en el body para que el frontend lo pase a la app
+
 // Request — flujo nativo Capacitor (Google Sign-In directo)
 { "idToken": "google_id_token" }
 // El backend verifica el idToken vía googleapis.com/tokeninfo
 ```
+
+**Respuesta para `platform: "android_chrome"`:** además de setear la cookie, retorna el JWT en el body:
+```json
+{ "success": true, "token": "<jwt>" }
+```
+El frontend (AuthCallback) usa ese token para construir el deep link `org.lahoja.app://session?token=<jwt>`, que el WebView de la app captura para iniciar sesión sin depender de la cookie del browser externo.
 
 **Comportamiento especial:** si el usuario todavía no está verificado, este endpoint no crea sesión. En su lugar genera un token de verificación, envía un correo y responde con `error.code = "PENDING_VERIFICATION"`.
 

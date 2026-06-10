@@ -4,6 +4,7 @@ import { USAGE_LIMIT_EVENT } from "@/react-app/lib/usageLimitModal";
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  vi.restoreAllMocks();
 });
 
 describe("apiFetch", () => {
@@ -98,5 +99,40 @@ describe("apiFetch", () => {
     expect(listener).not.toHaveBeenCalled();
 
     window.removeEventListener(USAGE_LIMIT_EVENT, listener as EventListener);
+  });
+
+  it("injects Authorization Bearer header when bearer_token is in localStorage", async () => {
+    localStorage.setItem("bearer_token", "my-jwt-token");
+    const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await apiFetch("/api/users/me", { method: "GET" });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/users/me",
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          "Authorization": "Bearer my-jwt-token",
+        }),
+      })
+    );
+
+    localStorage.removeItem("bearer_token");
+  });
+
+  it("does not inject Authorization header when bearer_token is absent", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await apiFetch("/api/employees", { method: "GET" }, 12);
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/employees",
+      expect.objectContaining({
+        headers: expect.not.objectContaining({
+          "Authorization": expect.any(String),
+        }),
+      })
+    );
   });
 });

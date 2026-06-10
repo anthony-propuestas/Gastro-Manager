@@ -149,7 +149,11 @@ describe("AuthCallback — plataforma", () => {
     expect(body.platform).toBe("android");
   });
 
-  it("no envía platform en el body cuando está en web", async () => {
+  it("no envía platform en el body cuando está en web (browser desktop)", async () => {
+    Object.defineProperty(navigator, "userAgent", {
+      value: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124.0",
+      configurable: true,
+    });
     mockIsNativePlatform.mockReturnValueOnce(false);
     mockFetch({ success: true });
     renderPage();
@@ -160,5 +164,53 @@ describe("AuthCallback — plataforma", () => {
       (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0][1].body
     );
     expect(body.platform).toBeUndefined();
+  });
+});
+
+// ─── Android Chrome ───────────────────────────────────────────────────────────
+
+describe("AuthCallback — android chrome", () => {
+  beforeEach(() => {
+    Object.defineProperty(navigator, "userAgent", {
+      value: "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 Chrome/124.0",
+      configurable: true,
+    });
+  });
+
+  afterEach(() => {
+    Object.defineProperty(navigator, "userAgent", {
+      value: "Mozilla/5.0 (linux) AppleWebKit/537.36 (KHTML, like Gecko) jsdom/20.0.0",
+      configurable: true,
+    });
+  });
+
+  it("envía platform='android_chrome' cuando detecta Android en userAgent (no nativo)", async () => {
+    mockIsNativePlatform.mockReturnValueOnce(false);
+    mockFetch({ success: true, token: "jwt-token-abc" });
+    renderPage();
+    await waitFor(() => expect(assignMock).toHaveBeenCalled());
+    const body = JSON.parse(
+      (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0][1].body
+    );
+    expect(body.platform).toBe("android_chrome");
+  });
+
+  it("redirige a org.lahoja.app://session?token=... cuando el servidor retorna token", async () => {
+    mockIsNativePlatform.mockReturnValueOnce(false);
+    mockFetch({ success: true, token: "jwt-token-abc" });
+    renderPage();
+    await waitFor(() =>
+      expect(assignMock).toHaveBeenCalledWith(
+        `org.lahoja.app://session?token=${encodeURIComponent("jwt-token-abc")}`
+      )
+    );
+  });
+
+  it("no muestra estado de éxito cuando redirige al scheme de la app", async () => {
+    mockIsNativePlatform.mockReturnValueOnce(false);
+    mockFetch({ success: true, token: "jwt-token-abc" });
+    renderPage();
+    await waitFor(() => expect(assignMock).toHaveBeenCalled());
+    expect(screen.queryByText(/Autenticación exitosa/i)).not.toBeInTheDocument();
   });
 });

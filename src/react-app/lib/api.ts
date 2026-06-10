@@ -15,6 +15,9 @@ export function apiFetch(
     ...(options.headers as Record<string, string>),
   };
 
+  const bearerToken = localStorage.getItem("bearer_token");
+  if (bearerToken) headers["Authorization"] = `Bearer ${bearerToken}`;
+
   if (negocioId) {
     headers["X-Negocio-ID"] = String(negocioId);
   }

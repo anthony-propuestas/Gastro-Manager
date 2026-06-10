@@ -71,7 +71,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [currentNegocio, setCurrentNegocio]);
 
   useEffect(() => {
-    fetch("/api/users/me")
+    const bearerToken = localStorage.getItem("bearer_token");
+    const opts = bearerToken ? { headers: { Authorization: `Bearer ${bearerToken}` } } : undefined;
+    fetch("/api/users/me", opts)
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         if (!data?.data) { setUser(null); return; }
@@ -95,6 +97,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = async () => {
     await fetch("/api/logout");
+    localStorage.removeItem("bearer_token");
     setUser(null);
     setNegocios([]);
     setCurrentNegocio(null);
