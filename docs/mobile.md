@@ -47,6 +47,14 @@ const config: CapacitorConfig = {
 | `webDir` | `dist` | Se usa cuando no hay `server.url` |
 | `server.url` | `https://www.lahoja.org` | Apunta a producción vía internet |
 
+### Plugin GoogleAuth (`@codetrix-studio/capacitor-google-auth`)
+
+| Campo | Notas |
+|-------|-------|
+| `scopes` | `['profile', 'email']` |
+| `clientId` | OAuth 2.0 Web Client ID de Google Cloud Console (mismo valor en `clientId` y `serverClientId`) |
+| `forceCodeForRefreshToken` | `false` — no fuerza el flujo de refresh token |
+
 ---
 
 ## Android nativo

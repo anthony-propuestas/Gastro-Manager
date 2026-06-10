@@ -42,7 +42,7 @@ POST /api/sessions { code, platform?: "android" }
         ↓
         ├─ Si el usuario ya está verificado:
         │    ↓ Lee role fresco de la DB
-        │    ↓ Crea JWT firmado con JWT_SECRET (jose, HS256, TTL 7 días)
+        │    ↓ Crea JWT firmado con JWT_SECRET (jose, HS256, TTL 30 días)
         │  Cookie session_token=<jwt> (HttpOnly, Secure, SameSite=Lax)
         │    ↓ Registra evento login_success en usage_logs
         │    ↓
@@ -154,7 +154,7 @@ const COOKIE_NAME = "session_token";
 async function createSession(payload: UserPayload, secret: string): Promise<string> {
   return new SignJWT(payload as unknown as Record<string, unknown>)
     .setProtectedHeader({ alg: "HS256" })
-    .setExpirationTime("7d")
+    .setExpirationTime("30d")
     .sign(new TextEncoder().encode(secret));
 }
 
@@ -269,7 +269,7 @@ app.post("/api/sessions", async (c) => {
     c.env.JWT_SECRET
   );
 
-  c.header("Set-Cookie", `${COOKIE_NAME}=${jwt}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=604800`);
+  c.header("Set-Cookie", `${COOKIE_NAME}=${jwt}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=2592000`);
   await logUsage(c.env.DB, googleUser.id, null, "login_success", "auth");
   return c.json({ success: true }, 200);
 });
@@ -313,7 +313,7 @@ app.get("/api/auth/verify-email", async (c) => {
     c.env.JWT_SECRET
   );
 
-  c.header("Set-Cookie", `${COOKIE_NAME}=${jwt}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=604800`);
+  c.header("Set-Cookie", `${COOKIE_NAME}=${jwt}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=2592000`);
   await logUsage(c.env.DB, row.user_id, null, "email_verify_success", "auth");
   return c.json({ success: true }, 200);
 });
@@ -559,7 +559,7 @@ async function isAdmin(email: string, db: D1Database, env: Env): Promise<boolean
 | `httpOnly` | Cookie no accesible desde JavaScript (protege XSS) |
 | `Secure` | Solo enviada sobre HTTPS |
 | `SameSite=Lax` | Previene CSRF |
-| `Max-Age=604800` | Expira en 7 días |
+| `Max-Age=2592000` | Expira en 30 días |
 | Rol fresco | `role` leído de DB en cada request, nunca del JWT |
 | `email_verified` fresco | Estado de verificación leído de DB en cada request |
 | UPSERT sin sobrescribir role | El login nunca revierte una promoción a `usuario_inteligente` |

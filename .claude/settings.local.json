@@ -18,7 +18,9 @@
       "Bash(xargs cat *)",
       "Bash(node -e \"console.log\\(require\\('./node_modules/@testing-library/react/package.json'\\).peerDependencies\\)\")",
       "Bash(Select-String -Pattern \"\\(FAIL|✗|×|Error|failed|AuthContext|AuthCallback.*android|App.*session|api.*Bearer\\)\")",
-      "Bash(Select-Object -First 60)"
+      "Bash(Select-Object -First 60)",
+      "Bash(keytool -list -v -keystore \"%USERPROFILE%\\\\.android\\\\debug.keystore\" -alias androiddebugkey -storepass android -keypass android)",
+      "Bash(findstr \"SHA1\")"
     ],
     "additionalDirectories": [
       "c:\\Users\\dell\\Desktop\\PPORGAMACION\\proyectos de prueva\\Gastro Manager\\src\\react-app\\pages"

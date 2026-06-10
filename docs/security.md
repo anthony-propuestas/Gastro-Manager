@@ -7,7 +7,7 @@ Este documento describe las capas de seguridad implementadas en Gastro Manager y
 ## Autenticación
 
 - **Google OAuth 2.0** — no se almacenan contraseñas. El flujo completo pasa por Google; el backend solo intercambia el código por tokens y verifica la identidad.
-- **JWT firmado** — tras autenticar con Google, el backend emite un JWT firmado con `JWT_SECRET` (TTL: 7 días) y lo devuelve como cookie `HttpOnly`. Cada request subsiguiente incluye esta cookie automáticamente sin exposición en JavaScript.
+- **JWT firmado** — tras autenticar con Google, el backend emite un JWT firmado con `JWT_SECRET` (TTL: 30 días) y lo devuelve como cookie `HttpOnly`. Cada request subsiguiente incluye esta cookie automáticamente sin exposición en JavaScript.
 - **Rol leído de DB en cada request** — el campo `role` del usuario no se lee del JWT sino de la tabla `users` en cada llamada. Esto garantiza que una promoción o degradación de rol tenga efecto inmediato sin necesidad de re-login ni de invalidar tokens.
 
 ### Riesgos temporales — logs de diagnóstico (pendiente de revertir)

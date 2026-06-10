@@ -60,11 +60,12 @@ type Variables = {
 // ============================================
 
 const COOKIE_NAME = "session_token";
+export const COOKIE_MAX_AGE = 2592000; // 30 días en segundos
 
-async function createSession(payload: UserPayload, secret: string): Promise<string> {
+export async function createSession(payload: UserPayload, secret: string): Promise<string> {
   return new SignJWT(payload as unknown as Record<string, unknown>)
     .setProtectedHeader({ alg: "HS256" })
-    .setExpirationTime("7d")
+    .setExpirationTime("30d")
     .sign(new TextEncoder().encode(secret));
 }
 
@@ -530,7 +531,7 @@ app.post("/api/sessions", async (c) => {
       c.env.JWT_SECRET
     );
 
-    c.header("Set-Cookie", `${COOKIE_NAME}=${jwt}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=604800`);
+    c.header("Set-Cookie", `${COOKIE_NAME}=${jwt}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=${COOKIE_MAX_AGE}`);
     await logUsage(c.env.DB, googleUser.id, null, "login_success", "auth");
     const responseBody: Record<string, unknown> = { success: true };
     if (body.platform === "android_chrome") responseBody.token = jwt;
@@ -582,7 +583,7 @@ app.get("/api/auth/verify-email", async (c) => {
       c.env.JWT_SECRET
     );
 
-    c.header("Set-Cookie", `${COOKIE_NAME}=${jwt}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=604800`);
+    c.header("Set-Cookie", `${COOKIE_NAME}=${jwt}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=${COOKIE_MAX_AGE}`);
     await logUsage(c.env.DB, row.user_id, null, "email_verify_success", "auth");
     return c.json({ success: true }, 200);
   } catch (error) {
