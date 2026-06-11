@@ -4,6 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "dependencies": {
+    "@capacitor-firebase/crashlytics": "^8.3.0",
     "@capacitor/android": "^8.2.0",
     "@capacitor/app": "^8.1.0",
     "@capacitor/cli": "^8.2.0",

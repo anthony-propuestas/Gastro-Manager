@@ -23,7 +23,8 @@
       "Bash(findstr \"SHA1\")",
       "Read(//c/Users/dell/AppData/Local/Android/Sdk/build-tools/**)",
       "PowerShell(& \"C:\\\\Users\\\\dell\\\\AppData\\\\Local\\\\Android\\\\Sdk\\\\build-tools\\\\35.0.0\\\\apksigner.bat\" verify --print-certs \"C:\\\\Users\\\\dell\\\\Desktop\\\\PPORGAMACION\\\\proyectos de prueva\\\\Gastro Manager\\\\android\\\\app\\\\release\\\\app-release.apk\" 2>&1)",
-      "PowerShell($env:JAVA_HOME = \"C:\\\\Program Files\\\\Android\\\\Android Studio\\\\jbr\"; & \"C:\\\\Users\\\\dell\\\\AppData\\\\Local\\\\Android\\\\Sdk\\\\build-tools\\\\35.0.0\\\\apksigner.bat\" verify --print-certs \"C:\\\\Users\\\\dell\\\\Desktop\\\\PPORGAMACION\\\\proyectos de prueva\\\\Gastro Manager\\\\android\\\\app\\\\release\\\\app-release.apk\" 2>&1)"
+      "PowerShell($env:JAVA_HOME = \"C:\\\\Program Files\\\\Android\\\\Android Studio\\\\jbr\"; & \"C:\\\\Users\\\\dell\\\\AppData\\\\Local\\\\Android\\\\Sdk\\\\build-tools\\\\35.0.0\\\\apksigner.bat\" verify --print-certs \"C:\\\\Users\\\\dell\\\\Desktop\\\\PPORGAMACION\\\\proyectos de prueva\\\\Gastro Manager\\\\android\\\\app\\\\release\\\\app-release.apk\" 2>&1)",
+      "Bash(npx cap *)"
     ],
     "additionalDirectories": [
       "c:\\Users\\dell\\Desktop\\PPORGAMACION\\proyectos de prueva\\Gastro Manager\\src\\react-app\\pages"
