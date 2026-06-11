@@ -93,7 +93,6 @@ export default function LandingPage() {
     setLoginError("");
     try {
       if (Capacitor.isNativePlatform()) {
-        await GoogleAuth.initialize();
         const googleUser = await GoogleAuth.signIn();
         const idToken = googleUser.authentication.idToken;
         const res = await fetch("/api/sessions", {

@@ -28,7 +28,13 @@
       "Bash(Get-ChildItem \"C:\\\\Users\\\\dell\\\\Downloads\" -Filter \"google-services*\")",
       "Bash(Select-Object Name, FullName)",
       "Read(//c/Users/dell/Downloads/**)",
-      "Bash(cp \"C:/Users/dell/Downloads/google-services.json\" \"c:/Users/dell/Desktop/PPORGAMACION/proyectos de prueva/Gastro Manager/android/app/google-services.json\")"
+      "Bash(cp \"C:/Users/dell/Downloads/google-services.json\" \"c:/Users/dell/Desktop/PPORGAMACION/proyectos de prueva/Gastro Manager/android/app/google-services.json\")",
+      "Bash(./gradlew signingReport)",
+      "Bash(keytool -keystore 'C:\\\\Users\\\\dell/.android/debug.keystore' -list -v -storepass android)",
+      "Bash(keytool -keystore \"C:/Users/dell/.android/debug.keystore\" -list -v -storepass android)",
+      "PowerShell(& \"$env:JAVA_HOME\\\\bin\\\\keytool.exe\" -keystore \"$env:USERPROFILE\\\\.android\\\\debug.keystore\" -list -v -storepass android 2>&1 | Select-String \"SHA1\")",
+      "Read(//c/Program Files/Android/Android Studio/jbr/bin/**)",
+      "PowerShell(& \"C:\\\\Program Files\\\\Android\\\\Android Studio\\\\jbr\\\\bin\\\\keytool.exe\" -keystore \"$env:USERPROFILE\\\\.android\\\\debug.keystore\" -list -v -storepass android 2>&1 | Select-String \"SHA1\")"
     ],
     "additionalDirectories": [
       "c:\\Users\\dell\\Desktop\\PPORGAMACION\\proyectos de prueva\\Gastro Manager\\src\\react-app\\pages",

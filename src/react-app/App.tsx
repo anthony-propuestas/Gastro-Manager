@@ -2,6 +2,7 @@ import { BrowserRouter as Router, Routes, Route, useNavigate } from "react-route
 import { useEffect } from "react";
 import { App as CapApp } from "@capacitor/app";
 import { Capacitor } from "@capacitor/core";
+import { GoogleAuth } from "@codetrix-studio/capacitor-google-auth";
 import { AuthProvider } from "@/react-app/context/AuthContext";
 import MainLayout from "@/react-app/components/layout/MainLayout";
 import ProtectedRoute, { RestrictedModuleRoute } from "@/react-app/components/auth/ProtectedRoute";
@@ -63,6 +64,12 @@ export function DeepLinkHandler() {
 }
 
 export default function App() {
+  useEffect(() => {
+    if (Capacitor.isNativePlatform()) {
+      GoogleAuth.initialize();
+    }
+  }, []);
+
   return (
     <ErrorBoundary>
       <AuthProvider>
