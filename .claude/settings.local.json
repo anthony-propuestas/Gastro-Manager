@@ -24,10 +24,15 @@
       "Read(//c/Users/dell/AppData/Local/Android/Sdk/build-tools/**)",
       "PowerShell(& \"C:\\\\Users\\\\dell\\\\AppData\\\\Local\\\\Android\\\\Sdk\\\\build-tools\\\\35.0.0\\\\apksigner.bat\" verify --print-certs \"C:\\\\Users\\\\dell\\\\Desktop\\\\PPORGAMACION\\\\proyectos de prueva\\\\Gastro Manager\\\\android\\\\app\\\\release\\\\app-release.apk\" 2>&1)",
       "PowerShell($env:JAVA_HOME = \"C:\\\\Program Files\\\\Android\\\\Android Studio\\\\jbr\"; & \"C:\\\\Users\\\\dell\\\\AppData\\\\Local\\\\Android\\\\Sdk\\\\build-tools\\\\35.0.0\\\\apksigner.bat\" verify --print-certs \"C:\\\\Users\\\\dell\\\\Desktop\\\\PPORGAMACION\\\\proyectos de prueva\\\\Gastro Manager\\\\android\\\\app\\\\release\\\\app-release.apk\" 2>&1)",
-      "Bash(npx cap *)"
+      "Bash(npx cap *)",
+      "Bash(Get-ChildItem \"C:\\\\Users\\\\dell\\\\Downloads\" -Filter \"google-services*\")",
+      "Bash(Select-Object Name, FullName)",
+      "Read(//c/Users/dell/Downloads/**)",
+      "Bash(cp \"C:/Users/dell/Downloads/google-services.json\" \"c:/Users/dell/Desktop/PPORGAMACION/proyectos de prueva/Gastro Manager/android/app/google-services.json\")"
     ],
     "additionalDirectories": [
-      "c:\\Users\\dell\\Desktop\\PPORGAMACION\\proyectos de prueva\\Gastro Manager\\src\\react-app\\pages"
+      "c:\\Users\\dell\\Desktop\\PPORGAMACION\\proyectos de prueva\\Gastro Manager\\src\\react-app\\pages",
+      "C:\\Users\\dell\\Downloads"
     ]
   }
 }
